@@ -1,0 +1,24 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+
+# Docker
+.docker/
+
+# IDEs
+.vscode/
+.idea/
+
+# Project Specific
+postgres_data/
+
+#Agent
+agent.md
+agent_data/
