@@ -1,0 +1,6 @@
+postgres_data/
+__pycache__/
+.venv/
+.git/
+*.mp4
+*.jpg
