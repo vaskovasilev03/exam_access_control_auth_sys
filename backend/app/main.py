@@ -8,6 +8,7 @@ import pandas as pd
 from .database import init_db, get_db
 from .models import Student, Exam, Admin, ExamRegistration, AccessLog
 from .schemas import StudentCreate, ExamCreate, ExamRegistrationCreate, AccessLogCreate
+from .auth import create_access_token, require_admin
 
 app = FastAPI()
 
@@ -25,10 +26,11 @@ async def enroll_student(
     full_name: str = Form(...),
     student_id_number: str = Form(...),
     email: str = Form(...),
-    department: str = Form(...),
+    faculty: str = Form(...),
+    specialty: str = Form(...),
     course: int = Form(...),
-    stream: str = Form(...),
-    group: str = Form(...),
+    stream: int = Form(...),
+    group: int = Form(...),
     password: str = Form(...),
     file: UploadFile = File(...),
     db: Session = Depends(get_db)
@@ -59,6 +61,16 @@ async def enroll_student(
             
         # Взимаме вектора на първото открито лице
         student_embedding = face_encodings[0].tolist()
+        if student_embedding:
+            duplicate_face = db.query(Student).filter(
+            Student.face_embedding.cosine_distance(student_embedding) < 0.05
+        ).first()
+        
+        if duplicate_face:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Biometric duplicate detected! This face is already registered to student {duplicate_face.full_name} ({duplicate_face.student_id_number})."
+            )
         
         # 3. Хеширане на паролата с bcrypt
         password_bytes = password.encode('utf-8')
@@ -72,7 +84,8 @@ async def enroll_student(
             full_name=full_name,
             student_id_number=student_id_number,
             email=email,
-            department=department,
+            faculty=faculty,
+            specialty=specialty,
             course=course,
             stream=stream.strip(),
             group=group.strip(),
@@ -92,10 +105,11 @@ async def enroll_student(
             "message": f"Student {full_name} enrolled successfully. Profile is pending admin activation.",
             "student_id": new_student.id
         }
-
+    except HTTPException as http_ex:
+        raise http_ex
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Registration failed:{str(e)}")
 
 @app.post("/admins/register")
 def register_admin(
@@ -128,7 +142,8 @@ def register_admin(
 @app.post("/admins/upload-exams")
 async def upload_exams_excel(
     file: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_admin: dict = Depends(require_admin)
 ):
     """
     Приема Excel файл (.xlsx) с колони: subject, room_number, date_time
@@ -194,3 +209,86 @@ async def upload_exams_excel(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to process Excel file: {str(e)}")
+
+
+# --- ЛОГИН ЗА АДМИНИСТРАТОРИ (УЕБ ПОРТАЛ) ---
+@app.post("/admins/login")
+def admin_login(email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
+    # Търсим изрично в таблицата за администратори
+    admin = db.query(Admin).filter(Admin.email == email).first()
+    if not admin:
+        raise HTTPException(status_code=400, detail="Invalid email or password.")
+    
+    password_bytes = password.encode('utf-8')
+    if not bcrypt.checkpw(password_bytes, admin.hashed_password.encode('utf-8')):
+        raise HTTPException(status_code=400, detail="Invalid email or password.")
+    
+    # Издаваме токен с роля admin
+    access_token = create_access_token(data={"user_id": admin.id, "role": "admin"})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+# --- ЛОГИН ЗА СТУДЕНТИ (МОБИЛНО ПРИЛОЖЕНИЕ) ---
+@app.post("/students/login")
+def student_login(email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
+    # Търсим изрично в таблицата за студенти
+    student = db.query(Student).filter(Student.email == email).first()
+    if not student:
+        raise HTTPException(status_code=400, detail="Invalid email or password.")
+    
+    password_bytes = password.encode('utf-8')
+    if not bcrypt.checkpw(password_bytes, student.hashed_password.encode('utf-8')):
+        raise HTTPException(status_code=400, detail="Invalid email or password.")
+    
+    # Изключително важно за Спринт 3 (Хардуера): Студентът трябва да е верифициран от админ, за да влезе!
+    if not student.is_verified:
+        raise HTTPException(status_code=403, detail="Your account is pending admin verification.")
+        
+    # Издаваме токен с роля student
+    access_token = create_access_token(data={"user_id": student.id, "role": "student"})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+@app.post("/admins/execute-allocation")
+def execute_student_allocation(
+    db: Session = Depends(get_db),
+    current_admin: dict = Depends(require_admin)
+):
+    """
+    Задействане на разпределението. 
+    Обхожда всички изпити, разделя групите по запетайка и вкарва съответните студенти в exam_registrations.
+    """
+    all_exams = db.query(Exam).all()
+    total_registrations_created = 0
+    
+    for exam in all_exams:
+        # Разделяме групите от стринга "37, 38" -> ['37', '38']
+        allowed_groups = [g.strip() for g in exam.group.split(",") if g.strip()]
+        
+        # Намираме студентите от този поток и тези групи
+        matching_students = db.query(Student).filter(
+            Student.stream == exam.stream,
+            Student.group.in_(allowed_groups)
+        ).all()
+        
+        for student in matching_students:
+            # Проверяваме дали вече няма съществуващ запис, за да не дублираме
+            exists = db.query(ExamRegistration).filter(
+                ExamRegistration.student_id == student.id,
+                ExamRegistration.exam_id == exam.id
+            ).first()
+            
+            if not exists:
+                new_reg = ExamRegistration(
+                    student_id=student.id,
+                    exam_id=exam.id
+                )
+                db.add(new_reg)
+                total_registrations_created += 1
+                
+    db.commit()
+    return {
+        "status": "success",
+        "message": f"Allocation executed successfully by admin ID {current_admin['user_id']}.",
+        "new_registrations_created": total_registrations_created
+    }

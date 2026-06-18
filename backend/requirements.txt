@@ -6,6 +6,7 @@ python-multipart
 python-dotenv
 httpx
 bcrypt
+pyjwt
 
 # --- Административен панел, Шаблони & Excel Анализ ---
 jinja2

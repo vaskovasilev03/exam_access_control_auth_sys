@@ -29,10 +29,11 @@ class Student(Base):
     full_name = Column(String, nullable=False)
     student_id_number = Column(String, unique=True, index=True, nullable=False) # Факултетен номер
     email = Column(String, unique=True, nullable=False)
-    department = Column(String) # Специалност
-    course = Column(Integer, nullable=False) # Курс
-    stream = Column(String, nullable=False)
-    group = Column(String, nullable=False)
+    faculty = Column(String, nullable=False)
+    specialty = Column(String, nullable=False)
+    course = Column(Integer, nullable=False)
+    stream = Column(Integer, nullable=False)
+    group = Column(Integer, nullable=False)
     
     # Хеширана парола за влизане в мобилното приложение (Flutter)
     hashed_password = Column(String, nullable=False)

@@ -18,6 +18,7 @@ services:
       - "8000:8000"
     environment:
       - DATABASE_URL=${DATABASE_URL}
+      - SECRET_KEY=${SECRET_KEY}
     volumes:
       - ./backend:/code
     depends_on:
