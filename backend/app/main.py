@@ -6,8 +6,8 @@ import bcrypt
 import pandas as pd
 
 from .database import init_db, get_db
-from .models import Student
-from .models import Admin, Exam
+from .models import Student, Exam, Admin, ExamRegistration, AccessLog, Room
+from .schemas import StudentCreate, ExamCreate, ExamRegistrationCreate, AccessLogCreate, RoomCreate, RoomUpdate
 
 app = FastAPI()
 
@@ -26,6 +26,7 @@ async def enroll_student(
     student_id_number: str = Form(...),
     email: str = Form(...),
     department: str = Form(...),
+    course: int = Form(...),
     stream: str = Form(...),
     group: str = Form(...),
     password: str = Form(...),
@@ -72,6 +73,7 @@ async def enroll_student(
             student_id_number=student_id_number,
             email=email,
             department=department,
+            course=course,
             stream=stream.strip(),
             group=group.strip(),
             hashed_password=hashed_password, # Записваме сигурния хеш, НЕ чистата парола
@@ -191,3 +193,31 @@ async def upload_exams_excel(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to process Excel file: {str(e)}")
+
+
+@app.post("/rooms", status_code=201)
+def create_room(room_data: RoomCreate, db: Session = Depends(get_db)):
+    """
+    Бърз ендпоинт за добавяне на университетски зали и техния капацитет.
+    Приема JSON: {"room_number": "Зала 1151", "capacity": 40}
+    """
+    clean_room_number = room_data.room_number.strip()
+    
+    # Проверка дали залата вече съществува
+    existing_room = db.query(Room).filter(Room.room_number == clean_room_number).first()
+    if existing_room:
+        raise HTTPException(status_code=400, detail=f"Room '{clean_room_number}' already exists.")
+    
+    new_room = Room(
+        room_number=clean_room_number,
+        capacity=room_data.capacity
+    )
+    db.add(new_room)
+    db.commit()
+    db.refresh(new_room)
+    
+    return {
+        "status": "success",
+        "message": f"Room {new_room.room_number} with capacity {new_room.capacity} added successfully.",
+        "room_id": new_room.id
+    }

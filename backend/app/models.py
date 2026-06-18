@@ -30,6 +30,7 @@ class Student(Base):
     student_id_number = Column(String, unique=True, index=True, nullable=False) # Факултетен номер
     email = Column(String, unique=True, nullable=False)
     department = Column(String) # Специалност
+    course = Column(Integer, nullable=False) # Курс
     stream = Column(String, nullable=False)
     group = Column(String, nullable=False)
     
@@ -89,3 +90,10 @@ class AccessLog(Base):
     
     student = relationship("Student", back_populates="logs")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class Room(Base):
+    __tablename__ = "rooms"
+
+    id = Column(Integer, primary_key=True, index=True)
+    room_number = Column(String, unique=True, nullable=False)
+    capacity = Column(Integer, nullable=False)
