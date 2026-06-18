@@ -1,11 +1,25 @@
+# --- Основни за FastAPI Бекенда & Сигурност ---
 fastapi
 uvicorn
+pydantic[email]
+python-multipart
+python-dotenv
+httpx
+bcrypt
+
+# --- Административен панел, Шаблони & Excel Анализ ---
+jinja2
+pandas
+openpyxl
+
+# --- База данни & Векторен ORM ---
 sqlalchemy
 psycopg2-binary
+pgvector
+
+# --- Изкуствен Интелект & Компютърно Зрение ---
 face_recognition
 numpy
 opencv-python-headless
 torch --index-url https://download.pytorch.org/whl/cpu
 torchvision --index-url https://download.pytorch.org/whl/cpu
-python-dotenv
-httpx
