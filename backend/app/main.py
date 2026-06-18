@@ -6,8 +6,8 @@ import bcrypt
 import pandas as pd
 
 from .database import init_db, get_db
-from .models import Student, Exam, Admin, ExamRegistration, AccessLog, Room
-from .schemas import StudentCreate, ExamCreate, ExamRegistrationCreate, AccessLogCreate, RoomCreate, RoomUpdate
+from .models import Student, Exam, Admin, ExamRegistration, AccessLog
+from .schemas import StudentCreate, ExamCreate, ExamRegistrationCreate, AccessLogCreate
 
 app = FastAPI()
 
@@ -141,15 +141,15 @@ async def upload_exams_excel(
         contents = await file.read()
         df = pd.read_excel(io.BytesIO(contents))
         
-        required_columns = {"subject", "room_number", "date_time"}
+        required_columns = {"subject", "room_number", "date_time", "lecturer", "stream", "group"}
         if not required_columns.issubset(df.columns):
             raise HTTPException(
                 status_code=400, 
                 detail=f"Excel file must contain these exact columns: {required_columns}"
             )
         
-        exams_added = 0
-        exams_skipped = 0
+        exams_created = 0
+        exams_updated = 0
         
         for index, row in df.iterrows():
             subject_val = str(row['subject']).strip()
@@ -157,67 +157,40 @@ async def upload_exams_excel(
             date_time_val = pd.to_datetime(row['date_time'])
             lecturer_val = str(row['lecturer']).strip()
             stream_val = str(row['stream']).strip()
-            group_val = str(row['group']).strip()
+            raw_groups = str(row['group']).strip()
             
             # Проверяваме дали този изпит ВЕЧЕ съществува
-            duplicate_exists = db.query(Exam).filter(
+            existing_exam = db.query(Exam).filter(
                 Exam.subject == subject_val,
                 Exam.room_number == room_val,
                 Exam.date_time == date_time_val
             ).first()
             
-            if duplicate_exists:
-                exams_skipped += 1
-                continue # Прескачаме този ред и отиваме на следващия
-            
-            # Ако не е дубликат, го създаваме (поддържа изпити по един предмет в различни зали!)
-            new_exam = Exam(
-                subject=subject_val,
-                room_number=room_val,
-                date_time=date_time_val,
-                lecturer=lecturer_val,
-                stream=stream_val,
-                group=group_val
-            )
-            db.add(new_exam)
-            exams_added += 1
-            
+            if existing_exam:
+                existing_exam.group = raw_groups
+                existing_exam.lecturer = lecturer_val
+                existing_exam.stream = stream_val
+                exams_updated += 1
+            else:
+                new_exam = Exam(
+                    subject=subject_val,
+                    room_number=room_val,
+                    date_time=date_time_val,
+                    lecturer=lecturer_val,
+                    stream=stream_val,
+                    group=raw_groups
+                )
+                db.add(new_exam)
+                exams_created += 1
+
         db.commit()
         return {
             "status": "success",
-            "message": f"Excel processing complete.",
-            "imported": exams_added,
-            "skipped_duplicates": exams_skipped
+            "message": "Excel processing complete.",
+            "crated": exams_created,
+            "updated": exams_updated
         }
         
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to process Excel file: {str(e)}")
-
-
-@app.post("/rooms", status_code=201)
-def create_room(room_data: RoomCreate, db: Session = Depends(get_db)):
-    """
-    Бърз ендпоинт за добавяне на университетски зали и техния капацитет.
-    Приема JSON: {"room_number": "Зала 1151", "capacity": 40}
-    """
-    clean_room_number = room_data.room_number.strip()
-    
-    # Проверка дали залата вече съществува
-    existing_room = db.query(Room).filter(Room.room_number == clean_room_number).first()
-    if existing_room:
-        raise HTTPException(status_code=400, detail=f"Room '{clean_room_number}' already exists.")
-    
-    new_room = Room(
-        room_number=clean_room_number,
-        capacity=room_data.capacity
-    )
-    db.add(new_room)
-    db.commit()
-    db.refresh(new_room)
-    
-    return {
-        "status": "success",
-        "message": f"Room {new_room.room_number} with capacity {new_room.capacity} added successfully.",
-        "room_id": new_room.id
-    }

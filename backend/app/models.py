@@ -90,10 +90,3 @@ class AccessLog(Base):
     
     student = relationship("Student", back_populates="logs")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-class Room(Base):
-    __tablename__ = "rooms"
-
-    id = Column(Integer, primary_key=True, index=True)
-    room_number = Column(String, unique=True, nullable=False)
-    capacity = Column(Integer, nullable=False)

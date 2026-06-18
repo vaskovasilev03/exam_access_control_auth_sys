@@ -32,10 +32,3 @@ class AccessLogCreate(BaseModel):
     student_id: int
     location: str
     status: str
-
-class RoomCreate(BaseModel):
-    room_number: str
-    capacity: int
-
-class RoomUpdate(BaseModel):
-    capacity: int
