@@ -10,9 +10,11 @@ print(f"SECRET_KEY: {SECRET_KEY}")  # Debugging line to check if SECRET_KEY is l
 
 security_agent = HTTPBearer()
 
-def create_access_token(data: dict, expires_delta: timedelta = timedelta(days=1)):
+def create_access_token(data: dict, expires_delta: timedelta = timedelta(hours=2)):
     """ Генерира JWT токен с роля и ID """
     to_encode = data.copy()
+    if "sub" in to_encode and not isinstance(to_encode["sub"], str):
+        to_encode["sub"] = str(to_encode["sub"])
     expire = datetime.utcnow() + expires_delta
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
