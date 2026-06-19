@@ -53,10 +53,12 @@ class Student(Base):
     logs = relationship("AccessLog", back_populates="student")
     registrations = relationship("ExamRegistration", back_populates="student")
 
-class ExamType(str, enum.Enum):
-    REGULAR = "regular"       # Редовен изпит
-    REMEDIAL = "remedial"     # Поправка
-    LIQUIDATION = "liquidation" # Ликвидация
+class SessionType(str, enum.Enum):
+    SUMMER = "лятна"
+    WINTER = "зимна"
+    RESIT = "поправителна" 
+    LIQUIDATION = "ликвидационна"
+
 
 class Examiner(Base):
     __tablename__ = "examiners"
@@ -76,13 +78,14 @@ class Exam(Base):
     __tablename__ = "exams"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    session_type = Column(Enum(SessionType), nullable=True, index=True)
     subject = Column(String, nullable=False)
+    lecturer = Column(String, nullable=True)
     room_number = Column(String, nullable=False)
     date_time = Column(DateTime(timezone=True), nullable=False)
-
+    faculty = Column(String, nullable=False, index=True)
     specialty = Column(String, nullable=False, index=True)
-    exam_type = Column(Enum(ExamType), nullable=False, default=ExamType.REGULAR, index=True)
-    lecturer = Column(String, nullable=True)
+    course = Column(Integer, nullable=False)
     stream = Column(String, nullable=False)
     group = Column(String, nullable=False)
 
@@ -120,5 +123,7 @@ class AdminLog(Base):
     admin_id = Column(UUID(as_uuid=True), ForeignKey("admins.id", ondelete="SET NULL"), nullable=True)
     action_type = Column(String, nullable=False) # напр. "STUDENT_IMPORT" или "EXAM_IMPORT"
     details = Column(String, nullable=True)     # напр. "Импортирани 30 студенти за група 37"
+    specialty = Column(String, nullable=True)
+    group = Column(String, nullable=True) 
     notification_sent = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

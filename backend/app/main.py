@@ -14,11 +14,12 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 
 from .database import init_db, get_db
-from .models import Student, Exam, Admin, ExamRegistration, AccessLog, Examiner, AdminLog
+from .models import Student, Exam, Admin, ExamRegistration, AccessLog, Examiner, AdminLog, SessionType
 from .schemas import AdminCreateSchema, ExaminerCreateSchema, StudentEnrollSchema
 from .auth import create_access_token, require_admin
 from .stream import generate_live_frames
 from .storage import init_storage, upload_photo_to_cloud
+from .mailer import send_welcome_email
 
 app = FastAPI()
 
@@ -84,21 +85,13 @@ async def upload_students_excel(
             if exists:
                 continue # Прескачаме дублиращите се студенти, без да чупим целия импорт
 
-            # Създава 10-символен случаен низ, отговарящ на изискванията за сигурност
-            temporary_password = secrets.token_urlsafe(8) + "1A!"
-
-            password_bytes = temporary_password.encode('utf-8')
-            salt = bcrypt.gensalt()
-            hashed_password_bytes = bcrypt.hashpw(password_bytes, salt)
-            
-            hashed_pwd_str = hashed_password_bytes.decode('utf-8')
-
+            lock_password = "LOCKED_UNTIL_EMAIL_SENT"
             # Създаваме новия студент в състояние PENDING
             new_student = Student(
                 full_name=full_name,
                 student_id_number=student_id_number,
                 email=email,
-                hashed_password=hashed_pwd_str,
+                hashed_password="LOCKED_UNTIL_EMAIL_SENT",
                 faculty=faculty,
                 specialty=specialty,
                 course=course,
@@ -112,7 +105,7 @@ async def upload_students_excel(
             # Записваме временно данните, за да може админът да ги види в респонса при желание
             generated_credentials.append({
                 "email": email,
-                "temporary_password": temporary_password
+                "temporary_password": lock_password
             })
 
         if imported_count == 0:
@@ -122,6 +115,8 @@ async def upload_students_excel(
         new_log = AdminLog(
             admin_id=admin.id,
             action_type="STUDENT_IMPORT",
+            specialty=specialty,
+            group=group,
             details=f"Успешен импорт на {imported_count} студенти за специалност {specialty}, група {group}.",
             notification_sent=False
         )
@@ -140,6 +135,61 @@ async def upload_students_excel(
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Грешка при обработка на Excel файла: {str(e)}")
 
+@app.post("/admins/notifications/send/{log_id}")
+def send_bulk_student_emails(log_id: str, db: Session = Depends(get_db)):
+    """
+    Ендпоинт, който изпраща имейл известия до всички студенти от конкретен импорт.
+    След успешно изпращане, флагът notification_sent става True.
+    """
+    # 1. Намираме съответния административен лог
+    log = db.query(AdminLog).filter(AdminLog.id == log_id).first()
+    if not log:
+        raise HTTPException(status_code=404, detail="Log entry not found for the provided ID.")
+    
+    if log.notification_sent:
+        raise HTTPException(status_code=400, detail="Email notifications for this log have already been sent.")
+
+    target_students = db.query(Student).filter(
+        Student.specialty == log.specialty,
+        Student.group == log.group,
+        Student.status == "PENDING",
+        Student.face_embedding == None
+    ).all()
+
+    if not target_students:
+        raise HTTPException(status_code=404, detail="There are no pending students for this specialty and group.")
+
+    success_sent_count = 0
+
+    for student in target_students:
+        # Генерираме нова чиста временна парола за пращането
+        new_temp_password = secrets.token_urlsafe(8) + "1A!"
+        
+        # Хешираме я с чист bcrypt
+        password_bytes = new_temp_password.encode('utf-8')
+        salt = bcrypt.gensalt()
+        hashed_bytes = bcrypt.hashpw(password_bytes, salt)
+        
+        # Обновяваме студента в базата данни
+        student.hashed_password = hashed_bytes.decode('utf-8')
+        
+        # Изпращаме физическия имейл през SMTP
+        email_delivered = send_welcome_email(
+            student_email=student.email,
+            student_name=student.full_name,
+            temp_password=new_temp_password
+        )
+        
+        if email_delivered:
+            success_sent_count += 1
+
+    if success_sent_count > 0:
+        # Обръщаме флага на True в базата данни
+        log.notification_sent = True
+        db.commit()
+        return {"message": f"Успешно изпратени {success_sent_count} имейл известия. Флагът на лога е обновен."}
+    else:
+        raise HTTPException(status_code=500, detail="Грешка при изпращането на имейлите през SMTP сървъра.")
 
 @app.post("/students/enroll")
 async def enroll_student(
@@ -285,74 +335,126 @@ def register_admin(
     return {"status": "success", "message": f"Admin {admin_data.full_name} registered successfully. Waiting for superadmin verification.", "admin_id": new_admin.id}
 
 
-@app.post("/admins/upload-exams")
-async def upload_exams_excel(
+@app.post("/admins/upload/exams")
+async def upload_exams(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_admin: dict = Depends(require_admin)
 ):
     """
-    Приема Excel файл (.xlsx) с колони: subject, room_number, date_time
-    Защитен срещу дублиране на записи при повторно качване.
+    Импортиране на изпити от Excel файл.
+    Очаква колони на български: Сесия, Дисциплина, Преподавател, Дата и Час, Зала, Факултет, Специалност, Курс, Поток, Група
     """
     if not file.filename.endswith(('.xlsx', '.xls')):
         raise HTTPException(status_code=400, detail="Invalid file format. Please upload an Excel file.")
 
-    # Check if the admin is verified before allowing them to upload exams
     admin = db.query(Admin).filter(Admin.id == current_admin['sub']).first()
-    if not admin.is_verified:
-        raise HTTPException(status_code=403, detail="Your admin account is pending verification. Please contact the superadmin.")
     
+    if not admin:
+        raise HTTPException(status_code=404, detail="Admin not found.")
+        
+    if not admin.is_verified:
+        raise HTTPException(status_code=403, detail="Your admin account is not verified.")
+
     try:
         contents = await file.read()
         df = pd.read_excel(io.BytesIO(contents))
         
-        required_columns = {"subject", "room_number", "date_time", "lecturer", "stream", "group"}
+        # Очаквани колони на български
+        required_columns = {
+            "Сесия", "Дисциплина", "Преподавател", "Дата", "Час", 
+            "Зала", "Факултет", "Специалност", "Курс", "Поток", "Група"
+        }
+        
         if not required_columns.issubset(df.columns):
             raise HTTPException(
                 status_code=400, 
-                detail=f"Excel file must contain these exact columns: {required_columns}"
+                detail=f"Excel file must contain exactly the following columns: {list(required_columns)}"
             )
         
         exams_created = 0
         exams_updated = 0
         
+        # 3. Обхождане на изпитите от Ексел
         for index, row in df.iterrows():
-            subject_val = str(row['subject']).strip()
-            room_val = str(row['room_number']).strip()
-            date_time_val = pd.to_datetime(row['date_time'])
-            lecturer_val = str(row['lecturer']).strip()
-            stream_val = str(row['stream']).strip()
-            raw_groups = str(row['group']).strip()
+            raw_session = str(row['Сесия']).strip().lower()
+            allowed_sessions = [e.value for e in SessionType] # ['лятна', 'зимна', 'поправителна', 'ликвидационна']
             
-            # Проверяваме дали този изпит ВЕЧЕ съществува
+            if raw_session not in allowed_sessions:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Error on row {index+2}: Invalid session '{row['Сесия']}'. "
+                           f"Allowed values are: Лятна, Зимна, Поправителна, Ликвидационна."
+                )
+
+            session_type_val = SessionType(raw_session)
+            subject_val = str(row['Дисциплина']).strip()
+            lecturer_val = str(row['Преподавател']).strip()
+            raw_date = str(row['Дата']).split()[0].strip()  # Изчистваме ако pandas е добавил автоматично 00:00:00 към датата
+            raw_time = str(row['Час']).strip()
+            
+            try:
+                combined_str = f"{raw_date} {raw_time}"
+                date_time_val = pd.to_datetime(combined_str)
+            except Exception:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Error on row {index+2}: Invalid format! Please ensure Date is in YYYY-MM-DD format and Time is in HH:MM format."
+                )
+            room_val = str(row['Зала']).strip()
+            faculty_val = str(row['Факултет']).strip()
+            specialty_val = str(row['Специалност']).strip()
+            course_val = int(row['Курс'])
+            stream_val = int(row['Поток'])
+            group_val = str(row['Група']).strip()
+            
+            # Проверка за уникалност по предмет, дата, специалност и група
             existing_exam = db.query(Exam).filter(
                 Exam.subject == subject_val,
-                Exam.room_number == room_val,
-                Exam.date_time == date_time_val
+                Exam.date_time == date_time_val,
+                Exam.group == group_val,
+                Exam.specialty == specialty_val
             ).first()
             
             if existing_exam:
-                existing_exam.group = raw_groups
+                existing_exam.session_type = session_type_val
+                existing_exam.room_number = room_val
                 existing_exam.lecturer = lecturer_val
+                existing_exam.faculty = faculty_val
+                existing_exam.course = course_val
                 existing_exam.stream = stream_val
                 exams_updated += 1
             else:
                 new_exam = Exam(
+                    session_type=session_type_val,
                     subject=subject_val,
-                    room_number=room_val,
-                    date_time=date_time_val,
                     lecturer=lecturer_val,
+                    date_time=date_time_val,
+                    room_number=room_val,
+                    faculty=faculty_val,
+                    specialty=specialty_val,
+                    course=course_val,
                     stream=stream_val,
-                    group=raw_groups
+                    group=group_val
                 )
                 db.add(new_exam)
                 exams_created += 1
 
+        # 4. Запис в лога при промени
+        if exams_created > 0 or exams_updated > 0:
+            new_log = AdminLog(
+                admin_id=admin.id,
+                action_type="EXAM_IMPORT",
+                details=f"Импорт на изпити: Създадени {exams_created}, Обновени {exams_updated}.",
+                notification_sent=True
+            )
+            db.add(new_log)
+
         db.commit()
+        
         return {
             "status": "success",
-            "message": "Excel processing complete.",
+            "message": "Обработката на Excel файла приключи успешно.",
             "created": exams_created,
             "updated": exams_updated
         }
@@ -361,7 +463,7 @@ async def upload_exams_excel(
         raise http_ex
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to process Excel file: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Грешка при обработката на Excel файла: {str(e)}")
 
 @app.post("/admins/examiners/register")
 def create_examiner(examiner_data: ExaminerCreateSchema, db: Session = Depends(get_db), current_admin: dict = Depends(require_admin)):
@@ -423,16 +525,12 @@ def student_login(email: str = Form(...), password: str = Form(...), db: Session
     if not student:
         raise HTTPException(status_code=400, detail="Invalid email or password.")
     
-    if not student.status == "APPROVED":
-        raise HTTPException(status_code=403, detail="Your account is pending admin verification.")
-    
+    if student.hashed_password == "LOCKED_UNTIL_EMAIL_SENT":
+        raise HTTPException(status_code=403, detail="Your account is locked until you receive the email with your temporary password.")
+        
     password_bytes = password.encode('utf-8')
     if not bcrypt.checkpw(password_bytes, student.hashed_password.encode('utf-8')):
         raise HTTPException(status_code=400, detail="Invalid email or password.")
-    
-    # Изключително важно за Спринт 3 (Хардуера): Студентът трябва да е верифициран от админ, за да влезе!
-    if not student.status == "APPROVED":
-        raise HTTPException(status_code=403, detail="Your account is pending admin verification.")
         
     # Издаваме токен с роля student
     access_token = create_access_token(data={"sub": student.id, "role": "student"})
@@ -451,17 +549,21 @@ def execute_student_allocation(
 
     admin = db.query(Admin).filter(Admin.id == current_admin['sub']).first()
     if not admin.is_verified:
-        raise HTTPException(status_code=403, detail="Your admin account is pending verification. Please contact the superadmin.")
+        raise HTTPException(status_code=403, detail="Your admin account is pending verification. Cannot execute allocation.")
 
-    all_exams = db.query(Exam).all()
+    all_exams = db.query(Exam).filter(Exam.session_type.in_([SessionType.SUMMER, SessionType.WINTER])).all()
     total_registrations_created = 0
     
     for exam in all_exams:
         # Разделяме групите от стринга "37, 38" -> ['37', '38']
-        allowed_groups = [g.strip() for g in exam.group.split(",") if g.strip()]
+        allowed_groups = [int(g.strip()) for g in exam.group.split(",") if g.strip().isdigit()]
         
-        # Намираме студентите от този поток и тези групи
+        # Намираме студентите от по факултета, специалността, курса, потока и групите, които са одобрени
         matching_students = db.query(Student).filter(
+            Student.status == "APPROVED",
+            Student.faculty == exam.faculty,
+            Student.specialty == exam.specialty,
+            Student.course == exam.course,
             Student.stream == exam.stream,
             Student.group.in_(allowed_groups)
         ).all()
@@ -480,6 +582,21 @@ def execute_student_allocation(
                 )
                 db.add(new_reg)
                 total_registrations_created += 1
+
+    if total_registrations_created == 0:
+        action_type = "ALLOCATION_EXECUTION_NO_NEW"
+        updated_details = "Няма нови регистрации за изпити. Всички студенти вече са разпределени."
+    else:
+        action_type = "ALLOCATION_EXECUTION"
+        updated_details = f"Успешно разпределение: Брой на новите регистрации: {total_registrations_created}."
+
+    new_log = AdminLog(
+        admin_id=admin.id,
+        action_type=action_type,
+        details=updated_details,
+        notification_sent=True
+    )
+    db.add(new_log)
                 
     db.commit()
     return {
