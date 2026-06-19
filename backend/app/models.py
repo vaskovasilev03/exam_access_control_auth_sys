@@ -112,3 +112,13 @@ class AccessLog(Base):
     
     student = relationship("Student", back_populates="logs")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class AdminLog(Base):
+    __tablename__ = "admin_logs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    admin_id = Column(UUID(as_uuid=True), ForeignKey("admins.id", ondelete="SET NULL"), nullable=True)
+    action_type = Column(String, nullable=False) # напр. "STUDENT_IMPORT" или "EXAM_IMPORT"
+    details = Column(String, nullable=True)     # напр. "Импортирани 30 студенти за група 37"
+    notification_sent = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

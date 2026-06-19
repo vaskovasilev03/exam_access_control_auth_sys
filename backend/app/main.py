@@ -1,5 +1,6 @@
 import os
 import io
+import secrets
 import face_recognition
 import bcrypt
 import time
@@ -13,7 +14,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 
 from .database import init_db, get_db
-from .models import Student, Exam, Admin, ExamRegistration, AccessLog, Examiner
+from .models import Student, Exam, Admin, ExamRegistration, AccessLog, Examiner, AdminLog
 from .schemas import AdminCreateSchema, ExaminerCreateSchema, StudentEnrollSchema
 from .auth import create_access_token, require_admin
 from .stream import generate_live_frames
@@ -29,6 +30,115 @@ def on_startup():
 @app.get("/")
 def read_root():
     return {"status": "AACAS API is running", "database": "Initialized and Connected"}
+
+@app.post("/admins/upload/students")
+async def upload_students_excel(
+    faculty: str = Form(...),
+    specialty: str = Form(...),
+    course: int = Form(...),
+    stream: int = Form(...),
+    group: int = Form(...),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_admin: dict = Depends(require_admin)
+):
+    """
+    Sub-ендпоинт за масово импортиране на студенти от Excel файл.
+    Автоматично генерира временни пароли и записва събитието в admin_logs.
+    """
+    admin = db.query(Admin).filter(Admin.id == current_admin['sub']).first()
+    if not admin:
+        raise HTTPException(status_code=403, detail="Unauthorized access. Admin privileges required.")
+    if not admin.is_verified:
+        raise HTTPException(status_code=403, detail="Account pending verification. Not authorized to upload students.")
+
+    # 1. Валидация на разширението на файла
+    if not file.filename.endswith(('.xlsx', '.xls')):
+        raise HTTPException(status_code=400, detail="Invalid file format. Please upload an Excel file.")
+
+    try:
+        # 2. Прочитане на Excel файла директно от паметта (буфера) без записване на диска
+        contents = await file.read()
+        df = pd.read_excel(io.BytesIO(contents))
+        
+        # Очаквани колони в Ексел файла (Име, Фамилия, Фак. Номер, Имейл)
+        required_columns = ["Име", "Фамилия", "Фак. Номер", "Имейл"]
+        for col in required_columns:
+            if col not in df.columns:
+                raise HTTPException(status_code=400, detail= f"Missing required column in Excel file: '{col}'")
+
+        imported_count = 0
+        generated_credentials = [] # Пазим ги тук локално, ако искаме да ги върнем като респонс за тест
+
+        # 3. Обхождане на редовете от Ексел таблицата
+        for index, row in df.iterrows():
+            full_name = f"{str(row['Име']).strip()} {str(row['Фамилия']).strip()}"
+            student_id_number = str(row['Фак. Номер']).strip()
+            email = str(row['Имейл']).strip()
+
+            # Проверка дали студентът вече съществува по Имейл или Фак. Номер
+            exists = db.query(Student).filter(
+                (Student.email == email) | (Student.student_id_number == student_id_number)
+            ).first()
+
+            if exists:
+                continue # Прескачаме дублиращите се студенти, без да чупим целия импорт
+
+            # Създава 10-символен случаен низ, отговарящ на изискванията за сигурност
+            temporary_password = secrets.token_urlsafe(8) + "1A!"
+
+            password_bytes = temporary_password.encode('utf-8')
+            salt = bcrypt.gensalt()
+            hashed_password_bytes = bcrypt.hashpw(password_bytes, salt)
+            
+            hashed_pwd_str = hashed_password_bytes.decode('utf-8')
+
+            # Създаваме новия студент в състояние PENDING
+            new_student = Student(
+                full_name=full_name,
+                student_id_number=student_id_number,
+                email=email,
+                hashed_password=hashed_pwd_str,
+                faculty=faculty,
+                specialty=specialty,
+                course=course,
+                stream=stream,
+                group=group,
+                status="PENDING" # Очаква мобилно потвърждение и одобрение от админ 
+            )
+            db.add(new_student)
+            imported_count += 1
+            
+            # Записваме временно данните, за да може админът да ги види в респонса при желание
+            generated_credentials.append({
+                "email": email,
+                "temporary_password": temporary_password
+            })
+
+        if imported_count == 0:
+            return {"message": "Няма нови студенти за импортиране от този файл."}
+
+        # 4. СЪЗДАВАНЕ НА ЗАПИС В ADMIN_LOGS С ФЛАГ notification_sent = False 
+        new_log = AdminLog(
+            admin_id=admin.id,
+            action_type="STUDENT_IMPORT",
+            details=f"Успешен импорт на {imported_count} студенти за специалност {specialty}, група {group}.",
+            notification_sent=False
+        )
+        db.add(new_log)
+        
+        db.commit()
+
+        return {
+            "message": f"Успешно импортирани {imported_count} студенти.",
+            "admin_log_id": str(new_log.id),
+            "notification_sent": False,
+            "debug_credentials": generated_credentials # В реална среда ще го премахнем, за сигурност
+        }
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Грешка при обработка на Excel файла: {str(e)}")
 
 
 @app.post("/students/enroll")
