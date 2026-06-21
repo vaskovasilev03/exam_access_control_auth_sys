@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exam Gate: Вход</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        :root {
+            --card: #f5f5f5;
+            --ring: #606060;
+            --input: #e0e0e0;
+            --muted: #d9d9d9;
+            --accent: #c0c0c0;
+            --border: #d0d0d0;
+            --radius: 0.35rem;
+            --popover: #f5f5f5;
+            --primary: #606060;
+            --sidebar: #eaeaea;
+            --font-mono: Fira Code, monospace;
+            --font-sans: Montserrat, sans-serif;
+            --secondary: #e0e0e0;
+            --background: #f0f0f0;
+            --font-serif: Georgia, serif;
+            --foreground: #333333;
+            --destructive: #cc3333;
+            --card-foreground: #333333;
+            --muted-foreground: #666666;
+            --accent-foreground: #333333;
+            --popover-foreground: #333333;
+            --primary-foreground: #ffffff;
+            --secondary-foreground: #333333;
+            --destructive-foreground: #ffffff;
+        }
+
+        body {
+            background: var(--background);
+            color: var(--foreground);
+            font-family: var(--font-sans);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div class="bg-[var(--card)] border border-[var(--border)] p-8 rounded-[var(--radius)] w-full max-w-md shadow-[0_2px_8px_hsl(0_0%_20%/0.12)]">
+        <div class="text-center mb-8">
+            <h2 id="loginTitle" class="text-2xl font-bold text-[var(--primary)] mt-2">Вход в системата</h2>
+            <p id="loginSubtitle" class="text-sm text-[var(--muted-foreground)] mt-1">Изберете роля и влезте в съответния панел</p>
+        </div>
+
+        <form id="loginForm" class="space-y-5">
+            <div>
+                <label class="text-xs text-[var(--muted-foreground)] block uppercase font-bold mb-1 tracking-wider">Роля</label>
+                <select id="role" class="w-full bg-[var(--input)] border border-[var(--border)] rounded-[var(--radius)] px-4 py-3 text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] transition">
+                    <option value="examiner">Квестор</option>
+                    <option value="admin">Администратор</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="text-xs text-[var(--muted-foreground)] block uppercase font-bold mb-1 tracking-wider">Имейл адрес</label>
+                <input type="email" id="email" required class="w-full bg-[var(--input)] border border-[var(--border)] rounded-[var(--radius)] px-4 py-3 text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] transition">
+            </div>
+            
+            <div>
+                <label class="text-xs text-[var(--muted-foreground)] block uppercase font-bold mb-1 tracking-wider">Парола</label>
+                <input type="password" id="password" required class="w-full bg-[var(--input)] border border-[var(--border)] rounded-[var(--radius)] px-4 py-3 text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] transition">
+            </div>
+
+            <div id="roomField">
+                <label class="text-xs text-[var(--muted-foreground)] block uppercase font-bold mb-1 tracking-wider">Номер на зала</label>
+                <input type="text" id="roomNumber" required inputmode="numeric" class="w-full bg-[var(--input)] border border-[var(--border)] rounded-[var(--radius)] px-4 py-3 text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] transition">
+            </div>
+
+            <div id="errorMessage" class="hidden text-sm bg-[var(--destructive)]/15 border border-[var(--destructive)] text-[var(--destructive)] p-3 rounded-[var(--radius)] text-center font-semibold"></div>
+
+            <button type="submit" class="w-full bg-[var(--primary)] hover:opacity-90 text-[var(--primary-foreground)] font-bold py-3 px-4 rounded-[var(--radius)] shadow-[0_2px_8px_hsl(0_0%_20%/0.12)] transition transform active:scale-95 cursor-pointer mt-2">
+                Влез в системата
+            </button>
+        </form>
+    </div>
+
+    <script>
+        const defaultRole = "{{ default_role|default('examiner') }}";
+        const roleSelect = document.getElementById("role");
+        const roomField = document.getElementById("roomField");
+        const roomInput = document.getElementById("roomNumber");
+        const loginTitle = document.getElementById("loginTitle");
+        const loginSubtitle = document.getElementById("loginSubtitle");
+
+        function syncRoleUi() {
+            const role = roleSelect.value;
+
+            if (role === "admin") {
+                loginTitle.innerText = "Вход за администратори";
+                loginSubtitle.innerText = "Достъп до администраторския панел";
+                roomField.classList.add("hidden");
+                roomInput.required = false;
+            } else {
+                loginTitle.innerText = "Вход за квестори";
+                loginSubtitle.innerText = "Система за биометричен контрол на изпити";
+                roomField.classList.remove("hidden");
+                roomInput.required = true;
+            }
+        }
+
+        roleSelect.value = defaultRole;
+        syncRoleUi();
+
+        roleSelect.addEventListener("change", syncRoleUi);
+
+        document.getElementById("loginForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const errorDiv = document.getElementById("errorMessage");
+            errorDiv.classList.add("hidden");
+            const role = roleSelect.value;
+
+            // Използваме URLSearchParams, защото и двата login ендпоинта очакват form data
+            const formData = new URLSearchParams();
+            formData.append("email", document.getElementById("email").value);
+            formData.append("password", document.getElementById("password").value);
+
+            try {
+                const loginUrl = role === "admin" ? "/admins/login" : "/examiners/login";
+                const response = await fetch(loginUrl, {
+                    method: "POST",
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    if (role === "admin") {
+                        localStorage.setItem("admin_token", data.access_token);
+                        window.location.href = window.location.origin + "/admins/dashboard";
+                    } else {
+                        localStorage.setItem("examiner_token", data.access_token);
+
+                        const roomNumber = roomInput.value.trim();
+                        if (!roomNumber) {
+                            errorDiv.innerText = "Моля, въведете номер на зала.";
+                            errorDiv.classList.remove("hidden");
+                            return;
+                        }
+
+                        // Пренасочваме квестора към монитора на избраната от него зала
+                        window.location.href = window.location.origin + `/api/v1/exams/${encodeURIComponent(roomNumber)}/monitor`;
+                    }
+                } else {
+                    errorDiv.innerText = data.detail || "Грешка при вход в системата.";
+                    errorDiv.classList.remove("hidden");
+                }
+            } catch (err) {
+                errorDiv.innerText = "Няма връзка с бекенд сървъра.";
+                errorDiv.classList.remove("hidden");
+            }
+        });
+    </script>
+</body>
+</html>

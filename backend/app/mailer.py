@@ -1,5 +1,6 @@
 import os
 import smtplib
+from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
@@ -8,7 +9,7 @@ SMTP_PORT = int(os.environ.get("SMTP_PORT", 587))
 SMTP_USER = os.environ.get("SMTP_USER", "")
 SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
 
-def send_welcome_email(student_email: str, student_name: str, temp_password: str):
+def send_welcome_email(student_email: str, student_fac_num: str, student_name: str, temp_password: str):
     """ Изпраща HTML имейл до студента с неговата временна парола """
     if not SMTP_USER or not SMTP_PASSWORD:
         print("Настройките за SMTP не са конфигурирани. Имейлът не е изпратен.")
@@ -30,7 +31,7 @@ def send_welcome_email(student_email: str, student_name: str, temp_password: str
           
           <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #0056b3; margin: 20px 0;">
             <p style="margin: 0;"><strong>Вашите временни данни за достъп до мобилното приложение:</strong></p>
-            <p style="margin: 5px 0;"><strong>Имейл:</strong> {student_email}</p>
+            <p style="margin: 5px 0;"><strong>Факултетен номер:</strong> {student_fac_num}</p>
             <p style="margin: 5px 0;"><strong>Временна парола:</strong> <span style="font-family: monospace; font-size: 16px; background: #e9ecef; padding: 2px 6px; border-radius: 3px;">{temp_password}</span></p>
           </div>
           
@@ -54,4 +55,63 @@ def send_welcome_email(student_email: str, student_name: str, temp_password: str
         return True
     except Exception as e:
         print(f"Грешка при изпращане на имейл до {student_email}: {e}")
+        return False
+
+
+def send_allocation_email(student_email: str, student_name: str, exams: list[dict]):
+    """Изпраща имейл с потвърждение за изпитни регистрации."""
+    if not SMTP_USER or not SMTP_PASSWORD:
+        print("Настройките за SMTP не са конфигурирани. Имейлът не е изпратен.")
+        return False
+
+    if not exams:
+        return False
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = "Потвърждение за изпитна регистрация"
+    msg["From"] = SMTP_USER
+    msg["To"] = student_email
+
+    rows = []
+    for exam in exams:
+        rows.append(
+            f"<tr><td style='padding:8px 10px;border-bottom:1px solid #e5e5e5;'>{exam['subject']}</td>"
+            f"<td style='padding:8px 10px;border-bottom:1px solid #e5e5e5;'>{exam['room_number']}</td>"
+            f"<td style='padding:8px 10px;border-bottom:1px solid #e5e5e5;'>{exam['date_time']}</td></tr>"
+        )
+
+    html = f"""
+    <html>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 640px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 5px;">
+          <h2 style="color: #0056b3; text-align: center;">Потвърждение за изпитна регистрация</h2>
+          <p>Здравейте, <strong>{student_name}</strong>,</p>
+          <p>Системата успешно ви регистрира за следните изпити:</p>
+          <table style="width: 100%; border-collapse: collapse; margin: 18px 0;">
+            <thead>
+              <tr>
+                <th style="text-align: left; padding: 8px 10px; border-bottom: 2px solid #0056b3;">Дисциплина</th>
+                <th style="text-align: left; padding: 8px 10px; border-bottom: 2px solid #0056b3;">Зала</th>
+                <th style="text-align: left; padding: 8px 10px; border-bottom: 2px solid #0056b3;">Дата и час</th>
+              </tr>
+            </thead>
+            <tbody>
+              {''.join(rows)}
+            </tbody>
+          </table>
+        </div>
+      </body>
+    </html>
+    """
+
+    msg.attach(MIMEText(html, "html", "utf-8"))
+
+    try:
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+            server.starttls()
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            server.sendmail(SMTP_USER, student_email, msg.as_string())
+        return True
+    except Exception as e:
+        print(f"Грешка при изпращане на изпитен имейл до {student_email}: {e}")
         return False

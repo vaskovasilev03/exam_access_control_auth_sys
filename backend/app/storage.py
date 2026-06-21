@@ -44,3 +44,12 @@ def upload_photo_to_cloud(file_data, object_name: str, content_type: str) -> str
     except Exception as e:
         print(f"Error uploading to MinIO: {e}")
         raise e
+
+def get_photo_from_cloud(object_name: str) -> bytes:
+    """ Сваля файл от MinIO и връща неговите чисти байтове """
+    try:
+        response = s3_client.get_object(Bucket=BUCKET_NAME, Key=object_name)
+        return response['Body'].read()
+    except Exception as e:
+        print(f"Error fetching from MinIO ({object_name}): {e}")
+        raise e

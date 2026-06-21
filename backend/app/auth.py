@@ -1,5 +1,6 @@
 import os
 import jwt
+import bcrypt
 from datetime import datetime, timedelta
 from fastapi import HTTPException, Security, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -35,3 +36,11 @@ def require_admin(current_user: dict = Depends(get_current_user)):
     if current_user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Permission denied. Admins only.")
     return current_user
+
+def get_password_hash(password: str) -> str:
+    """ Генерира сигурен Bcrypt хеш за новата парола """
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))

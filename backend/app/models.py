@@ -44,7 +44,8 @@ class Student(Base):
     # 128-измерният биометричен вектор от face_recognition
     face_embedding = Column(Vector(128), nullable=True) 
 
-    status = Column(String, default="PENDING") # PENDING, APPROVED, REJECTED
+    status = Column(String, default="PENDING") # PENDING, APPROVED, PENDING_APPROVAL, REJECTED
+    must_change_password = Column(Boolean, default=True, nullable=False)
     photo_path = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)      # Активен/Прекъснал
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -88,6 +89,7 @@ class Exam(Base):
     course = Column(Integer, nullable=False)
     stream = Column(String, nullable=False)
     group = Column(String, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     registrations = relationship("ExamRegistration", back_populates="exam")
 

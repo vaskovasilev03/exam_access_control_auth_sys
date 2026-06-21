@@ -1,6 +1,10 @@
 import os
 import io
+import json
+import mimetypes
+import asyncio
 import secrets
+import jwt
 import face_recognition
 import bcrypt
 import time
@@ -8,20 +12,151 @@ import cv2
 import numpy as np
 import requests
 import pandas as pd
-from fastapi import FastAPI, Depends, File, UploadFile, HTTPException, Form, APIRouter
-from fastapi.responses import StreamingResponse
+import fastapi
+from fastapi import FastAPI, Depends, Response, File, UploadFile, HTTPException, Form, APIRouter, BackgroundTasks, Query, Body
+from fastapi.responses import StreamingResponse, HTMLResponse, RedirectResponse
+from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timedelta
+from pydantic import ValidationError
+from typing import Optional
+from zoneinfo import ZoneInfo
 
 from .database import init_db, get_db
 from .models import Student, Exam, Admin, ExamRegistration, AccessLog, Examiner, AdminLog, SessionType
-from .schemas import AdminCreateSchema, ExaminerCreateSchema, StudentEnrollSchema
-from .auth import create_access_token, require_admin
-from .stream import generate_live_frames
-from .storage import init_storage, upload_photo_to_cloud
-from .mailer import send_welcome_email
+from .schemas import AdminCreateSchema, ExaminerCreateSchema, StudentEnrollSchema, ExamUploadValidationSchema, StudentLoginSchema, StudentLoginResponseSchema, ChangePasswordSchema, CameraRegisterSchema
+from .auth import create_access_token, get_current_user, require_admin, verify_password, get_password_hash, SECRET_KEY, ALGORITHM
+from .stream_esp32 import generate_from_memory, fetch_frames_from_esp32, ACTIVE_CAMERAS, CAMERA_TASKS, AI_ROOM_STATES
+from .storage import init_storage, upload_photo_to_cloud, get_photo_from_cloud, BUCKET_NAME
+from .mailer import send_welcome_email, send_allocation_email
 
 app = FastAPI()
+templates = Jinja2Templates(directory="app/templates")
+timezone = ZoneInfo("Europe/Sofia")
+
+
+def _parse_admin_log_details(details: Optional[str]) -> dict:
+    if not details:
+        return {}
+    try:
+        parsed = json.loads(details)
+        if isinstance(parsed, dict):
+            return parsed
+    except Exception:
+        pass
+    return {"raw": details}
+
+
+def _student_payload(student: Student) -> dict:
+    return {
+        "id": str(student.id),
+        "full_name": student.full_name,
+        "student_id_number": student.student_id_number,
+        "email": student.email,
+        "faculty": student.faculty,
+        "specialty": student.specialty,
+        "course": student.course,
+        "stream": student.stream,
+        "group": student.group,
+        "status": student.status,
+        "photo_path": student.photo_path,
+        "photo_url": f"/admins/students/{student.id}/photo" if student.photo_path else None,
+        "created_at": student.created_at.isoformat() if student.created_at else None,
+    }
+
+
+def _exam_payload(exam: Exam) -> dict:
+    return {
+        "id": str(exam.id),
+        "session_type": exam.session_type.value if exam.session_type else None,
+        "subject": exam.subject,
+        "lecturer": exam.lecturer,
+        "room_number": exam.room_number,
+        "date_time": exam.date_time.isoformat() if exam.date_time else None,
+        "faculty": exam.faculty,
+        "specialty": exam.specialty,
+        "course": exam.course,
+        "stream": exam.stream,
+        "group": exam.group,
+    }
+
+
+def _admin_log_payload(log: AdminLog) -> dict:
+    parsed_details = _parse_admin_log_details(log.details)
+    return {
+        "id": str(log.id),
+        "action_type": log.action_type,
+        "details": log.details,
+        "parsed_details": parsed_details,
+        "specialty": log.specialty,
+        "group": log.group,
+        "notification_sent": log.notification_sent,
+        "created_at": log.created_at.isoformat() if log.created_at else None,
+        "student_ids": parsed_details.get("student_ids", []),
+        "exam_ids": parsed_details.get("exam_ids", []),
+    }
+
+
+def _resolve_log_students(db: Session, log: AdminLog, selected_student_ids: Optional[list[str]] = None) -> list[Student]:
+    parsed_details = _parse_admin_log_details(log.details)
+    
+    if log.action_type == "STUDENT_IMPORT":
+        # ⚡ Безопасно преобразуваме стринга от лога към Integer
+        group_int = None
+        if log.group:
+            try:
+                group_int = int(float(log.group))
+            except ValueError:
+                pass
+
+        # Филтрираме по специалност
+        query = db.query(Student).filter(Student.specialty == log.specialty)
+        
+        # Ако преобразуването е успешно, филтрираме по група
+        if group_int is not None:
+            query = query.filter(Student.group == group_int)
+        else:
+            query = query.filter(Student.group == log.group)
+
+        if selected_student_ids:
+            query = query.filter(Student.id.in_(selected_student_ids))
+            
+        return query.order_by(Student.created_at.asc()).all()
+
+    if log.action_type.startswith("ALLOCATION_EXECUTION"):
+        exam_ids = parsed_details.get("exam_ids", [])
+        query = db.query(Student).join(ExamRegistration, ExamRegistration.student_id == Student.id).filter(
+            ExamRegistration.exam_id.in_(exam_ids)
+        )
+        if selected_student_ids:
+            query = query.filter(Student.id.in_(selected_student_ids))
+        return query.distinct().order_by(Student.created_at.asc()).all()
+
+    return []
+
+
+def _resolve_log_exams(db: Session, log: AdminLog) -> list[Exam]:
+    parsed_details = _parse_admin_log_details(log.details)
+    
+    if log.action_type == "EXAM_IMPORT":
+        start_window = log.created_at - timedelta(seconds=10)
+        end_window = log.created_at + timedelta(seconds=10)
+        
+        return db.query(Exam).filter(
+            Exam.created_at >= start_window,
+            Exam.created_at <= end_window
+        ).order_by(Exam.date_time.asc()).all()
+        
+    exam_ids = parsed_details.get("exam_ids", [])
+    if not exam_ids:
+        return []
+    return db.query(Exam).filter(Exam.id.in_(exam_ids)).order_by(Exam.date_time.asc()).all()
+
+
+def _photo_url_for_student(student: Student) -> Optional[str]:
+    if not student.photo_path:
+        return None
+    return f"/admins/students/{student.id}/photo"
 
 @app.on_event("startup")
 def on_startup():
@@ -97,7 +232,7 @@ async def upload_students_excel(
                 course=course,
                 stream=stream,
                 group=group,
-                status="PENDING" # Очаква мобилно потвърждение и одобрение от админ 
+                status="PENDING" 
             )
             db.add(new_student)
             imported_count += 1
@@ -136,60 +271,81 @@ async def upload_students_excel(
         raise HTTPException(status_code=500, detail=f"Грешка при обработка на Excel файла: {str(e)}")
 
 @app.post("/admins/notifications/send/{log_id}")
-def send_bulk_student_emails(log_id: str, db: Session = Depends(get_db)):
-    """
-    Ендпоинт, който изпраща имейл известия до всички студенти от конкретен импорт.
-    След успешно изпращане, флагът notification_sent става True.
-    """
-    # 1. Намираме съответния административен лог
+def send_bulk_student_emails(log_id: str, payload: dict | None = Body(default=None), db: Session = Depends(get_db), current_admin: dict = Depends(require_admin)):
+    """Изпраща известия за студентски импорт или изпитни регистрации."""
+    admin = db.query(Admin).filter(Admin.id == current_admin['sub']).first()
+    if not admin or not admin.is_verified:
+        raise HTTPException(status_code=403, detail="Unauthorized access. Admin privileges required.")
+
     log = db.query(AdminLog).filter(AdminLog.id == log_id).first()
     if not log:
         raise HTTPException(status_code=404, detail="Log entry not found for the provided ID.")
-    
-    if log.notification_sent:
-        raise HTTPException(status_code=400, detail="Email notifications for this log have already been sent.")
 
-    target_students = db.query(Student).filter(
-        Student.specialty == log.specialty,
-        Student.group == log.group,
-        Student.status == "PENDING",
-        Student.face_embedding == None
-    ).all()
+    selected_student_ids = []
+    if isinstance(payload, dict):
+        selected_student_ids = payload.get("student_ids") or []
 
+    all_log_students = _resolve_log_students(db, log)
+    target_students = _resolve_log_students(db, log, selected_student_ids or None)
     if not target_students:
-        raise HTTPException(status_code=404, detail="There are no pending students for this specialty and group.")
+        raise HTTPException(status_code=404, detail="There are no matching students for this log entry.")
 
     success_sent_count = 0
-
     for student in target_students:
-        # Генерираме нова чиста временна парола за пращането
-        new_temp_password = secrets.token_urlsafe(8) + "1A!"
-        
-        # Хешираме я с чист bcrypt
-        password_bytes = new_temp_password.encode('utf-8')
-        salt = bcrypt.gensalt()
-        hashed_bytes = bcrypt.hashpw(password_bytes, salt)
-        
-        # Обновяваме студента в базата данни
-        student.hashed_password = hashed_bytes.decode('utf-8')
-        
-        # Изпращаме физическия имейл през SMTP
-        email_delivered = send_welcome_email(
-            student_email=student.email,
-            student_name=student.full_name,
-            temp_password=new_temp_password
-        )
-        
-        if email_delivered:
-            success_sent_count += 1
+        if log.action_type == "STUDENT_IMPORT":
+            new_temp_password = secrets.token_urlsafe(8) + "1A!"
+            password_bytes = new_temp_password.encode('utf-8')
+            hashed_bytes = bcrypt.hashpw(password_bytes, bcrypt.gensalt())
+            student.hashed_password = hashed_bytes.decode('utf-8')
+            email_delivered = send_welcome_email(
+                student_email=student.email,
+                student_fac_num=student.student_id_number,
+                student_name=student.full_name,
+                temp_password=new_temp_password
+            )
+            if email_delivered:
+                student.must_change_password = True
+                success_sent_count += 1
+            continue
 
-    if success_sent_count > 0:
-        # Обръщаме флага на True в базата данни
-        log.notification_sent = True
-        db.commit()
-        return {"message": f"Успешно изпратени {success_sent_count} имейл известия. Флагът на лога е обновен."}
-    else:
+        if log.action_type.startswith("ALLOCATION_EXECUTION"):
+            exams = []
+            for exam in _resolve_log_exams(db, log):
+                exists = db.query(ExamRegistration).filter(
+                    ExamRegistration.student_id == student.id,
+                    ExamRegistration.exam_id == exam.id
+                ).first()
+                if exists:
+                    exams.append({
+                        "subject": exam.subject,
+                        "room_number": exam.room_number,
+                        "date_time": exam.date_time.astimezone(timezone).strftime("%d.%m.%Y %H:%M") if exam.date_time else "",
+                    })
+
+            if not exams:
+                continue
+
+            email_delivered = send_allocation_email(
+                student_email=student.email,
+                student_name=student.full_name,
+                exams=exams,
+            )
+            if email_delivered:
+                success_sent_count += 1
+
+    if success_sent_count == 0:
         raise HTTPException(status_code=500, detail="Грешка при изпращането на имейлите през SMTP сървъра.")
+
+    selected_set = set(selected_student_ids)
+    all_ids = {str(student.id) for student in all_log_students}
+
+    if log.action_type == "STUDENT_IMPORT" and (not selected_student_ids or selected_set == all_ids):
+        log.notification_sent = True
+    elif log.action_type.startswith("ALLOCATION_EXECUTION") and (not selected_student_ids or selected_set == all_ids):
+        log.notification_sent = True
+
+    db.commit()
+    return {"message": f"Успешно изпратени {success_sent_count} имейл известия."}
 
 @app.post("/students/enroll")
 async def enroll_student(
@@ -334,6 +490,122 @@ def register_admin(
     
     return {"status": "success", "message": f"Admin {admin_data.full_name} registered successfully. Waiting for superadmin verification.", "admin_id": new_admin.id}
 
+@app.get("/admins/dashboard", response_class=HTMLResponse)
+def get_admin_dashboard_page(request: fastapi.Request, response: Response):
+    """ Връща HTML страницата за Администраторския контролен панел """
+    admin_token = request.cookies.get("admin_token")
+    if not admin_token:
+        return RedirectResponse(url="/admins/login-view", status_code=302)
+
+    try:
+        payload = jwt.decode(admin_token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("role") != "admin":
+            return RedirectResponse(url="/admins/login-view", status_code=302)
+    except Exception:
+        return RedirectResponse(url="/admins/login-view", status_code=302)
+
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return templates.TemplateResponse(
+        request=request, 
+        name="admin_dashboard.html", 
+        context={}
+    )
+
+
+@app.get("/admins/dashboard-data")
+def get_admin_dashboard_data(db: Session = Depends(get_db), current_admin: dict = Depends(require_admin)):
+    admin = db.query(Admin).filter(Admin.id == current_admin['sub']).first()
+    if not admin or not admin.is_verified:
+        raise HTTPException(status_code=403, detail="Unauthorized access. Admin privileges required.")
+
+    student_import_logs = db.query(AdminLog).filter(AdminLog.action_type == "STUDENT_IMPORT").order_by(AdminLog.created_at.desc()).all()
+    exam_import_logs = db.query(AdminLog).filter(AdminLog.action_type == "EXAM_IMPORT").order_by(AdminLog.created_at.desc()).all()
+    allocation_logs = db.query(AdminLog).filter(AdminLog.action_type.in_(["ALLOCATION_EXECUTION", "ALLOCATION_EXECUTION_NO_NEW"])).order_by(AdminLog.created_at.desc()).all()
+    pending_students = db.query(Student).filter(Student.status == "PENDING_APPROVAL").order_by(Student.created_at.asc()).all()
+    examiners = db.query(Examiner).order_by(Examiner.created_at.desc()).all()
+    exams = db.query(Exam).order_by(Exam.date_time.asc()).all()
+
+    return {
+        "counts": {
+            "student_import_logs": len(student_import_logs),
+            "exam_import_logs": len(exam_import_logs),
+            "allocation_logs": len(allocation_logs),
+            "pending_students": len(pending_students),
+            "examiners": len(examiners),
+            "exams": len(exams),
+        },
+        "student_import_logs": [
+            {
+                **_admin_log_payload(log),
+                "students": [
+                    {
+                        **_student_payload(student),
+                        "photo_url": _photo_url_for_student(student),
+                    }
+                    for student in _resolve_log_students(db, log)
+                ],
+            }
+            for log in student_import_logs
+        ],
+        "exam_import_logs": [
+            {
+                **_admin_log_payload(log),
+                "exams": [_exam_payload(exam) for exam in _resolve_log_exams(db, log)],
+            }
+            for log in exam_import_logs
+        ],
+        "allocation_logs": [
+            {
+                **_admin_log_payload(log),
+                "exams": [_exam_payload(exam) for exam in _resolve_log_exams(db, log)],
+                "students": [_student_payload(student) for student in _resolve_log_students(db, log)],
+            }
+            for log in allocation_logs
+        ],
+        "pending_students": [
+            {
+                **_student_payload(student),
+                "photo_url": _photo_url_for_student(student),
+            }
+            for student in pending_students
+        ],
+        "examiners": [
+            {
+                "id": str(examiner.id),
+                "full_name": examiner.full_name,
+                "email": examiner.email,
+                "is_verified": examiner.is_verified,
+                "created_at": examiner.created_at.isoformat() if examiner.created_at else None,
+            }
+            for examiner in examiners
+        ],
+        "exams": [_exam_payload(exam) for exam in exams],
+    }
+
+
+@app.get("/admins/students/{student_id}/photo")
+def get_student_photo(student_id: str, token: str = Query(...), db: Session = Depends(get_db)):
+
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("role") != "admin":
+            raise HTTPException(status_code=403, detail="Достъпът е отказан. Изискват се админ права.")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Невалиден или изтекъл администраторски токен.")
+
+    student = db.query(Student).filter(Student.id == student_id).first()
+    if not student or not student.photo_path:
+        raise HTTPException(status_code=404, detail="Student photo not found.")
+
+    prefix = f"/{BUCKET_NAME}/"
+    if student.photo_path.startswith(prefix):
+        object_name = student.photo_path[len(prefix):]
+    else:
+        object_name = student.photo_path.lstrip("/")
+
+    file_data = get_photo_from_cloud(object_name)
+    content_type, _ = mimetypes.guess_type(object_name)
+    return StreamingResponse(io.BytesIO(file_data), media_type=content_type or "image/jpeg")
 
 @app.post("/admins/upload/exams")
 async def upload_exams(
@@ -377,65 +649,56 @@ async def upload_exams(
         
         # 3. Обхождане на изпитите от Ексел
         for index, row in df.iterrows():
-            raw_session = str(row['Сесия']).strip().lower()
-            allowed_sessions = [e.value for e in SessionType] # ['лятна', 'зимна', 'поправителна', 'ликвидационна']
-            
-            if raw_session not in allowed_sessions:
+            try:
+                row_dict = row.to_dict()
+                validated_data = ExamUploadValidationSchema(**row_dict)
+            except ValidationError as val_err:
+                # Взимаме първата грешка и я връщаме с точния ред от Excel
+                error_msg = val_err.errors()[0]['msg']
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Error on row {index+2}: Invalid session '{row['Сесия']}'. "
-                           f"Allowed values are: Лятна, Зимна, Поправителна, Ликвидационна."
+                    detail=f"Грешка на ред {index + 2}: {error_msg}"
                 )
 
-            session_type_val = SessionType(raw_session)
-            subject_val = str(row['Дисциплина']).strip()
-            lecturer_val = str(row['Преподавател']).strip()
-            raw_date = str(row['Дата']).split()[0].strip()  # Изчистваме ако pandas е добавил автоматично 00:00:00 към датата
-            raw_time = str(row['Час']).strip()
-            
-            try:
-                combined_str = f"{raw_date} {raw_time}"
-                date_time_val = pd.to_datetime(combined_str)
-            except Exception:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Error on row {index+2}: Invalid format! Please ensure Date is in YYYY-MM-DD format and Time is in HH:MM format."
-                )
-            room_val = str(row['Зала']).strip()
-            faculty_val = str(row['Факултет']).strip()
-            specialty_val = str(row['Специалност']).strip()
-            course_val = int(row['Курс'])
-            stream_val = int(row['Поток'])
-            group_val = str(row['Група']).strip()
-            
-            # Проверка за уникалност по предмет, дата, специалност и група
+            # Софтуерно обединяване на дата и час (след като знаем, че са чисти)
+            raw_date = str(validated_data.date_raw).split()[0].strip()
+            raw_time = validated_data.time_raw.strip()
+            date_time_val = pd.to_datetime(f"{raw_date} {raw_time}")
+            if date_time_val.tzinfo is None:
+                date_time_val = date_time_val.tz_localize(timezone)
+            else:
+                date_time_val = date_time_val.tz_convert(timezone)
+            date_time_val = date_time_val.to_pydatetime()
+
+            # Проверка за уникалност
             existing_exam = db.query(Exam).filter(
-                Exam.subject == subject_val,
+                Exam.subject == validated_data.subject.strip(),
                 Exam.date_time == date_time_val,
-                Exam.group == group_val,
-                Exam.specialty == specialty_val
+                Exam.room_number == validated_data.room_number.strip(),
+                Exam.specialty == validated_data.specialty.strip()
             ).first()
             
             if existing_exam:
-                existing_exam.session_type = session_type_val
-                existing_exam.room_number = room_val
-                existing_exam.lecturer = lecturer_val
-                existing_exam.faculty = faculty_val
-                existing_exam.course = course_val
-                existing_exam.stream = stream_val
+                existing_exam.session_type = validated_data.session_type
+                existing_exam.group = validated_data.group
+                existing_exam.lecturer = validated_data.lecturer.strip()
+                existing_exam.faculty = validated_data.faculty.strip()
+                existing_exam.course = validated_data.course
+                existing_exam.stream = validated_data.stream
+                existing_exam.created_at = func.now()
                 exams_updated += 1
             else:
                 new_exam = Exam(
-                    session_type=session_type_val,
-                    subject=subject_val,
-                    lecturer=lecturer_val,
+                    session_type=validated_data.session_type,
+                    subject=validated_data.subject.strip(),
+                    lecturer=validated_data.lecturer.strip(),
                     date_time=date_time_val,
-                    room_number=room_val,
-                    faculty=faculty_val,
-                    specialty=specialty_val,
-                    course=course_val,
-                    stream=stream_val,
-                    group=group_val
+                    room_number=validated_data.room_number.strip(),
+                    faculty=validated_data.faculty.strip(),
+                    specialty=validated_data.specialty.strip(),
+                    course=validated_data.course,
+                    stream=validated_data.stream,
+                    group=validated_data.group
                 )
                 db.add(new_exam)
                 exams_created += 1
@@ -497,9 +760,13 @@ def create_examiner(examiner_data: ExaminerCreateSchema, db: Session = Depends(g
         "examiner_id": str(new_examiner.id)
     }
 
-# --- ЛОГИН ЗА АДМИНИСТРАТОРИ (УЕБ ПОРТАЛ) ---
 @app.post("/admins/login")
-def admin_login(email: str, password: str, db: Session = Depends(get_db)):
+def admin_login(
+    response: Response,
+    email: str = Form(...),
+    password: str = Form(...),
+    db: Session = Depends(get_db)
+):
     # Търсим изрично в таблицата за администратори
     admin = db.query(Admin).filter(Admin.email == email).first()
     if not admin:
@@ -514,31 +781,158 @@ def admin_login(email: str, password: str, db: Session = Depends(get_db)):
     
     # Издаваме токен с роля admin
     access_token = create_access_token(data={"sub": admin.id, "role": "admin"})
+    response.set_cookie(
+        key="admin_token",
+        value=access_token,
+        max_age=60 * 60 * 2,
+        httponly=False,
+        samesite="lax",
+        secure=False,
+        path="/"
+    )
     return {"access_token": access_token, "token_type": "bearer"}
 
-
-# --- ЛОГИН ЗА СТУДЕНТИ (МОБИЛНО ПРИЛОЖЕНИЕ) ---
-@app.post("/students/login")
-def student_login(email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
-    # Търсим изрично в таблицата за студенти
-    student = db.query(Student).filter(Student.email == email).first()
-    if not student:
+@app.post("/examiners/login")
+def examiner_login(email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
+    """ Ендпоинт за автентикация на квестори и издаване на JWT токен """
+    examiner = db.query(Examiner).filter(Examiner.email == email.strip()).first()
+    if not examiner:
         raise HTTPException(status_code=400, detail="Invalid email or password.")
     
-    if student.hashed_password == "LOCKED_UNTIL_EMAIL_SENT":
-        raise HTTPException(status_code=403, detail="Your account is locked until you receive the email with your temporary password.")
-        
-    password_bytes = password.encode('utf-8')
-    if not bcrypt.checkpw(password_bytes, student.hashed_password.encode('utf-8')):
+    # Проверка на паролата чрез Bcrypt от auth.py
+    if not verify_password(password, examiner.hashed_password):
         raise HTTPException(status_code=400, detail="Invalid email or password.")
-        
-    # Издаваме токен с роля student
-    access_token = create_access_token(data={"sub": student.id, "role": "student"})
-    return {"access_token": access_token, "token_type": "bearer"}
 
+    # Издаваме токен със sub (ID) и роля examiner
+    access_token = create_access_token(data={"sub": str(examiner.id), "role": "examiner"})
+    return {"access_token": access_token, "token_type": "bearer", "full_name": examiner.full_name}
+
+@app.get("/examiners/login-view", response_class=HTMLResponse)
+def get_examiner_login_page(request: fastapi.Request):
+    """ Връща HTML страницата за вход на квестори """
+    return templates.TemplateResponse(
+        request=request, 
+        name="login.html", 
+        context={"default_role": "examiner"}
+    )
+
+@app.get("/admins/login-view", response_class=HTMLResponse)
+def get_admin_login_page(request: fastapi.Request):
+    """ Връща HTML страницата за вход на администратори """
+    return templates.TemplateResponse(
+        request=request,
+        name="login.html",
+        context={"default_role": "admin"}
+    )
+
+@app.post("/students/login", response_model=StudentLoginResponseSchema)
+async def student_login(
+    payload: StudentLoginSchema,
+    db: Session = Depends(get_db)
+):
+    """
+    Ендпоинт за вход на студенти в мобилното приложение.
+    Ако влиза за първи път, връща статус 'force_password_change'.
+    """
+    # 1. Търсене на студента по Факултетен номер
+    student = db.query(Student).filter(Student.student_id_number == payload.student_id_number.strip()).first()
+    if not student:
+        raise HTTPException(status_code=401, detail="Invalid student ID number or password.")
+
+    # 2. Проверка дали акаунтът е заключен (Чакащ имейл) 
+    if student.hashed_password == "LOCKED_UNTIL_EMAIL_SENT":
+        raise HTTPException(
+            status_code=403, 
+            detail="Your account is locked until you receive the official email with a temporary password."
+        )
+
+    # 3. Проверка на паролата
+    if not verify_password(payload.password, student.hashed_password):
+        raise HTTPException(status_code=401, detail="Invalid student ID number or password.")
+
+    if student.status == "REJECTED":
+        token = create_access_token(data={
+            "sub": str(student.id),
+            "student_id_number": student.student_id_number,
+            "role": "student",
+            "must_change": student.must_change_password,
+            "student_status": student.status,
+        })
+        return {
+            "status": "revalidation_required",
+            "message": "Профилът е отхвърлен. Моля, преминете през нова лiveness верификация.",
+            "access_token": token,
+            "student_status": student.status,
+        }
+
+    # 4. Генериране на JWT Данни (Payload)
+    token_data = {
+        "sub": str(student.id),
+        "student_id_number": student.student_id_number,
+        "role": "student",
+        "must_change": student.must_change_password,
+        "student_status": student.status,
+    }
+    
+    token = create_access_token(data=token_data)
+
+    # 5. Проверка за първо влизане (Смяна на парола)
+    if student.must_change_password:
+        return {
+            "status": "force_password_change",
+            "message": "Първоначален вход. Моля, сменете временната си парола.",
+            "access_token": token
+        }
+
+    # 6. Нормален вход (Ако вече е сменил паролата си в миналото)
+    return {
+        "status": "success",
+        "message": "Успешен вход в системата.",
+        "access_token": token,
+        "student_status": student.status
+    }
+
+@app.post("/students/change-password")
+async def change_student_password(
+    payload: ChangePasswordSchema,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Ендпоинт за първоначална или последваща смяна на студентската парола.
+    След успешна смяна, флагът must_change_password се залага на False.
+    """
+    # 1. Стриктна софтуерна защита: Допускаме само потребители с роля 'student'
+    if current_user.get("role") != "student":
+        raise HTTPException(status_code=403, detail="Достъпът е отказан. Ендпоинтът е само за студенти.")
+    
+    if current_user.get("must_change") != True:
+        raise HTTPException(status_code=403, detail="Достъпът е отказан. Този ендпоинт е предназначен само за първоначална смяна на парола.")
+
+    # 2. Извличане на студента от базата чрез ID-то ('sub') от JWT токена
+    student_id = current_user.get("sub")
+    student = db.query(Student).filter(Student.id == student_id).first()
+    
+    if not student:
+        raise HTTPException(status_code=404, detail="Студентът не е намерен в системата.")
+
+    # 3. Хеширане на новата парола и обновяване на базата данни
+    hashed_new_pw = get_password_hash(payload.new_password)
+    student.hashed_password = hashed_new_pw
+    
+    student.must_change_password = False
+
+    # Запазваме промените в Postgres
+    db.commit()
+
+    return {
+        "status": "success",
+        "message": "Паролата беше обновена успешно. Можете да преминете към биометрична верификация."
+    }
 
 @app.post("/admins/execute-allocation")
 def execute_student_allocation(
+    payload: dict | None = Body(default=None),
     db: Session = Depends(get_db),
     current_admin: dict = Depends(require_admin)
 ):
@@ -551,10 +945,22 @@ def execute_student_allocation(
     if not admin.is_verified:
         raise HTTPException(status_code=403, detail="Your admin account is pending verification. Cannot execute allocation.")
 
-    all_exams = db.query(Exam).filter(Exam.session_type.in_([SessionType.SUMMER, SessionType.WINTER])).all()
+    exam_id = None
+    if isinstance(payload, dict):
+        exam_id = payload.get("exam_id")
+
+    if exam_id:
+        all_exams = db.query(Exam).filter(Exam.id == exam_id).all()
+        if not all_exams:
+            raise HTTPException(status_code=404, detail="Exam not found for the provided ID.")
+    else:
+        all_exams = db.query(Exam).filter(Exam.session_type.in_([SessionType.SUMMER, SessionType.WINTER])).all()
+
     total_registrations_created = 0
+    processed_exam_ids = []
     
     for exam in all_exams:
+        processed_exam_ids.append(str(exam.id))
         # Разделяме групите от стринга "37, 38" -> ['37', '38']
         allowed_groups = [int(g.strip()) for g in exam.group.split(",") if g.strip().isdigit()]
         
@@ -593,8 +999,13 @@ def execute_student_allocation(
     new_log = AdminLog(
         admin_id=admin.id,
         action_type=action_type,
-        details=updated_details,
-        notification_sent=True
+        details=json.dumps({
+            "summary": updated_details,
+            "exam_ids": processed_exam_ids,
+            "total_registrations_created": total_registrations_created,
+            "mode": "single" if exam_id else "bulk",
+        }, ensure_ascii=False),
+        notification_sent=False
     )
     db.add(new_log)
                 
@@ -695,13 +1106,317 @@ def check_door_access(room_number: str, db: Session = Depends(get_db)):
             "reason": f"Студентът няма активен изпит в зала {room_number} за този времеви прозорец."
         }
 
-@app.get("/admins/rooms/{room_number}/live-stream")
-def get_room_live_stream(room_number: str):
+@app.get("/api/v1/exams/{room_number}/stream")
+async def stream_exam_room(room_number: str, background_tasks: BackgroundTasks, token: str = Query(...)):
     """
-    Ендпоинт, който админ панелът (Frontend-а) може да зареди директно в един <img> таг!
-    Пример: <img src="http://localhost:8000/admins/rooms/1151/live-stream" />
+    Ендпоинт за Квесторския панел. Приема номер на зала и IP на ESP32.
+    Сервира MJPEG стрийм с биометрични резултати в реално време.
     """
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("role") not in ["examiner", "superadmin"]:
+            raise HTTPException(status_code=403, detail="Достъпът е отказан.")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired token.")
+
+    if room_number not in ACTIVE_CAMERAS:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"No active ESP32-CAM platform registered for room {room_number}."
+        )
+    
+    esp32_ip = ACTIVE_CAMERAS[room_number]
+
+    if room_number not in CAMERA_TASKS or CAMERA_TASKS[room_number].done():
+        # Създаваме задачата в истинския асинхронен event loop на FastAPI за постоянно изпълнение
+        task = asyncio.create_task(fetch_frames_from_esp32(room_number, esp32_ip))
+        CAMERA_TASKS[room_number] = task
+    
+    # Връщаме стрийма към потребителя веднага от паметта!
     return StreamingResponse(
-        generate_live_frames(room_number),
+        generate_from_memory(room_number),
         media_type="multipart/x-mixed-replace; boundary=frame"
     )
+# def get_room_live_stream(room_number: str):
+#     """
+#     Ендпоинт, който админ панелът (Frontend-а) може да зареди директно в един <img> таг!
+#     Пример: <img src="http://localhost:8000/api/v1/exams/1151/stream" />
+#     """
+#     return StreamingResponse(
+#         generate_live_frames(room_number),
+#         media_type="multipart/x-mixed-replace; boundary=frame"
+#     )
+
+@app.get("/api/v1/exams/{room_number}/monitor", response_class=HTMLResponse)
+def get_monitor_page(room_number: str, request: fastapi.Request, response: Response):
+
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+
+    return templates.TemplateResponse(
+        request=request, 
+        name="monitor.html", 
+        context={"room_number": room_number}
+    )
+
+@app.post("/api/v1/exams/{room_number}/force-register")
+def force_register_student_to_exam(
+    room_number: str, 
+    student_id_number: str = Form(...), 
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user) # Защита през хедъра на Fetch API
+):
+    """ Академичен модул: Принудително записване на студент за изпит в текущата зала """
+    if current_user.get("role") != "examiner":
+        raise HTTPException(status_code=403, detail="Операцията е разрешена само за квестори.")
+
+    # 1. Търсим студента
+    student = db.query(Student).filter(Student.student_id_number == student_id_number.strip()).first()
+    if not student:
+        raise HTTPException(status_code=44, detail="Студент с такъв факултетен номер не съществува.")
+
+    # 2. Намираме изпита за тази зала, провеждащ се ДНЕС
+    current_date = datetime.now().date()
+    current_exam = db.query(Exam).filter(
+        Exam.room_number == room_number,
+        func.date(Exam.date_time) == current_date
+    ).first()
+
+    if not current_exam:
+        raise HTTPException(status_code=404, detail=f"Днес няма планиран изпит в зала {room_number}.")
+
+    # 3. Проверяваме дали вече няма регистрация
+    already_registered = db.query(ExamRegistration).filter(
+        ExamRegistration.student_id == student.id,
+        ExamRegistration.exam_id == current_exam.id
+    ).first()
+
+    if already_registered:
+        return {"status": "already_done", "message": "Студентът вече има валидна регистрация."}
+
+    # 4. Създаваме принудителна нова регистрация
+    new_registration = ExamRegistration(
+        student_id=student.id,
+        exam_id=current_exam.id
+    )
+    db.add(new_registration)
+    db.commit()
+
+    print(f"[Спешен Допуск] Квесторът записа студент {student.full_name} за изпит в зала {room_number}")
+    return {"status": "success", "message": f"Успешно извънредно записване на {student.full_name} за дисциплина: {current_exam.subject}."}
+
+@app.post("/students/validate")
+async def student_submit_for_verification(
+    status: str = Form(...),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Мобилен ендпоинт: Приема снимката след Liveness проверка, 
+    записва я в MinIO и слага студента в опашката за одобрение от администратор.
+    """
+
+    ALLOWED_EXTENSIONS = ["image/jpeg", "image/png", "image/jpg", "image/webp"]
+
+    if status != "LIVENESS_PASSED":
+        raise HTTPException(status_code=400, detail="Liveness check failed. Cannot proceed with verification.")
+    # 1. Защита на достъпа
+    if current_user.get("role") != "student":
+        raise HTTPException(status_code=403, detail="Access denied.")
+
+    if file.content_type not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Invalid file type! Only images are allowed: {', '.join(ALLOWED_EXTENSIONS)}"
+        )
+
+    student_id = current_user.get("sub")
+    student = db.query(Student).filter(Student.id == student_id).first()
+    
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found.")
+        
+    if student.status == "APPROVED":
+        return {"status": "already_approved", "message": "Profile is already approved and verified."}
+
+    try:
+        contents = await file.read()
+        file_size = len(contents)
+        
+        photo_url = upload_photo_to_cloud(
+            file_data=contents,
+            object_name=f"{student.student_id_number}_{int(time.time())}{os.path.splitext(file.filename)[1]}",
+            content_type=file.content_type
+        )
+
+        # 3. Обновяване на статуса в базата данни
+        student.status = "PENDING_APPROVAL" 
+        student.photo_path = photo_url
+        db.commit()
+
+        return {
+            "status": "success",
+            "message": "Image uploaded successfully. Your profile is now pending admin approval.",
+        }
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Грешка при запис в системата: {str(e)}")
+
+
+@app.post("/admins/approve-student/{student_id}")
+async def approve_student_biometrics(
+    student_id: str,
+    db: Session = Depends(get_db),
+    current_admin: dict = Depends(require_admin)
+):
+    """
+    Администраторски ендпоинт: Взима снимката директно по записания път на студента,
+    извлича 128-измерния вектор и го одобрява. Без местене на файлове!
+    """
+    # 1. Намираме студента
+    student = db.query(Student).filter(Student.id == student_id).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Студентът не е намерен.")
+    
+    if student.status != "PENDING_APPROVAL":
+        raise HTTPException(status_code=400, detail="Този студент не чака одобрение на биометрия.")
+
+    # 2. Извличаме чистия object name (Key) от записания URL
+    # Пример: ако student.photo_url е "/access-control-bucket/121221001_1718872205.jpg"
+    # махаме "/access-control-bucket/" отпред, за да получим само името на файла за S3
+    prefix = f"/{BUCKET_NAME}/"
+    if student.photo_path.startswith(prefix):
+        object_name = student.photo_path[len(prefix):]
+    else:
+        # Застраховка, ако е записано само името на файла
+        object_name = student.photo_path.lstrip("/")
+
+    try:
+        # 3. Сваляме байтовете от MinIO по точното име на файла
+        file_data = get_photo_from_cloud(object_name)
+
+        # 4. Зареждаме изображението и извличаме 128-измерния вектор
+        image = face_recognition.load_image_file(io.BytesIO(file_data))
+        face_encodings = face_recognition.face_encodings(image)
+        
+        if len(face_encodings) == 0:
+            raise HTTPException(status_code=400, detail="No face detected in the image.")
+        
+        # Взимаме първото лице и го правим на списък за face_embedding
+        student_embedding = face_encodings[0].tolist()
+
+        # 5. Обновяваме студента в Postgres
+        student.face_embedding = student_embedding
+        student.status = "APPROVED"
+
+        # 6. Лог за администратора
+        new_log = AdminLog(
+            admin_id=current_admin['sub'],
+            action_type="STUDENT_APPROVE",
+            details=f"Одобрен студент с фак. номер {student.student_id_number}. Генериран face_embedding.",
+            notification_sent=False
+        )
+        db.add(new_log)
+        db.commit()
+
+        return {
+            "status": "success",
+            "message": f"Student {student.student_id_number} approved and face_embedding saved successfully."
+        }
+
+    except HTTPException as http_ex:
+        raise http_ex
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Approval failed: {str(e)}")
+
+
+@app.post("/admins/reject-student/{student_id}")
+def reject_student_biometrics(
+    student_id: str,
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_admin: dict = Depends(require_admin)
+):
+    admin = db.query(Admin).filter(Admin.id == current_admin['sub']).first()
+    if not admin or not admin.is_verified:
+        raise HTTPException(status_code=403, detail="Unauthorized access. Admin privileges required.")
+
+    reason = (payload or {}).get("reason", "")
+    if len(reason.strip()) < 3:
+        raise HTTPException(status_code=400, detail="Reason is required.")
+
+    student = db.query(Student).filter(Student.id == student_id).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Студентът не е намерен.")
+    if student.status != "PENDING_APPROVAL":
+        raise HTTPException(status_code=400, detail="Този студент не чака одобрение на биометрия.")
+
+    student.status = "REJECTED"
+    student.face_embedding = None
+
+    db.add(AdminLog(
+        admin_id=admin.id,
+        action_type="STUDENT_REJECT",
+        details=f"Студент {student.student_id_number} е отхвърлен. Причина: {reason.strip()}",
+        notification_sent=False,
+    ))
+    db.commit()
+
+    return {"status": "success", "message": f"Student {student.student_id_number} rejected successfully."}
+
+@app.post("/api/v1/exams/register-camera")
+async def register_camera(data: CameraRegisterSchema):
+    """
+    Автоматичен ендпоинт за ESP32 устройствата.
+    При включване платката казва в коя зала се намира и какво IP е взела.
+    """
+    ACTIVE_CAMERAS[data.room_number] = data.esp32_ip
+    print(f"[Hardware register] Room {data.room_number} is now linked with ESP32 at: {data.esp32_ip}")
+    return {
+        "status": "registered", 
+        "room_number": data.room_number, 
+        "esp32_ip": data.esp32_ip
+    }
+
+@app.get("/api/v1/exams/{room_number}/camera-status")
+def get_exam_room_camera_status(room_number: str):
+    """Връща дали залата има регистрирана активна камера."""
+    esp32_ip = ACTIVE_CAMERAS.get(room_number)
+    return {
+        "room_number": room_number,
+        "armed": esp32_ip is not None,
+        "esp32_ip": esp32_ip,
+    }
+
+@app.get("/api/v1/exams/{room_number}/status")
+async def get_exam_room_biometric_status(room_number: str, token: str = Query(...)):
+    """
+    Ендпоинт за Квесторския панел. 
+    Връща JSON с името, факултетния номер и статуса на засичане извън видеото.
+    """
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("role") not in ["examiner", "superadmin"]:
+            raise HTTPException(status_code=403, detail="Достъпът е отказан.")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired token.")
+
+    if room_number not in AI_ROOM_STATES:
+        return {
+            "student_name": "—",
+            "faculty_number": "—",
+            "status_text": "Няма активна връзка с терминала в залата",
+            "status_type": "idle"
+        }
+    
+    state = AI_ROOM_STATES[room_number]
+    return {
+        "student_name": state.get("student_name", ""),
+        "faculty_number": state.get("faculty_number", ""),
+        "status_text": state.get("status_text", "Очакване на обект..."),
+        "status_type": state.get("status_type", "idle")
+    }
