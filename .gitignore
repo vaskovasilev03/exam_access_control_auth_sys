@@ -23,3 +23,24 @@ postgres_data/
 agent.md
 ui-theme.md
 agent_data/
+
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+
+# Специфични за Flutter скриптове и конфигурации на локалната машина
+.flutter-plugins
+.flutter-plugins-dependencies
+.plugin_symlinks
+metadata
+
+android/.gradle/
+android/local.properties
+android/captures/
+android/app/components/
+# Изключваме генерираните инсталационни файлове (APK, AAB)
+*.apk
+*.ap_
+*.aab

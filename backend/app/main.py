@@ -839,6 +839,13 @@ async def student_login(
     if not student:
         raise HTTPException(status_code=401, detail="Invalid student ID number or password.")
 
+    if student.face_embedding is None:
+        return {
+            "status": "revalidation_required",
+            "access_token": create_access_token(data={"sub": str(student.id), "role": "student"}),
+            "message": "Необходим е liveness тест за генериране на биометричен шаблон."
+        }
+
     # 2. Проверка дали акаунтът е заключен (Чакащ имейл) 
     if student.hashed_password == "LOCKED_UNTIL_EMAIL_SENT":
         raise HTTPException(
@@ -1420,3 +1427,177 @@ async def get_exam_room_biometric_status(room_number: str, token: str = Query(..
         "status_text": state.get("status_text", "Очакване на обект..."),
         "status_type": state.get("status_type", "idle")
     }
+
+
+@app.get("/students/my-registrations")
+def get_my_exam_registrations(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    1. Извлича всички текущи изпитни регистрации за логнатия студент.
+    """
+    if current_user.get("role") != "student":
+        raise HTTPException(status_code=403, detail="Достъпът е разрешен само за студенти.")
+
+    student_id = current_user.get("sub")
+    
+    # Правим JOIN между ExamRegistration и Exam, за да изкараме пълните детайли
+    registrations = db.query(ExamRegistration).join(Exam).filter(
+        ExamRegistration.student_id == student_id
+    ).all()
+
+    return [
+        {
+            "registration_id": str(reg.id),
+            "exam_id": str(reg.exam.id),
+            "subject": reg.exam.subject,
+            "lecturer": reg.exam.lecturer,
+            "room_number": reg.exam.room_number,
+            "date_time": reg.exam.date_time.isoformat() if reg.exam.date_time else None,
+            "session_type": reg.exam.session_type.value if reg.exam.session_type else None
+        }
+        for reg in registrations
+    ]
+
+@app.get("/students/upcoming-resits")
+def get_upcoming_resits_and_liquidations(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    2. Извлича наличните поправителни и ликвидационни изпити в прозорец от 20 дни напред.
+    """
+    if current_user.get("role") != "student":
+        raise HTTPException(status_code=403, detail="Достъпът е забранен.")
+
+    now = datetime.now(timezone)
+    end_window = now + timedelta(days=20)
+
+    # Филтрираме изпитите, които са RESIT (поправителна) или LIQUIDATION (ликвидационна) в близките 20 дни
+    upcoming_exams = db.query(Exam).filter(
+        Exam.session_type.in_([SessionType.RESIT, SessionType.LIQUIDATION]),
+        Exam.date_time >= now,
+        Exam.date_time <= end_window
+    ).order_by(Exam.date_time.asc()).all()
+
+    return [
+        {
+            "id": str(exam.id),
+            "subject": exam.subject,
+            "lecturer": exam.lecturer,
+            "room_number": exam.room_number,
+            "date_time": exam.date_time.isoformat(),
+            "course": exam.course,
+            "group": exam.group,
+            "session_type": exam.session_type.value
+        }
+        for exam in upcoming_exams
+    ]
+
+
+@app.post("/students/request-insert")
+async def request_exam_insertion(
+    exam_id: str = Form(...),
+    file: Optional[UploadFile] = File(None),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    3. Подаване на заявка за служебно записване на изпит.
+    Ако курсът на изпита се разминава с курса на студента, системата изисква снимка на протокол.
+    """
+    if current_user.get("role") != "student":
+        raise HTTPException(status_code=403, detail="Достъпът е забранен.")
+
+    student_id = current_user.get("sub")
+    student = db.query(Student).filter(Student.id == student_id).first()
+    exam = db.query(Exam).filter(Exam.id == exam_id).first()
+
+    if not student or not exam:
+        raise HTTPException(status_code=404, detail="Студентът или изпитът не бяха намерени.")
+
+    # Проверка дали вече е регистриран за този изпит
+    already_registered = db.query(ExamRegistration).filter(
+        ExamRegistration.student_id == student_id,
+        ExamRegistration.exam_id == exam_id
+    ).first()
+    if already_registered:
+        raise HTTPException(status_code=400, detail="Вие вече сте регистриран за този изпит.")
+        
+    # Ако студентът е 4-ти курс, а изпитът е за 3-ти курс (невзет изпит от минала година)
+    has_course_mismatch = (exam.course != student.course)
+    protocol_cloud_path = None
+
+    if has_course_mismatch:
+        if not file:
+            raise HTTPException(
+                status_code=400, 
+                detail="Разминаване в курсовете! Задължително трябва да прикачите снимка на индивидуален изпитен протокол."
+            )
+        
+        # Валидация на типа файл за снимка
+        if file.content_type not in ["image/jpeg", "image/png", "image/jpg"]:
+            raise HTTPException(status_code=400, detail="Невалиден формат на документа. Качете JPEG или PNG снимка.")
+        
+        # Качваме снимката на протокола в MinIO кофата
+        try:
+            contents = await file.read()
+            object_name = f"protocols/{student.student_id_number}_exam_{exam.id}_{int(time.time())}{os.path.splitext(file.filename)[1]}"
+            protocol_cloud_path = upload_photo_to_cloud(
+                file_data=contents,
+                object_name=object_name,
+                content_type=file.content_type
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Проблем при качване на документа в MinIO: {str(e)}")
+
+    # Директно записваме студента в сесията (за PoC модела)
+    new_registration = ExamRegistration(
+        student_id=student.id,
+        exam_id=exam.id
+    )
+    db.add(new_registration)
+
+    # Записваме одит лог в системата, за да може администраторът да го проследи, ако има прикачен протокол
+    log_details = f"Студент {student.student_id_number} се записа за изпит {exam.subject}."
+    if protocol_cloud_path:
+        log_details += f" Прикачен изпитен протокол: {protocol_cloud_path}"
+
+    db.add(AdminLog(
+        admin_id=None, # Системен лог, задействан от студент
+        action_type="STUDENT_PROTOCOL_INSERT" if protocol_cloud_path else "STUDENT_SELF_INSERT",
+        details=log_details,
+        specialty=student.specialty,
+        group=str(student.group)
+    ))
+
+    db.commit()
+    
+    return {
+        "status": "success",
+        "message": "Успешно записване за изпита." + (" Документът е прикачен за администраторска проверка." if protocol_cloud_path else "")
+    }
+
+
+@app.delete("/students/delete-account")
+def delete_student_account(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    4. Изтриване на студентския акаунт от мобилното приложение.
+    Поради CASCADE релациите в базата данни, автоматично се трият и изпитните му регистрации.
+    """
+    if current_user.get("role") != "student":
+        raise HTTPException(status_code=403, detail="Достъпът е забранен.")
+
+    student_id = current_user.get("sub")
+    student = db.query(Student).filter(Student.id == student_id).first()
+
+    if not student:
+        raise HTTPException(status_code=404, detail="Акаунтът не беше намерен.")
+
+    db.delete(student)
+    db.commit()
+    return {"status": "success", "message": "Акаунтът и всички свързани данни бяха заличени успешно."}
