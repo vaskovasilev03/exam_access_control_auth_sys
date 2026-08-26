@@ -8,7 +8,7 @@ class FaceOverlayPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     // Дефинираме леко затъмнен полупрозрачен слой около лицето
-    final backgroundPaint = Paint()..color = Colors.black.withOpacity(0.65);
+    final backgroundPaint = Paint()..color = Colors.black.withValues(alpha: 0.65);
     
     final screenRect = Rect.fromLTWH(0, 0, size.width, size.height);
     

@@ -23,6 +23,7 @@ postgres_data/
 agent.md
 ui-theme.md
 agent_data/
+.antigravityignore
 
 .dart_tool/
 .packages
@@ -44,3 +45,5 @@ android/app/components/
 *.apk
 *.ap_
 *.aab
+
+*.ino

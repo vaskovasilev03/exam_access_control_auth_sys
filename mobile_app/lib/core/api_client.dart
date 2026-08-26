@@ -2,7 +2,10 @@ import 'package:dio/dio.dart';
 import 'secure_storage_service.dart';
 
 class ApiClient {
-  static const String baseUrl = 'http://192.168.1.90:8000'; 
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://192.168.68.53:8000',
+  );
   
   final Dio dio;
   final SecureStorageService _storageService;
