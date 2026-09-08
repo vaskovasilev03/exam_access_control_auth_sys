@@ -24,6 +24,9 @@ class UiThemeTokens {
       color: color ?? foreground,
       fontSize: fontSize,
       fontWeight: fontWeight,
+      textStyle: const TextStyle(
+        fontFamilyFallback: ['Roboto', 'sans-serif'],
+      ),
     );
   }
 }

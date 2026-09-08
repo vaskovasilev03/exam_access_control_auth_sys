@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'theme_tokens.dart';
 
 class AppTheme {
@@ -6,6 +7,8 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       scaffoldBackgroundColor: UiThemeTokens.background,
+      fontFamily: GoogleFonts.montserrat().fontFamily,
+      fontFamilyFallback: const ['Roboto', 'sans-serif'],
       colorScheme: const ColorScheme.light(
         primary: UiThemeTokens.primary,
         surface: UiThemeTokens.card,
