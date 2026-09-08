@@ -26,7 +26,7 @@ from .database import init_db, get_db
 from .models import Student, Exam, Admin, ExamRegistration, AccessLog, Examiner, AdminLog, SessionType
 from .schemas import AdminCreateSchema, ExaminerCreateSchema, StudentEnrollSchema, ExamUploadValidationSchema, StudentLoginSchema, StudentLoginResponseSchema, ChangePasswordSchema, CameraRegisterSchema
 from .auth import create_access_token, get_current_user, require_admin, verify_password, get_password_hash, SECRET_KEY, ALGORITHM
-from .stream_esp32 import generate_from_memory, fetch_frames_from_esp32, ACTIVE_CAMERAS, CAMERA_TASKS, AI_ROOM_STATES
+from .stream_esp32 import generate_from_memory, fetch_frames_from_esp32, ACTIVE_CAMERAS, CAMERA_TASKS, AI_ROOM_STATES, CAMERA_HEALTH
 from .storage import init_storage, upload_photo_to_cloud, get_photo_from_cloud, BUCKET_NAME
 from .mailer import send_welcome_email, send_allocation_email
 
@@ -358,7 +358,7 @@ async def enroll_student(
     course: int = Form(...),
     stream: int = Form(...),
     group: int = Form(...),
-    file: UploadFile = File(...),
+    #file: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
     """
@@ -380,13 +380,13 @@ async def enroll_student(
     except ValueError as e:
         # Ако имейлът или паролата са слаби, хвърляме грешката директно към клиента
         raise HTTPException(status_code=400, detail=str(e))
-    ALLOWED_EXTENSIONS = ["image/jpeg", "image/png", "image/jpg", "image/webp"]
+    # ALLOWED_EXTENSIONS = ["image/jpeg", "image/png", "image/jpg", "image/webp"]
 
-    if file.content_type not in ALLOWED_EXTENSIONS:
-        raise HTTPException(
-            status_code=400, 
-            detail=f"Invalid file type! Only images are allowed: {', '.join(ALLOWED_EXTENSIONS)}"
-        )
+    # if file.content_type not in ALLOWED_EXTENSIONS:
+    #     raise HTTPException(
+    #         status_code=400, 
+    #         detail=f"Invalid file type! Only images are allowed: {', '.join(ALLOWED_EXTENSIONS)}"
+    #     )
 
     # 1. Проверка за дублиране на факултетен номер или имейл
     existing_student = db.query(Student).filter(
@@ -398,33 +398,33 @@ async def enroll_student(
 
     try:
         # 2. Обработка на снимката (Селфито)
-        image_bytes = await file.read()
-        image = face_recognition.load_image_file(io.BytesIO(image_bytes))
+        # image_bytes = await file.read()
+        # image = face_recognition.load_image_file(io.BytesIO(image_bytes))
         
-        photo_url = upload_photo_to_cloud(
-            file_data=image_bytes,
-            object_name=f"{student_id_number}_{int(time.time())}{os.path.splitext(file.filename)[1]}",
-            content_type=file.content_type
-        )
+        # photo_url = upload_photo_to_cloud(
+        #     file_data=image_bytes,
+        #     object_name=f"{student_id_number}_{int(time.time())}{os.path.splitext(file.filename)[1]}",
+        #     content_type=file.content_type
+        # )
     
-        # Извличане на векторите на лицата от снимката
-        face_encodings = face_recognition.face_encodings(image)
+        # # Извличане на векторите на лицата от снимката
+        # face_encodings = face_recognition.face_encodings(image)
         
-        if len(face_encodings) == 0:
-            raise HTTPException(status_code=400, detail="No face detected in the image. Please try another photo.")
+        # if len(face_encodings) == 0:
+        #     raise HTTPException(status_code=400, detail="No face detected in the image. Please try another photo.")
             
-        # Взимаме вектора на първото открито лице
-        student_embedding = face_encodings[0].tolist()
-        if student_embedding:
-            duplicate_face = db.query(Student).filter(
-            Student.face_embedding.cosine_distance(student_embedding) < 0.05
-        ).first()
+        # # Взимаме вектора на първото открито лице
+        # student_embedding = face_encodings[0].tolist()
+        # if student_embedding:
+        #     duplicate_face = db.query(Student).filter(
+        #     Student.face_embedding.cosine_distance(student_embedding) < 0.05
+        # ).first()
         
-        if duplicate_face:
-            raise HTTPException(
-                status_code=400, 
-                detail=f"Biometric duplicate detected! This face is already registered to student {duplicate_face.full_name} ({duplicate_face.student_id_number})."
-            )
+        # if duplicate_face:
+        #     raise HTTPException(
+        #         status_code=400, 
+        #         detail=f"Biometric duplicate detected! This face is already registered to student {duplicate_face.full_name} ({duplicate_face.student_id_number})."
+        #     )
         
         # 3. Хеширане на паролата с bcrypt
         password_bytes = password.encode('utf-8')
@@ -444,7 +444,7 @@ async def enroll_student(
             stream=stream,
             group=group,
             hashed_password=hashed_password, # Записваме сигурния хеш, НЕ чистата парола
-            face_embedding=student_embedding,
+            face_embedding=None,#student_embedding,
             status="PENDING", # Студентът чака одобрение от администратор
             is_active=True
         )
@@ -839,13 +839,6 @@ async def student_login(
     if not student:
         raise HTTPException(status_code=401, detail="Invalid student ID number or password.")
 
-    if student.face_embedding is None:
-        return {
-            "status": "revalidation_required",
-            "access_token": create_access_token(data={"sub": str(student.id), "role": "student"}),
-            "message": "Необходим е liveness тест за генериране на биометричен шаблон."
-        }
-
     # 2. Проверка дали акаунтът е заключен (Чакащ имейл) 
     if student.hashed_password == "LOCKED_UNTIL_EMAIL_SENT":
         raise HTTPException(
@@ -857,20 +850,7 @@ async def student_login(
     if not verify_password(payload.password, student.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid student ID number or password.")
 
-    if student.status == "REJECTED":
-        token = create_access_token(data={
-            "sub": str(student.id),
-            "student_id_number": student.student_id_number,
-            "role": "student",
-            "must_change": student.must_change_password,
-            "student_status": student.status,
-        })
-        return {
-            "status": "revalidation_required",
-            "message": "Профилът е отхвърлен. Моля, преминете през нова лiveness верификация.",
-            "access_token": token,
-            "student_status": student.status,
-        }
+    has_face = student.face_embedding is not None
 
     # 4. Генериране на JWT Данни (Payload)
     token_data = {
@@ -880,7 +860,6 @@ async def student_login(
         "must_change": student.must_change_password,
         "student_status": student.status,
     }
-    
     token = create_access_token(data=token_data)
 
     # 5. Проверка за първо влизане (Смяна на парола)
@@ -888,15 +867,20 @@ async def student_login(
         return {
             "status": "force_password_change",
             "message": "Първоначален вход. Моля, сменете временната си парола.",
-            "access_token": token
+            "access_token": token,
+            "student_status": student.status,
+            "has_face_embedding": has_face,
+            "must_change_password": True,
         }
 
-    # 6. Нормален вход (Ако вече е сменил паролата си в миналото)
+    # 6. Нормален вход
     return {
         "status": "success",
         "message": "Успешен вход в системата.",
         "access_token": token,
-        "student_status": student.status
+        "student_status": student.status,
+        "has_face_embedding": has_face,
+        "must_change_password": False,
     }
 
 @app.post("/students/change-password")
@@ -912,9 +896,6 @@ async def change_student_password(
     # 1. Стриктна софтуерна защита: Допускаме само потребители с роля 'student'
     if current_user.get("role") != "student":
         raise HTTPException(status_code=403, detail="Достъпът е отказан. Ендпоинтът е само за студенти.")
-    
-    if current_user.get("must_change") != True:
-        raise HTTPException(status_code=403, detail="Достъпът е отказан. Този ендпоинт е предназначен само за първоначална смяна на парола.")
 
     # 2. Извличане на студента от базата чрез ID-то ('sub') от JWT токена
     student_id = current_user.get("sub")
@@ -926,15 +907,24 @@ async def change_student_password(
     # 3. Хеширане на новата парола и обновяване на базата данни
     hashed_new_pw = get_password_hash(payload.new_password)
     student.hashed_password = hashed_new_pw
-    
     student.must_change_password = False
 
     # Запазваме промените в Postgres
     db.commit()
 
+    # Генерираме нов токен с актуализиран must_change = False
+    new_token = create_access_token(data={
+        "sub": str(student.id),
+        "student_id_number": student.student_id_number,
+        "role": "student",
+        "must_change": False,
+        "student_status": student.status,
+    })
+
     return {
         "status": "success",
-        "message": "Паролата беше обновена успешно. Можете да преминете към биометрична верификация."
+        "message": "Паролата беше обновена успешно.",
+        "access_token": new_token
     }
 
 @app.post("/admins/execute-allocation")
@@ -1381,7 +1371,19 @@ async def register_camera(data: CameraRegisterSchema):
     Автоматичен ендпоинт за ESP32 устройствата.
     При включване платката казва в коя зала се намира и какво IP е взела.
     """
+    # При повторна регистрация прекратяваме старата задача (в случай че IP-то е сменено)
+    old_task = CAMERA_TASKS.get(data.room_number)
+    if old_task and not old_task.done():
+        old_task.cancel()
+
     ACTIVE_CAMERAS[data.room_number] = data.esp32_ip
+    CAMERA_HEALTH[data.room_number] = {
+        "last_frame_time": time.time(),
+        "is_online": True,
+        "esp32_ip": data.esp32_ip
+    }
+    CAMERA_TASKS[data.room_number] = asyncio.create_task(fetch_frames_from_esp32(data.room_number, data.esp32_ip))
+
     print(f"[Hardware register] Room {data.room_number} is now linked with ESP32 at: {data.esp32_ip}")
     return {
         "status": "registered", 
@@ -1391,12 +1393,19 @@ async def register_camera(data: CameraRegisterSchema):
 
 @app.get("/api/v1/exams/{room_number}/camera-status")
 def get_exam_room_camera_status(room_number: str):
-    """Връща дали залата има регистрирана активна камера."""
+    """Връща дали залата има регистрирана и работеща в момента активна камера."""
     esp32_ip = ACTIVE_CAMERAS.get(room_number)
+    health = CAMERA_HEALTH.get(room_number, {})
+    is_online = bool(
+        esp32_ip and 
+        health.get("is_online", False) and 
+        (time.time() - health.get("last_frame_time", 0) < 8.0)
+    )
     return {
         "room_number": room_number,
-        "armed": esp32_ip is not None,
+        "armed": is_online,
         "esp32_ip": esp32_ip,
+        "is_online": is_online
     }
 
 @app.get("/api/v1/exams/{room_number}/status")

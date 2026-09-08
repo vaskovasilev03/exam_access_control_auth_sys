@@ -1,5 +1,6 @@
 # Secrets
 .env
+*.txt
 
 # Python
 __pycache__/
@@ -22,6 +23,7 @@ postgres_data/
 #Agent
 agent.md
 ui-theme.md
+refractoring_context.md
 agent_data/
 .antigravityignore
 

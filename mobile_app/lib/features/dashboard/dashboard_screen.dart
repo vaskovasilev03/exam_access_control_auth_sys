@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme_tokens.dart';
 
+import '../auth/auth_repository.dart';
+
 class DashboardScreen extends StatelessWidget {
-  const DashboardScreen({super.key});
+  final AuthRepository? authRepository;
+
+  const DashboardScreen({super.key, this.authRepository});
 
   @override
   Widget build(BuildContext context) {

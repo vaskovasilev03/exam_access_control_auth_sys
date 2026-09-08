@@ -111,6 +111,8 @@ class StudentLoginResponseSchema(BaseModel):
     access_token: str
     token_type: str = "bearer"
     student_status: Optional[str] = None
+    has_face_embedding: Optional[bool] = None
+    must_change_password: Optional[bool] = None
 
 class ChangePasswordSchema(BaseModel):
     new_password: str = Field(..., description="Новата парола на студента")

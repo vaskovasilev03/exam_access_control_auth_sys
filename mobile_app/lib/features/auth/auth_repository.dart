@@ -9,6 +9,11 @@ class AuthRepository {
   AuthRepository(this._apiClient, this._storageService);
 
   ApiClient getApiClient() => _apiClient;
+  SecureStorageService getStorageService() => _storageService;
+
+  Future<({String? studentId, String? password})> getSavedCredentials() {
+    return _storageService.getCredentials();
+  }
   
   Future<Map<String, dynamic>> login(String studentId, String password) async {
     try {
@@ -26,6 +31,11 @@ class AuthRepository {
       if (data['access_token'] != null) {
         await _storageService.saveToken(data['access_token']);
       }
+
+      // Запазваме локалните креденшъли за автоматичен вход при следващо стартиране
+      if (data['status'] == 'success' || data['status'] == 'force_password_change') {
+        await _storageService.saveCredentials(studentId, password);
+      }
       
       return data;
     } on DioException catch (e) {
@@ -36,15 +46,29 @@ class AuthRepository {
 
   Future<void> changePassword(String newPassword) async {
     try {
-      await _apiClient.dio.post(
+      final response = await _apiClient.dio.post(
         '/students/change-password',
         data: {
           'new_password': newPassword,
         },
       );
+
+      final data = response.data;
+      if (data is Map<String, dynamic> && data['access_token'] != null) {
+        await _storageService.saveToken(data['access_token']);
+      }
+
+      final creds = await _storageService.getCredentials();
+      if (creds.studentId != null) {
+        await _storageService.saveCredentials(creds.studentId!, newPassword);
+      }
     } on DioException catch (e) {
       final errorMsg = e.response?.data['detail'] ?? 'Неуспешна смяна на парола';
       throw Exception(errorMsg);
     }
+  }
+
+  Future<void> logout() async {
+    await _storageService.clearAll();
   }
 }
