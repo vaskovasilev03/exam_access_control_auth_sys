@@ -129,3 +129,17 @@ class ChangePasswordSchema(BaseModel):
         if not re.search(r"\d", v):
             raise ValueError("Паролата трябва да съдържа поне едно число.")
         return v.strip()
+
+class StudentProfileSchema(BaseModel):
+    id: str
+    full_name: str
+    student_id_number: str
+    email: str
+    faculty: str
+    specialty: str
+    course: int
+    stream: int
+    group: int
+    status: str
+    has_face_embedding: bool
+    rejection_reason: Optional[str] = None

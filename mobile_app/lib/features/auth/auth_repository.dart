@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import '../../core/api_client.dart';
 import '../../core/secure_storage_service.dart';
+import '../dashboard/models/student_models.dart';
 
 class AuthRepository {
   final ApiClient _apiClient;
@@ -64,6 +65,27 @@ class AuthRepository {
       }
     } on DioException catch (e) {
       final errorMsg = e.response?.data['detail'] ?? 'Неуспешна смяна на парола';
+      throw Exception(errorMsg);
+    }
+  }
+
+  Future<StudentProfileModel> getStudentProfile() async {
+    try {
+      final response = await _apiClient.dio.get('/students/profile');
+      return StudentProfileModel.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      final errorMsg = e.response?.data['detail'] ?? 'Грешка при зареждане на профила';
+      throw Exception(errorMsg);
+    }
+  }
+
+  Future<List<ExamItemModel>> getMyExams() async {
+    try {
+      final response = await _apiClient.dio.get('/students/my-registrations');
+      final list = response.data as List<dynamic>;
+      return list.map((item) => ExamItemModel.fromJson(item as Map<String, dynamic>)).toList();
+    } on DioException catch (e) {
+      final errorMsg = e.response?.data['detail'] ?? 'Грешка при зареждане на изпитния график';
       throw Exception(errorMsg);
     }
   }

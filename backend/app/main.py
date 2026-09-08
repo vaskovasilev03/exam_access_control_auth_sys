@@ -24,7 +24,11 @@ from zoneinfo import ZoneInfo
 
 from .database import init_db, get_db
 from .models import Student, Exam, Admin, ExamRegistration, AccessLog, Examiner, AdminLog, SessionType
-from .schemas import AdminCreateSchema, ExaminerCreateSchema, StudentEnrollSchema, ExamUploadValidationSchema, StudentLoginSchema, StudentLoginResponseSchema, ChangePasswordSchema, CameraRegisterSchema
+from .schemas import (
+    AdminCreateSchema, ExaminerCreateSchema, StudentEnrollSchema,
+    ExamUploadValidationSchema, StudentLoginSchema, StudentLoginResponseSchema,
+    ChangePasswordSchema, CameraRegisterSchema, StudentProfileSchema
+)
 from .auth import create_access_token, get_current_user, require_admin, verify_password, get_password_hash, SECRET_KEY, ALGORITHM
 from .stream_esp32 import generate_from_memory, fetch_frames_from_esp32, ACTIVE_CAMERAS, CAMERA_TASKS, AI_ROOM_STATES, CAMERA_HEALTH
 from .storage import init_storage, upload_photo_to_cloud, get_photo_from_cloud, BUCKET_NAME
@@ -927,6 +931,56 @@ async def change_student_password(
         "access_token": new_token
     }
 
+@app.get("/students/profile", response_model=StudentProfileSchema)
+@app.get("/students/me", response_model=StudentProfileSchema)
+def get_student_profile(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Извлича профила и текущия статус на валидация на студента.
+    При статус REJECTED извлича причината за отхвърляне от admin_logs.
+    """
+    if current_user.get("role") != "student":
+        raise HTTPException(status_code=403, detail="Достъпът е разрешен само за студенти.")
+
+    student_id = current_user.get("sub")
+    student = db.query(Student).filter(Student.id == student_id).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Студентът не е намерен в системата.")
+
+    rejection_reason = None
+    if student.status == "REJECTED":
+        reject_log = (
+            db.query(AdminLog)
+            .filter(
+                AdminLog.action_type == "STUDENT_REJECT",
+                AdminLog.details.like(f"%{student.student_id_number}%")
+            )
+            .order_by(AdminLog.created_at.desc())
+            .first()
+        )
+        if reject_log and reject_log.details:
+            if "Причина: " in reject_log.details:
+                rejection_reason = reject_log.details.split("Причина: ", 1)[1].strip()
+            else:
+                rejection_reason = reject_log.details.strip()
+
+    return {
+        "id": str(student.id),
+        "full_name": student.full_name,
+        "student_id_number": student.student_id_number,
+        "email": student.email,
+        "faculty": student.faculty,
+        "specialty": student.specialty,
+        "course": student.course,
+        "stream": student.stream,
+        "group": student.group,
+        "status": student.status or "PENDING",
+        "has_face_embedding": student.face_embedding is not None,
+        "rejection_reason": rejection_reason,
+    }
+
 @app.post("/admins/execute-allocation")
 def execute_student_allocation(
     payload: dict | None = Body(default=None),
@@ -1454,7 +1508,7 @@ def get_my_exam_registrations(
     # Правим JOIN между ExamRegistration и Exam, за да изкараме пълните детайли
     registrations = db.query(ExamRegistration).join(Exam).filter(
         ExamRegistration.student_id == student_id
-    ).all()
+    ).order_by(Exam.date_time.asc()).all()
 
     return [
         {
