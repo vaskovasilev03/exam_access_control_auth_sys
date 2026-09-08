@@ -126,10 +126,11 @@
         let cameraArmed = false;
 
         function updateCameraUi(armed) {
+            const wasArmed = cameraArmed;
             cameraArmed = armed;
 
             if (armed) {
-                cameraStatusBadge.className = "flex items-center text-xs text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full font-bold uppercase animate-pulse";
+                cameraStatusBadge.className = "flex items-center text-xs text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full font-bold uppercase animate-pulse border border-emerald-500/30";
                 cameraStatusDot.className = "w-2 h-2 bg-emerald-400 rounded-full mr-2";
                 cameraStatusText.innerText = "System Armed";
 
@@ -138,11 +139,14 @@
                     videoStream.src = streamUrl;
                 }
             } else {
-                cameraStatusBadge.className = "flex items-center text-xs text-red-400 bg-red-500/10 px-2.5 py-1 rounded-full font-bold uppercase animate-pulse";
+                cameraStatusBadge.className = "flex items-center text-xs text-red-400 bg-red-500/10 px-2.5 py-1 rounded-full font-bold uppercase animate-pulse border border-red-500/30";
                 cameraStatusDot.className = "w-2 h-2 bg-red-400 rounded-full mr-2";
-                cameraStatusText.innerText = "System Disarmed";
-                videoStream.removeAttribute("src");
-                videoStream.alt = "Няма активна камера за тази зала";
+                cameraStatusText.innerText = "System Disarmed / Offline";
+                if (videoStream.getAttribute("src")) {
+                    videoStream.src = "";
+                    videoStream.removeAttribute("src");
+                }
+                videoStream.alt = "Камерата е изключена или няма активна връзка";
             }
         }
 
@@ -157,14 +161,27 @@
             window.location.href = `/api/v1/exams/${encodeURIComponent(nextRoom)}/monitor`;
         }
 
+        let offlineCount = 0;
+
         async function checkCameraStatus() {
             try {
                 const response = await fetch(`/api/v1/exams/${roomNumber}/camera-status`);
                 const data = await response.json();
-                updateCameraUi(Boolean(data.armed));
+                if (data.armed) {
+                    offlineCount = 0;
+                    updateCameraUi(true);
+                } else {
+                    offlineCount++;
+                    if (offlineCount >= 2) {
+                        updateCameraUi(false);
+                    }
+                }
             } catch (err) {
-                updateCameraUi(false);
-                cameraStatusText.innerText = "Camera Offline";
+                offlineCount++;
+                if (offlineCount >= 2) {
+                    updateCameraUi(false);
+                    cameraStatusText.innerText = "Camera Offline";
+                }
             }
         }
 
