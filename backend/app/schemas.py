@@ -116,6 +116,7 @@ class StudentLoginResponseSchema(BaseModel):
 
 class ChangePasswordSchema(BaseModel):
     new_password: str = Field(..., description="Новата парола на студента")
+    old_password: Optional[str] = Field(None, description="Текущата парола на студента (задължителна при последваща смяна от профила)")
 
     @field_validator("new_password")
     @classmethod

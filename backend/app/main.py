@@ -908,7 +908,19 @@ async def change_student_password(
     if not student:
         raise HTTPException(status_code=404, detail="Студентът не е намерен в системата.")
 
-    # 3. Хеширане на новата парола и обновяване на базата данни
+    # 3. Валидация на текущата парола при последваща смяна от потребителския профил
+    if not student.must_change_password:
+        if not payload.old_password:
+            raise HTTPException(status_code=400, detail="Моля, въведете текущата си парола.")
+        if not verify_password(payload.old_password, student.hashed_password):
+            raise HTTPException(status_code=400, detail="Грешна текуща парола.")
+        if payload.old_password == payload.new_password:
+            raise HTTPException(status_code=400, detail="Новата парола трябва да бъде различна от текущата.")
+    elif payload.old_password:
+        if not verify_password(payload.old_password, student.hashed_password):
+            raise HTTPException(status_code=400, detail="Грешна текуща парола.")
+
+    # 4. Хеширане на новата парола и обновяване на базата данни
     hashed_new_pw = get_password_hash(payload.new_password)
     student.hashed_password = hashed_new_pw
     student.must_change_password = False

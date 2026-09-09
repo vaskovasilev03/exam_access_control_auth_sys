@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../core/theme_tokens.dart';
 import '../auth/auth_repository.dart';
 import '../auth/change_password_sheet.dart';
@@ -18,7 +19,10 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedTabIndex = 0; // 0: Student Profile, 1: Exam's Window
-  bool _isLoading = true;
+  late final PageController _pageController;
+
+  bool _isLoading = true; // Първоначално зареждане
+  bool _isRefreshing = false; // Плавно фоново обновяване без скриване на горния панел
   String? _errorMessage;
 
   StudentProfileModel? _profile;
@@ -29,7 +33,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
+    _pageController = PageController(initialPage: _selectedTabIndex);
     _loadInitialData();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadInitialData() async {
@@ -90,8 +101,59 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  /// Гладко обновяване на данните без скриване на горната лента и табовете
   Future<void> _refreshAll() async {
-    await _loadInitialData();
+    if (widget.authRepository == null || _isRefreshing) return;
+
+    setState(() {
+      _isRefreshing = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final profile = await widget.authRepository!.getStudentProfile();
+      if (!mounted) return;
+      setState(() {
+        _profile = profile;
+      });
+
+      if (profile.hasAccessToExams) {
+        final exams = await widget.authRepository!.getMyExams();
+        if (mounted) {
+          setState(() {
+            _exams = exams;
+            _examsErrorMessage = null;
+          });
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+          backgroundColor: UiThemeTokens.destructive,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRefreshing = false;
+        });
+      }
+    }
+  }
+
+  void _onTabTapped(int index) {
+    if (_selectedTabIndex == index) return;
+    setState(() => _selectedTabIndex = index);
+    _pageController.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+    if (index == 1 && _profile != null && _profile!.hasAccessToExams && _exams.isEmpty && !_isLoadingExams) {
+      _loadExams();
+    }
   }
 
   void _openLivenessScan() async {
@@ -114,7 +176,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         );
       }
-      _loadInitialData();
+      _refreshAll();
     }
   }
 
@@ -132,6 +194,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       builder: (context) => ChangePasswordSheet(
         authRepository: widget.authRepository!,
+        isInitialSetup: false,
         onSuccess: () {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -186,32 +249,97 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  /// Потвърждение при натискане на хардуерен Back бутон на начален таб
+  Future<bool?> _showExitConfirmationDialog() {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Затваряне на приложението',
+          style: UiThemeTokens.getSansFont(fontWeight: FontWeight.bold, fontSize: 18),
+        ),
+        content: Text(
+          'Желаете ли да затворите Exam Gate?',
+          style: UiThemeTokens.getSansFont(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Отказ', style: UiThemeTokens.getSansFont(color: UiThemeTokens.mutedForeground)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: UiThemeTokens.primary,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Затвори'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: UiThemeTokens.background,
-      body: SafeArea(
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator(color: UiThemeTokens.primary))
-            : _errorMessage != null
-                ? _buildErrorView()
-                : RefreshIndicator(
-                    onRefresh: _refreshAll,
-                    color: UiThemeTokens.primary,
-                    child: Column(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+
+        // 1. Ако сме в "Изпитен Прозорец", връщаме към "Студентски Профил"
+        if (_selectedTabIndex != 0) {
+          _onTabTapped(0);
+          return;
+        }
+
+        // 2. Ако сме в "Студентски Профил", питаме за потвърждение за затваряне
+        final shouldExit = await _showExitConfirmationDialog();
+        if (shouldExit == true) {
+          SystemNavigator.pop();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: UiThemeTokens.background,
+        body: SafeArea(
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator(color: UiThemeTokens.primary))
+              : _errorMessage != null
+                  ? _buildErrorView()
+                  : Column(
                       children: [
                         _buildTopHeader(),
                         _buildTopTabSwitcher(),
+                        if (_isRefreshing)
+                          const LinearProgressIndicator(
+                            minHeight: 2.5,
+                            color: UiThemeTokens.primary,
+                            backgroundColor: Colors.transparent,
+                          ),
                         if (_profile != null && !_profile!.isApproved)
                           _buildPersistentAlertBanner(),
                         Expanded(
-                          child: _selectedTabIndex == 0
-                              ? _buildStudentProfileTab()
-                              : _buildExamsWindowTab(),
+                          child: PageView(
+                            controller: _pageController,
+                            onPageChanged: (index) {
+                              setState(() => _selectedTabIndex = index);
+                              if (index == 1 &&
+                                  _profile != null &&
+                                  _profile!.hasAccessToExams &&
+                                  _exams.isEmpty &&
+                                  !_isLoadingExams) {
+                                _loadExams();
+                              }
+                            },
+                            children: [
+                              _buildStudentProfileTab(),
+                              _buildExamsWindowTab(),
+                            ],
+                          ),
                         ),
                       ],
                     ),
-                  ),
+        ),
       ),
     );
   }
@@ -249,7 +377,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildTopHeader() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: UiThemeTokens.card,
         border: Border(bottom: BorderSide(color: UiThemeTokens.border)),
       ),
@@ -265,7 +393,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 children: [
                   Text(
                     'Exam Gate',
-                    style: UiThemeTokens.getSansFont(fontSize: 17, fontWeight: FontWeight.bold, color: UiThemeTokens.primary),
+                    style: UiThemeTokens.getSansFont(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      color: UiThemeTokens.primary,
+                    ),
                   ),
                   if (_profile != null)
                     Text(
@@ -279,9 +411,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Row(
             children: [
               IconButton(
-                icon: const Icon(Icons.refresh, color: UiThemeTokens.mutedForeground),
+                icon: _isRefreshing
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: UiThemeTokens.primary),
+                      )
+                    : const Icon(Icons.refresh, color: UiThemeTokens.mutedForeground),
                 tooltip: 'Обнови',
-                onPressed: _refreshAll,
+                onPressed: _isRefreshing ? null : _refreshAll,
               ),
               IconButton(
                 icon: const Icon(Icons.logout, color: UiThemeTokens.destructive),
@@ -298,100 +436,123 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildTopTabSwitcher() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
-      child: Container(
-        padding: const EdgeInsets.all(4.0),
-        decoration: BoxDecoration(
-          color: UiThemeTokens.input,
-          borderRadius: UiThemeTokens.borderRadius,
-          border: Border.all(color: UiThemeTokens.border),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: GestureDetector(
-                onTap: () => setState(() => _selectedTabIndex = 0),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.symmetric(vertical: 12.0),
-                  decoration: BoxDecoration(
-                    color: _selectedTabIndex == 0 ? UiThemeTokens.primary : Colors.transparent,
-                    borderRadius: UiThemeTokens.borderRadius,
-                    boxShadow: _selectedTabIndex == 0
-                        ? [
+      child: AnimatedBuilder(
+        animation: _pageController,
+        builder: (context, child) {
+          // Извличаме позицията на превъртане в реално време (от 0.0 до 1.0)
+          final page = (_pageController.hasClients && _pageController.page != null)
+              ? _pageController.page!
+              : _selectedTabIndex.toDouble();
+          final progress = page.clamp(0.0, 1.0);
+
+          return Container(
+            padding: const EdgeInsets.all(4.0),
+            decoration: BoxDecoration(
+              color: UiThemeTokens.input,
+              borderRadius: UiThemeTokens.borderRadius,
+              border: Border.all(color: UiThemeTokens.border),
+            ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final tabWidth = constraints.maxWidth / 2;
+
+                return Stack(
+                  children: [
+                    // 1. Плаващо / плъзгащо се хапче, движещо се заедно със суайпването в реално време
+                    Positioned(
+                      top: 0,
+                      bottom: 0,
+                      left: progress * tabWidth,
+                      width: tabWidth,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: UiThemeTokens.primary,
+                          borderRadius: UiThemeTokens.borderRadius,
+                          boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.08),
+                              color: Colors.black.withValues(alpha: 0.1),
                               blurRadius: 4,
                               offset: const Offset(0, 2),
                             ),
-                          ]
-                        : null,
-                  ),
-                  child: Center(
-                    child: Text(
-                      'Студентски Профил',
-                      style: UiThemeTokens.getSansFont(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: _selectedTabIndex == 0
-                            ? UiThemeTokens.primaryForeground
-                            : UiThemeTokens.mutedForeground,
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 4),
-            Expanded(
-              child: GestureDetector(
-                onTap: () {
-                  setState(() => _selectedTabIndex = 1);
-                  if (_profile != null && _profile!.hasAccessToExams && _exams.isEmpty && !_isLoadingExams) {
-                    _loadExams();
-                  }
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.symmetric(vertical: 12.0),
-                  decoration: BoxDecoration(
-                    color: _selectedTabIndex == 1 ? UiThemeTokens.primary : Colors.transparent,
-                    borderRadius: UiThemeTokens.borderRadius,
-                    boxShadow: _selectedTabIndex == 1
-                        ? [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.08),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ]
-                        : null,
-                  ),
-                  child: Center(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+
+                    // 2. Интерактивни бутони с плавно преливащ цвят на текста (Color.lerp)
+                    Row(
                       children: [
-                        Text(
-                          'Изпитен Прозорец',
-                          style: UiThemeTokens.getSansFont(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: _selectedTabIndex == 1
-                                ? UiThemeTokens.primaryForeground
-                                : UiThemeTokens.mutedForeground,
+                        Expanded(
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () => _onTabTapped(0),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 12.0),
+                              child: Center(
+                                child: Text(
+                                  'Студентски Профил',
+                                  style: UiThemeTokens.getSansFont(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color.lerp(
+                                      UiThemeTokens.primaryForeground,
+                                      UiThemeTokens.mutedForeground,
+                                      progress,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
                         ),
-                        if (_profile != null && !_profile!.hasAccessToExams) ...[
-                          const SizedBox(width: 4),
-                          const Icon(Icons.lock_outline, size: 14, color: UiThemeTokens.mutedForeground),
-                        ],
+                        Expanded(
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () => _onTabTapped(1),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 12.0),
+                              child: Center(
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      'Изпитен Прозорец',
+                                      style: UiThemeTokens.getSansFont(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color.lerp(
+                                          UiThemeTokens.mutedForeground,
+                                          UiThemeTokens.primaryForeground,
+                                          progress,
+                                        ),
+                                      ),
+                                    ),
+                                    if (_profile != null && !_profile!.hasAccessToExams) ...[
+                                      const SizedBox(width: 4),
+                                      Icon(
+                                        Icons.lock_outline,
+                                        size: 14,
+                                        color: Color.lerp(
+                                          UiThemeTokens.mutedForeground,
+                                          UiThemeTokens.primaryForeground.withValues(alpha: 0.8),
+                                          progress,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                       ],
                     ),
-                  ),
-                ),
-              ),
+                  ],
+                );
+              },
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -414,10 +575,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       border = const Color(0xFFFFE082);
       icon = Icons.hourglass_top_outlined;
       text = 'Вашият биометричен профил се преглежда от администратор. Очаквайте потвърждение.';
-      actionButton = TextButton(
-        onPressed: _loadInitialData,
-        child: Text('Провери', style: UiThemeTokens.getSansFont(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF8D6E63))),
-      );
+      actionButton = null; // Премахнат излишният бутон "Провери" - използва се горната лента
     } else if (isRejected) {
       bg = const Color(0xFFFFEBEE);
       border = const Color(0xFFFFCDD2);
@@ -474,8 +632,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
               style: UiThemeTokens.getSansFont(fontSize: 12, fontWeight: FontWeight.w500, color: UiThemeTokens.foreground),
             ),
           ),
-          const SizedBox(width: 8),
-          actionButton,
+          if (actionButton != null) ...[
+            const SizedBox(width: 8),
+            actionButton,
+          ],
         ],
       ),
     );
@@ -484,18 +644,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildStudentProfileTab() {
     if (_profile == null) return const SizedBox.shrink();
 
-    return ListView(
-      padding: const EdgeInsets.all(16.0),
-      children: [
-        _buildProfileHeaderCard(),
-        const SizedBox(height: 16),
-        _buildAccountStatusCard(),
-        const SizedBox(height: 16),
-        _buildAcademicInfoCard(),
-        const SizedBox(height: 16),
-        _buildSecurityOptionsCard(),
-        const SizedBox(height: 24),
-      ],
+    return RefreshIndicator(
+      onRefresh: _refreshAll,
+      color: UiThemeTokens.primary,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16.0),
+        children: [
+          _buildProfileHeaderCard(),
+          const SizedBox(height: 16),
+          _buildAccountStatusCard(),
+          const SizedBox(height: 16),
+          _buildAcademicInfoCard(),
+          const SizedBox(height: 16),
+          _buildSecurityOptionsCard(),
+          const SizedBox(height: 24),
+        ],
+      ),
     );
   }
 
@@ -596,15 +761,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ],
       );
-      actionButton = OutlinedButton.icon(
-        onPressed: _loadInitialData,
-        icon: const Icon(Icons.sync, size: 16),
-        label: const Text('Обнови'),
-        style: OutlinedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          textStyle: UiThemeTokens.getSansFont(fontSize: 13, fontWeight: FontWeight.bold),
-        ),
-      );
+      // Премахнат излишният бутон "Обнови" при чакащо одобрение
+      actionButton = null;
     } else if (isRejected) {
       statusBadge = Row(
         mainAxisSize: MainAxisSize.min,
@@ -861,140 +1019,159 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     if (_exams.isEmpty) {
-      return Center(
-        child: Padding(
+      return RefreshIndicator(
+        onRefresh: _refreshAll,
+        color: UiThemeTokens.primary,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(32.0),
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(28.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.event_available_outlined, size: 56, color: UiThemeTokens.primary),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Нямате предстоящи изпити',
-                    style: UiThemeTokens.getSansFont(fontSize: 17, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Всички регистрирани изпити за вашата група и поток ще се появят тук.',
-                    textAlign: TextAlign.center,
-                    style: UiThemeTokens.getSansFont(color: UiThemeTokens.mutedForeground, fontSize: 13),
-                  ),
-                  const SizedBox(height: 16),
-                  OutlinedButton.icon(
-                    onPressed: _loadExams,
-                    icon: const Icon(Icons.refresh, size: 16),
-                    label: const Text('Провери отново'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(16.0),
-      itemCount: _exams.length,
-      itemBuilder: (context, index) {
-        final exam = _exams[index];
-        return _buildExamCard(exam);
-      },
-    );
-  }
-
-  Widget _buildBlurredGatedExamWindow() {
-    return Stack(
-      children: [
-        // Размито предварително съдържание (Mockup exam layout зад блъра)
-        ListView(
-          padding: const EdgeInsets.all(16.0),
-          physics: const NeverScrollableScrollPhysics(),
           children: [
-            _buildMockExamCard('Математически анализ III', 'Зала 1151', '12.06.2026 г. в 09:00 ч.', 'доц. д-р И. Петров'),
-            const SizedBox(height: 12),
-            _buildMockExamCard('Обектно-ориентирано програмиране', 'Зала 2110', '18.06.2026 г. в 11:30 ч.', 'проф. д-р С. Георгиев'),
-            const SizedBox(height: 12),
-            _buildMockExamCard('Бази от данни', 'Зала 4203', '25.06.2026 г. в 14:00 ч.', 'доц. д-р М. Димитрова'),
-          ],
-        ),
-
-        // Блър ефект (Gaussian blur)
-        Positioned.fill(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 9.0, sigmaY: 9.0),
-            child: Container(
-              color: Colors.white.withValues(alpha: 0.35),
-            ),
-          ),
-        ),
-
-        // Централна заключваща карта с биометричен бутон
-        Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
-            child: Card(
-              elevation: 4,
-              shape: RoundedRectangleBorder(
-                borderRadius: UiThemeTokens.borderRadius,
-                side: BorderSide(color: UiThemeTokens.border.withValues(alpha: 0.8)),
-              ),
+            const SizedBox(height: 40),
+            Card(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
+                padding: const EdgeInsets.all(28.0),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: UiThemeTokens.primary.withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.fingerprint,
-                        size: 40,
-                        color: UiThemeTokens.primary,
-                      ),
-                    ),
+                    const Icon(Icons.event_available_outlined, size: 56, color: UiThemeTokens.primary),
                     const SizedBox(height: 16),
                     Text(
-                      'Трябва да преминете биометрично сканиране, преди да получите достъп до този раздел!',
-                      textAlign: TextAlign.center,
-                      style: UiThemeTokens.getSansFont(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: UiThemeTokens.foreground,
-                      ),
+                      'Нямате предстоящи изпити',
+                      style: UiThemeTokens.getSansFont(fontSize: 17, fontWeight: FontWeight.bold),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 8),
                     Text(
-                      'За гарантиране на сигурността в изпитните зали, прегледът на графика и определената зала изисква потвърдена биометрия.',
+                      'Всички регистрирани изпити за вашата група и поток ще се появят тук.',
                       textAlign: TextAlign.center,
-                      style: UiThemeTokens.getSansFont(
-                        fontSize: 12,
-                        color: UiThemeTokens.mutedForeground,
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    ElevatedButton.icon(
-                      onPressed: _openLivenessScan,
-                      icon: const Icon(Icons.camera_alt_outlined, size: 18),
-                      label: const Text('Към биометрично сканиране'),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                        textStyle: UiThemeTokens.getSansFont(fontSize: 14, fontWeight: FontWeight.bold),
-                      ),
+                      style: UiThemeTokens.getSansFont(color: UiThemeTokens.mutedForeground, fontSize: 13),
                     ),
                   ],
                 ),
               ),
             ),
-          ),
+          ],
         ),
-      ],
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _refreshAll,
+      color: UiThemeTokens.primary,
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16.0),
+        itemCount: _exams.length,
+        itemBuilder: (context, index) {
+          final exam = _exams[index];
+          return _buildExamCard(exam);
+        },
+      ),
+    );
+  }
+
+  Widget _buildBlurredGatedExamWindow() {
+    final isPendingApproval = _profile != null && _profile!.isPendingApproval;
+
+    return ClipRect(
+      child: Stack(
+        children: [
+          // Размито предварително съдържание (Mockup exam layout зад блъра)
+          ListView(
+            padding: const EdgeInsets.all(16.0),
+            physics: const NeverScrollableScrollPhysics(),
+            children: [
+              _buildMockExamCard('Математически анализ III', 'Зала 1151', '12.06.2026 г. в 09:00 ч.', 'доц. д-р И. Петров'),
+              const SizedBox(height: 12),
+              _buildMockExamCard('Обектно-ориентирано програмиране', 'Зала 2110', '18.06.2026 г. в 11:30 ч.', 'проф. д-р С. Георгиев'),
+              const SizedBox(height: 12),
+              _buildMockExamCard('Бази от данни', 'Зала 4203', '25.06.2026 г. в 14:00 ч.', 'доц. д-р М. Димитрова'),
+            ],
+          ),
+
+          // Блър ефект (Gaussian blur) - изолиран строго в очертанията на този прозорец
+          Positioned.fill(
+            child: ClipRect(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 9.0, sigmaY: 9.0),
+                child: Container(
+                  color: Colors.white.withValues(alpha: 0.35),
+                ),
+              ),
+            ),
+          ),
+
+          // Централна заключваща карта с биометричен статус
+          Center(
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
+              child: Card(
+                elevation: 4,
+                shape: RoundedRectangleBorder(
+                  borderRadius: UiThemeTokens.borderRadius,
+                  side: BorderSide(color: UiThemeTokens.border.withValues(alpha: 0.8)),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: (isPendingApproval ? Colors.orange : UiThemeTokens.primary).withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          isPendingApproval ? Icons.hourglass_top_outlined : Icons.fingerprint,
+                          size: 40,
+                          color: isPendingApproval ? Colors.orange.shade800 : UiThemeTokens.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        isPendingApproval
+                            ? 'Вашият биометричен профил се обработва!'
+                            : 'Трябва да преминете биометрично сканиране, преди да получите достъп до този раздел!',
+                        textAlign: TextAlign.center,
+                        style: UiThemeTokens.getSansFont(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: UiThemeTokens.foreground,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        isPendingApproval
+                            ? 'Вие вече изпратихте снимка за верификация. Моля, изчакайте администратор да одобри данните Ви, за да получите пълен достъп до графика.'
+                            : 'За гарантиране на сигурността в изпитните зали, прегледът на графика и определената зала изисква потвърдена биометрия.',
+                        textAlign: TextAlign.center,
+                        style: UiThemeTokens.getSansFont(
+                          fontSize: 12,
+                          color: UiThemeTokens.mutedForeground,
+                        ),
+                      ),
+                      // Не показваме бутон за повторно сканиране, ако вече се чака одобрение
+                      if (!isPendingApproval) ...[
+                        const SizedBox(height: 18),
+                        ElevatedButton.icon(
+                          onPressed: _openLivenessScan,
+                          icon: const Icon(Icons.camera_alt_outlined, size: 18),
+                          label: const Text('Към биометрично сканиране'),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            textStyle: UiThemeTokens.getSansFont(fontSize: 14, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

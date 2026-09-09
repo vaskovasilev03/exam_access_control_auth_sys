@@ -99,6 +99,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
       builder: (context) => ChangePasswordSheet(
         authRepository: widget.authRepository,
+        isInitialSetup: true,
         onSuccess: _navigateToDashboard,
       ),
     );

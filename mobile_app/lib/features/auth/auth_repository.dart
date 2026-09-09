@@ -45,12 +45,13 @@ class AuthRepository {
     }
   }
 
-  Future<void> changePassword(String newPassword) async {
+  Future<void> changePassword(String newPassword, {String? oldPassword}) async {
     try {
       final response = await _apiClient.dio.post(
         '/students/change-password',
         data: {
           'new_password': newPassword,
+          if (oldPassword != null && oldPassword.isNotEmpty) 'old_password': oldPassword,
         },
       );
 
