@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="bg">
+<html lang="bg" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,50 +7,63 @@
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <style>
         :root {
-            --card: #f5f5f5;
-            --ring: #606060;
-            --input: #e0e0e0;
-            --muted: #d9d9d9;
-            --accent: #c0c0c0;
-            --border: #d0d0d0;
-            --radius: 0.35rem;
-            --popover: #f5f5f5;
-            --primary: #606060;
-            --sidebar: #eaeaea;
-            --font-mono: Fira Code, monospace;
-            --font-sans: Montserrat, sans-serif;
-            --secondary: #e0e0e0;
-            --background: #f0f0f0;
-            --font-serif: Georgia, serif;
-            --foreground: #333333;
-            --destructive: #cc3333;
-            --card-foreground: #333333;
-            --muted-foreground: #666666;
-            --accent-foreground: #333333;
-            --popover-foreground: #333333;
-            --primary-foreground: #ffffff;
-            --secondary-foreground: #333333;
-            --destructive-foreground: #ffffff;
+            --bg-body: #f8fafc;
+            --bg-card: #ffffff;
+            --bg-sidebar: #0f172a;
+            --bg-sidebar-hover: #1e293b;
+            --bg-sidebar-active: #2563eb;
+            --sidebar-text: #94a3b8;
+            --sidebar-text-active: #ffffff;
+            --border: #e2e8f0;
+            --border-subtle: #f1f5f9;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --primary-light: #eff6ff;
+            --success: #10b981;
+            --success-light: #ecfdf5;
+            --warning: #f59e0b;
+            --warning-light: #fffbeb;
+            --danger: #ef4444;
+            --danger-light: #fef2f2;
+            --purple: #8b5cf6;
+            --purple-light: #f5f3ff;
+            --radius: 0.5rem;
+            --font-sans: Montserrat, system-ui, -apple-system, sans-serif;
+            --font-mono: 'Fira Code', monospace;
+        }
+
+        [data-theme="dark"] {
+            --bg-body: #090d16;
+            --bg-card: #131b2e;
+            --bg-sidebar: #0b1120;
+            --bg-sidebar-hover: #1c2640;
+            --bg-sidebar-active: #2563eb;
+            --sidebar-text: #94a3b8;
+            --sidebar-text-active: #ffffff;
+            --border: #1e293b;
+            --border-subtle: #192237;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --primary: #3b82f6;
+            --primary-hover: #60a5fa;
+            --primary-light: rgba(59, 130, 246, 0.12);
+            --success: #10b981;
+            --success-light: rgba(16, 185, 129, 0.12);
+            --warning: #f59e0b;
+            --warning-light: rgba(245, 158, 11, 0.12);
+            --danger: #ef4444;
+            --danger-light: rgba(239, 68, 68, 0.12);
+            --purple: #a855f7;
+            --purple-light: rgba(168, 85, 247, 0.12);
         }
 
         body {
-            background:
-                radial-gradient(circle at top left, rgba(96, 96, 96, 0.08), transparent 28%),
-                radial-gradient(circle at top right, rgba(192, 192, 192, 0.16), transparent 22%),
-                var(--background);
-            color: var(--foreground);
+            background-color: var(--bg-body);
+            color: var(--text-main);
             font-family: var(--font-sans);
-        }
-
-        .glass {
-            background: rgba(245, 245, 245, 0.88);
-            backdrop-filter: blur(10px);
-        }
-
-        .tab-button[aria-selected="true"] {
-            background: var(--primary);
-            color: var(--primary-foreground);
-            border-color: var(--primary);
+            transition: background-color 0.2s ease, color 0.2s ease;
         }
 
         .panel {
@@ -59,528 +72,1023 @@
 
         .panel.active {
             display: block;
+            animation: fadeIn 0.18s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(3px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Sidebar transitions */
+        .sidebar {
+            transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .sidebar-collapsed .sidebar-label,
+        .sidebar-collapsed .sidebar-badge,
+        .sidebar-collapsed .sidebar-brand-text {
+            display: none !important;
+        }
+
+        .sidebar-collapsed .nav-item {
+            justify-content: center;
+            padding-left: 0;
+            padding-right: 0;
+        }
+
+        .sidebar-collapsed .nav-item > div {
+            justify-content: center;
+            gap: 0;
+        }
+
+        .sidebar-collapsed .sidebar-brand {
+            justify-content: center;
+            padding-left: 0;
+            padding-right: 0;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.3);
+            border-radius: 999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(148, 163, 184, 0.5);
         }
     </style>
 </head>
-<body class="min-h-screen">
-    <header class="glass sticky top-0 z-30 border-b border-[var(--border)] px-4 sm:px-6 py-4 shadow-[0_2px_18px_hsl(0_0%_20%/0.08)]">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between max-w-[1600px] mx-auto">
-            <div>
-                <p class="text-xs uppercase tracking-[0.35em] text-[var(--muted-foreground)] mb-1">Admin control surface</p>
-                <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-[var(--primary)]">Административен Панел</h1>
+<body class="min-h-screen antialiased flex">
+
+    <!-- MOBILE OVERLAY BACKDROP -->
+    <div id="mobileBackdrop" class="fixed inset-0 bg-slate-900/60 z-40 lg:hidden hidden backdrop-blur-xs transition-opacity"></div>
+
+    <!-- =============================================== -->
+    <!-- ADMINATOR SIDEBAR NAVIGATION                    -->
+    <!-- =============================================== -->
+    <aside id="appSidebar" class="sidebar fixed inset-y-0 left-0 z-50 flex flex-col w-64 bg-[var(--bg-sidebar)] border-r border-[var(--border)] transition-all lg:static shadow-xl lg:shadow-none -translate-x-full lg:translate-x-0">
+        <!-- BRAND HEADER -->
+        <div class="sidebar-brand h-16 flex items-center gap-3 px-5 border-b border-slate-800/80 shrink-0">
+            <div class="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold shadow-md shadow-blue-500/20 shrink-0">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
             </div>
-            <div class="flex items-center gap-3">
-                <p id="dashboardStatus" class="text-sm font-semibold text-[var(--foreground)] hidden sm:block">Зареждане...</p>
-                <button onclick="adminLogout()" class="bg-[var(--primary)] hover:opacity-90 text-[var(--primary-foreground)] px-4 py-2 rounded-[var(--radius)] text-sm font-semibold transition cursor-pointer">Изход</button>
+            <div class="sidebar-brand-text min-w-0">
+                <h1 class="text-sm font-bold text-white tracking-wide truncate">Exam Gate</h1>
+                <p class="text-[10px] uppercase tracking-wider text-slate-400 truncate">Academic Access</p>
             </div>
         </div>
-    </header>
 
-    <main class="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 space-y-6">
-        <section class="grid grid-cols-1 lg:grid-cols-4 gap-4">
-            <div class="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius)] p-5 shadow-[0_2px_12px_hsl(0_0%_20%/0.08)]">
-                <p class="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)]">Student imports</p>
-                <p id="countStudentImports" class="text-3xl font-bold mt-2">0</p>
-            </div>
-            <div class="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius)] p-5 shadow-[0_2px_12px_hsl(0_0%_20%/0.08)]">
-                <p class="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)]">Exam imports</p>
-                <p id="countExamImports" class="text-3xl font-bold mt-2">0</p>
-            </div>
-            <div class="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius)] p-5 shadow-[0_2px_12px_hsl(0_0%_20%/0.08)]">
-                <p class="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)]">Pending approvals</p>
-                <p id="countPendingStudents" class="text-3xl font-bold mt-2">0</p>
-            </div>
-            <div class="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius)] p-5 shadow-[0_2px_12px_hsl(0_0%_20%/0.08)]">
-                <p class="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)]">Allocations</p>
-                <p id="countAllocationLogs" class="text-3xl font-bold mt-2">0</p>
-            </div>
-        </section>
+        <!-- NAVIGATION MENU -->
+        <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-1.5" id="sidebarNav">
+            <!-- 1. OVERVIEW -->
+            <button class="nav-item w-full flex items-center justify-between px-3 py-2.5 rounded-[var(--radius)] text-xs font-semibold bg-blue-600 text-white shadow-md shadow-blue-500/20 transition cursor-pointer group" data-tab="overview" title="Обзор">
+                <div class="flex items-center gap-3 min-w-0">
+                    <svg class="w-5 h-5 text-blue-200 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                    </svg>
+                    <span class="sidebar-label truncate">Обзор</span>
+                </div>
+            </button>
 
-        <section class="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius)] shadow-[0_2px_12px_hsl(0_0%_20%/0.08)] overflow-hidden">
-            <div class="border-b border-[var(--border)] p-4 sm:p-5">
-                <div class="flex flex-wrap gap-2" id="tabBar">
-                    <button class="tab-button px-4 py-2 rounded-[var(--radius)] border border-[var(--border)] text-sm font-semibold transition" data-tab="overview" aria-selected="true">Обзор</button>
-                    <button class="tab-button px-4 py-2 rounded-[var(--radius)] border border-[var(--border)] text-sm font-semibold transition" data-tab="students">Студенти</button>
-                    <button class="tab-button px-4 py-2 rounded-[var(--radius)] border border-[var(--border)] text-sm font-semibold transition" data-tab="exams">Изпити</button>
-                    <button class="tab-button px-4 py-2 rounded-[var(--radius)] border border-[var(--border)] text-sm font-semibold transition" data-tab="allocation">Разпределение</button>
-                    <button class="tab-button px-4 py-2 rounded-[var(--radius)] border border-[var(--border)] text-sm font-semibold transition" data-tab="approval">Одобрения</button>
-                    <button class="tab-button px-4 py-2 rounded-[var(--radius)] border border-[var(--border)] text-sm font-semibold transition" data-tab="examiners">Квестори</button>
-                    {% if is_superadmin %}
-                    <button id="verificationsTabBtn" class="tab-button px-4 py-2 rounded-[var(--radius)] border border-[var(--border)] text-sm font-semibold transition items-center gap-1.5" style="display: inline-flex;" data-tab="verifications">
-                        <span>Верификации</span>
-                        <span id="verificationsBadge" class="hidden px-1.5 py-0.5 rounded-full text-xs bg-[var(--destructive)] text-[var(--destructive-foreground)] font-bold">0</span>
+            <!-- 2. STUDENTS -->
+            <button class="nav-item w-full flex items-center justify-between px-3 py-2.5 rounded-[var(--radius)] text-xs font-semibold text-slate-300 hover:text-white hover:bg-[var(--bg-sidebar-hover)] transition cursor-pointer group" data-tab="students" title="Студенти">
+                <div class="flex items-center gap-3 min-w-0">
+                    <svg class="w-5 h-5 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                    </svg>
+                    <span class="sidebar-label truncate">Студенти</span>
+                </div>
+            </button>
+
+            <!-- 3. EXAMS -->
+            <button class="nav-item w-full flex items-center justify-between px-3 py-2.5 rounded-[var(--radius)] text-xs font-semibold text-slate-300 hover:text-white hover:bg-[var(--bg-sidebar-hover)] transition cursor-pointer group" data-tab="exams" title="Изпити">
+                <div class="flex items-center gap-3 min-w-0">
+                    <svg class="w-5 h-5 text-purple-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span class="sidebar-label truncate">Изпити</span>
+                </div>
+            </button>
+
+            <!-- 4. ALLOCATION -->
+            <button class="nav-item w-full flex items-center justify-between px-3 py-2.5 rounded-[var(--radius)] text-xs font-semibold text-slate-300 hover:text-white hover:bg-[var(--bg-sidebar-hover)] transition cursor-pointer group" data-tab="allocation" title="Разпределение">
+                <div class="flex items-center gap-3 min-w-0">
+                    <svg class="w-5 h-5 text-amber-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                    <span class="sidebar-label truncate">Разпределение</span>
+                </div>
+            </button>
+
+            <!-- 5. APPROVALS -->
+            <button class="nav-item w-full flex items-center justify-between px-3 py-2.5 rounded-[var(--radius)] text-xs font-semibold text-slate-300 hover:text-white hover:bg-[var(--bg-sidebar-hover)] transition cursor-pointer group" data-tab="approval" title="Одобрения">
+                <div class="flex items-center gap-3 min-w-0">
+                    <svg class="w-5 h-5 text-rose-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span class="sidebar-label truncate">Одобрения</span>
+                </div>
+                <span id="pendingCountBadgeNav" class="sidebar-badge hidden px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30">0</span>
+            </button>
+
+            <!-- 6. EXAMINERS -->
+            <button class="nav-item w-full flex items-center justify-between px-3 py-2.5 rounded-[var(--radius)] text-xs font-semibold text-slate-300 hover:text-white hover:bg-[var(--bg-sidebar-hover)] transition cursor-pointer group" data-tab="examiners" title="Квестори">
+                <div class="flex items-center gap-3 min-w-0">
+                    <svg class="w-5 h-5 text-cyan-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    <span class="sidebar-label truncate">Квестори</span>
+                </div>
+            </button>
+
+            {% if is_superadmin %}
+            <!-- 7. VERIFICATIONS (Superadmin Only) -->
+            <button id="verificationsTabBtn" class="nav-item w-full flex items-center justify-between px-3 py-2.5 rounded-[var(--radius)] text-xs font-semibold text-slate-300 hover:text-white hover:bg-[var(--bg-sidebar-hover)] transition cursor-pointer group" data-tab="verifications" title="Верификации & Secure Key">
+                <div class="flex items-center gap-3 min-w-0">
+                    <svg class="w-5 h-5 text-amber-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                    </svg>
+                    <span class="sidebar-label truncate">Верификации</span>
+                </div>
+                <span id="verificationsBadge" class="sidebar-badge hidden px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-600 text-white animate-pulse">0</span>
+            </button>
+            {% endif %}
+        </nav>
+
+        <!-- SIDEBAR FOOTER (COLLAPSE TOGGLE) -->
+        <div class="p-3 border-t border-slate-800/80 shrink-0 hidden lg:block">
+            <button id="desktopSidebarToggle" class="w-full flex items-center justify-center gap-2 py-2 rounded-[var(--radius)] text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800/60 transition cursor-pointer">
+                <svg id="collapseIcon" class="w-4 h-4 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                </svg>
+                <span class="sidebar-label text-[11px]">Свиване на менюто</span>
+            </button>
+        </div>
+    </aside>
+
+    <!-- =============================================== -->
+    <!-- MAIN APPLICATION WRAPPER                        -->
+    <!-- =============================================== -->
+    <div class="flex-1 flex flex-col min-w-0 min-h-screen overflow-x-hidden">
+
+        <!-- =============================================== -->
+        <!-- ADMINATOR TOPBAR                                -->
+        <!-- =============================================== -->
+        <header class="h-16 bg-[var(--bg-card)] border-b border-[var(--border)] px-4 sm:px-6 flex items-center justify-between gap-4 sticky top-0 z-30 shadow-xs">
+            <!-- LEFT AREA: SIDEBAR BURGER & SEARCH -->
+            <div class="flex items-center gap-3 flex-1 min-w-0">
+                <!-- MOBILE TOGGLE BUTTON -->
+                <button id="mobileMenuBtn" class="lg:hidden p-2 rounded-lg text-[var(--text-muted)] hover:bg-[var(--border-subtle)] hover:text-[var(--text-main)] transition cursor-pointer" aria-label="Open sidebar">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                </button>
+
+                <!-- SEARCH PALETTE TRIGGER BUTTON -->
+                <button id="searchPaletteTrigger" class="flex items-center gap-2 px-3 py-1.5 rounded-[var(--radius)] bg-[var(--bg-body)] border border-[var(--border)] text-xs text-[var(--text-muted)] hover:text-[var(--text-main)] hover:border-blue-500/40 transition cursor-pointer shadow-2xs group">
+                    <svg class="w-3.5 h-3.5 text-[var(--text-muted)] group-hover:text-blue-500 transition shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <span class="text-xs">Search pages, actions...</span>
+                    <kbd class="hidden sm:inline-block text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--bg-card)] border border-[var(--border)] text-[var(--text-muted)]">⌘K</kbd>
+                </button>
+            </div>
+
+            <!-- RIGHT AREA: STATUS, THEME TOGGLE & USER PROFILE -->
+            <div class="flex items-center gap-3 shrink-0">
+                <!-- BREADCRUMB INDICATOR -->
+                <div class="hidden xl:flex items-center gap-1.5 text-xs text-[var(--text-muted)] border-r border-[var(--border)] pr-3">
+                    <span>Exam Gate</span>
+                    <span>>></span>
+                    <span id="currentBreadcrumb" class="font-bold text-[var(--text-main)]">Обзор</span>
+                </div>
+
+                <!-- LIVE STATUS PILL -->
+                <div class="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span id="dashboardStatus">База данни: Свързана</span>
+                </div>
+
+                <!-- THEME TOGGLE BUTTON -->
+                <button id="themeToggleBtn" title="Превключване на тъмна / светла тема" class="p-2 rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--border-subtle)] transition cursor-pointer">
+                    <!-- Sun Icon (Dark Mode active -> switch to Light) -->
+                    <svg id="sunIcon" class="w-4 h-4 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                    </svg>
+                    <!-- Moon Icon (Light Mode active -> switch to Dark) -->
+                    <svg id="moonIcon" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                    </svg>
+                </button>
+
+                <!-- USER ROLE BADGE & LOGOUT -->
+                <div class="flex items-center gap-2 pl-2 border-l border-[var(--border)]">
+                    <div class="hidden sm:flex flex-col text-right">
+                        <span id="userRoleBadge" class="text-xs font-bold leading-tight">
+                            {% if is_superadmin %}👑 Superadmin{% else %}👤 Администратор{% endif %}
+                        </span>
+                        <span class="text-[10px] text-[var(--text-muted)]">Control Surface</span>
+                    </div>
+                    <button onclick="adminLogout()" class="px-3 py-1.5 rounded-[var(--radius)] bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/30 text-xs font-bold hover:bg-red-600 hover:text-white transition cursor-pointer">
+                        Изход
                     </button>
-                    {% endif %}
+                </div>
+            </div>
+        </header>
+
+        <!-- =============================================== -->
+        <!-- MAIN CONTENT CONTAINER                          -->
+        <!-- =============================================== -->
+        <main class="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1600px] w-full mx-auto space-y-6">
+
+            <!-- =============================================== -->
+            <!-- 1. PANEL: OVERVIEW (Adminator Style)            -->
+            <!-- =============================================== -->
+            <div id="panel-overview" class="panel active space-y-6">
+                
+                <!-- HERO WELCOME BANNER -->
+                <section class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-6 sm:p-8 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
+                    <div class="space-y-1.5 relative z-10 max-w-2xl">
+                        <span id="heroDate" class="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Зареждане на дата...</span>
+                        <h2 class="text-2xl sm:text-3xl font-extrabold text-[var(--text-main)] tracking-tight">
+                            Добре дошли в <span class="text-blue-600 dark:text-blue-400">Exam Gate</span>
+                        </h2>
+                        <p class="text-xs sm:text-sm text-[var(--text-muted)] leading-relaxed">
+                            Централизиран контролен център за академични изпитни сесии, автоматизирано студентско разпределение и биометричен ИИ мониторинг.
+                        </p>
+                    </div>
+
+                    <!-- HERO SHORTCUT BUTTONS -->
+                    <div class="flex flex-wrap items-center gap-3 relative z-10">
+                        <button onclick="switchTab('students')" class="px-4 py-2.5 rounded-[var(--radius)] bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 transition cursor-pointer flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                            </svg>
+                            Нов студентски импорт
+                        </button>
+                        <button onclick="switchTab('exams')" class="px-4 py-2.5 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--border-subtle)] text-[var(--text-main)] text-xs font-bold transition cursor-pointer flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            Изпитни графици
+                        </button>
+                    </div>
+                </section>
+
+                <!-- ADMINATOR KPI METRIC GRID -->
+                <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" aria-label="Key Performance Indicators">
+                    <!-- KPI 1: STUDENT IMPORTS -->
+                    <article class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 shadow-xs flex flex-col justify-between hover:border-blue-500/50 transition group cursor-pointer" onclick="switchTab('students')">
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold">
+                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                                    </svg>
+                                </div>
+                                <span class="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Студентски импорти</span>
+                            </div>
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400">Партиди</span>
+                        </div>
+                        <div class="mt-4 flex items-baseline justify-between">
+                            <span id="countStudentImports" class="text-3xl font-extrabold text-[var(--text-main)]">0</span>
+                            <span class="text-xs text-[var(--text-muted)] flex items-center gap-1 group-hover:text-blue-600 transition">Преглед →</span>
+                        </div>
+                    </article>
+
+                    <!-- KPI 2: EXAM IMPORTS -->
+                    <article class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 shadow-xs flex flex-col justify-between hover:border-purple-500/50 transition group cursor-pointer" onclick="switchTab('exams')">
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-lg bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold">
+                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    </svg>
+                                </div>
+                                <span class="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Изпитни сесии</span>
+                            </div>
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400">Графици</span>
+                        </div>
+                        <div class="mt-4 flex items-baseline justify-between">
+                            <span id="countExamImports" class="text-3xl font-extrabold text-[var(--text-main)]">0</span>
+                            <span class="text-xs text-[var(--text-muted)] flex items-center gap-1 group-hover:text-purple-600 transition">Преглед →</span>
+                        </div>
+                    </article>
+
+                    <!-- KPI 3: PENDING APPROVALS -->
+                    <article class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 shadow-xs flex flex-col justify-between hover:border-rose-500/50 transition group cursor-pointer" onclick="switchTab('approval')">
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-lg bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center font-bold">
+                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                                <span class="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Чакащи биометрия</span>
+                            </div>
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400">Опашка</span>
+                        </div>
+                        <div class="mt-4 flex items-baseline justify-between">
+                            <span id="countPendingStudents" class="text-3xl font-extrabold text-rose-600 dark:text-rose-400">0</span>
+                            <span class="text-xs text-rose-600 flex items-center gap-1 font-bold">Одобри →</span>
+                        </div>
+                    </article>
+
+                    <!-- KPI 4: ALLOCATIONS -->
+                    <article class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 shadow-xs flex flex-col justify-between hover:border-emerald-500/50 transition group cursor-pointer" onclick="switchTab('allocation')">
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold">
+                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                    </svg>
+                                </div>
+                                <span class="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Разпределения</span>
+                            </div>
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">Зали</span>
+                        </div>
+                        <div class="mt-4 flex items-baseline justify-between">
+                            <span id="countAllocationLogs" class="text-3xl font-extrabold text-[var(--text-main)]">0</span>
+                            <span class="text-xs text-[var(--text-muted)] flex items-center gap-1 group-hover:text-emerald-600 transition">Преглед →</span>
+                        </div>
+                    </article>
+                </section>
+
+                <!-- OVERVIEW CONTENT GRID: QUICK ACTIONS & RECENT ACTIVITY -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    
+                    <!-- QUICK ACTIONS HUB (5 COLS) -->
+                    <section class="lg:col-span-5 bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 sm:p-6 shadow-xs flex flex-col justify-between">
+                        <div>
+                            <div class="border-b border-[var(--border)] pb-3 mb-4">
+                                <span class="text-[10px] uppercase tracking-wider font-bold text-blue-600 dark:text-blue-400">Бързи операции</span>
+                                <h3 class="text-base font-bold text-[var(--text-main)]">Контролни Действия</h3>
+                            </div>
+                            <div class="space-y-2.5">
+                                <button onclick="switchTab('students')" class="w-full flex items-center justify-between p-3 rounded-[var(--radius)] border border-[var(--border)] hover:bg-[var(--border-subtle)] hover:border-blue-500/40 transition cursor-pointer text-left">
+                                    <div class="flex items-center gap-3">
+                                        <span class="w-8 h-8 rounded-md bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-sm">1</span>
+                                        <div>
+                                            <p class="text-xs font-bold text-[var(--text-main)]">Импортиране на студенти</p>
+                                            <p class="text-[11px] text-[var(--text-muted)]">Качване на Excel таблица с групи</p>
+                                        </div>
+                                    </div>
+                                    <span class="text-xs text-[var(--text-muted)]">→</span>
+                                </button>
+
+                                <button onclick="switchTab('exams')" class="w-full flex items-center justify-between p-3 rounded-[var(--radius)] border border-[var(--border)] hover:bg-[var(--border-subtle)] hover:border-purple-500/40 transition cursor-pointer text-left">
+                                    <div class="flex items-center gap-3">
+                                        <span class="w-8 h-8 rounded-md bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold text-sm">2</span>
+                                        <div>
+                                            <p class="text-xs font-bold text-[var(--text-main)]">Качване на изпитен график</p>
+                                            <p class="text-[11px] text-[var(--text-muted)]">Импорт на дати, часове и зали</p>
+                                        </div>
+                                    </div>
+                                    <span class="text-xs text-[var(--text-muted)]">→</span>
+                                </button>
+
+                                <button onclick="switchTab('allocation')" class="w-full flex items-center justify-between p-3 rounded-[var(--radius)] border border-[var(--border)] hover:bg-[var(--border-subtle)] hover:border-emerald-500/40 transition cursor-pointer text-left">
+                                    <div class="flex items-center gap-3">
+                                        <span class="w-8 h-8 rounded-md bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-sm">3</span>
+                                        <div>
+                                            <p class="text-xs font-bold text-[var(--text-main)]">Стартиране на разпределение</p>
+                                            <p class="text-[11px] text-[var(--text-muted)]">Зачисляване на студенти към изпити</p>
+                                        </div>
+                                    </div>
+                                    <span class="text-xs text-[var(--text-muted)]">→</span>
+                                </button>
+
+                                <button onclick="switchTab('approval')" class="w-full flex items-center justify-between p-3 rounded-[var(--radius)] border border-[var(--border)] hover:bg-[var(--border-subtle)] hover:border-rose-500/40 transition cursor-pointer text-left">
+                                    <div class="flex items-center gap-3">
+                                        <span class="w-8 h-8 rounded-md bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center font-bold text-sm">4</span>
+                                        <div>
+                                            <p class="text-xs font-bold text-[var(--text-main)]">Биометрични одобрения</p>
+                                            <p class="text-[11px] text-[var(--text-muted)]">Преглед на лицеви снимки и верификация</p>
+                                        </div>
+                                    </div>
+                                    <span class="text-xs text-[var(--text-muted)]">→</span>
+                                </button>
+
+                                {% if is_superadmin %}
+                                <button onclick="switchTab('verifications')" class="w-full flex items-center justify-between p-3 rounded-[var(--radius)] border border-[var(--border)] hover:bg-[var(--border-subtle)] hover:border-amber-500/40 transition cursor-pointer text-left">
+                                    <div class="flex items-center gap-3">
+                                        <span class="w-8 h-8 rounded-md bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 flex items-center justify-center font-bold text-sm">🔑</span>
+                                        <div>
+                                            <p class="text-xs font-bold text-amber-800 dark:text-amber-300">Secure Key & Верификации</p>
+                                            <p class="text-[11px] text-amber-700/80 dark:text-amber-400/80">Необслужвани регистрации на персонал</p>
+                                        </div>
+                                    </div>
+                                    <span class="text-xs text-amber-700">→</span>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- RECENT ACTIVITY FEED (7 COLS) -->
+                    <section class="lg:col-span-7 bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 sm:p-6 shadow-xs flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between border-b border-[var(--border)] pb-3 mb-4">
+                                <div>
+                                    <span class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)]">Журнал на събитията</span>
+                                    <h3 class="text-base font-bold text-[var(--text-main)]">Последна Активност</h3>
+                                </div>
+                                <button onclick="loadDashboardData()" class="p-1.5 rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--border-subtle)] text-xs font-semibold transition cursor-pointer" title="Обнови данните">
+                                    ↻
+                                </button>
+                            </div>
+
+                            <div id="overviewActivityFeed" class="space-y-3">
+                                <div class="text-xs text-[var(--text-muted)] text-center py-8">Зареждане на системния журнал...</div>
+                            </div>
+                        </div>
+
+                        <div class="pt-4 border-t border-[var(--border)] mt-4 flex items-center justify-between text-xs text-[var(--text-muted)]">
+                            <span>Синхронизирано в реално време</span>
+                            <button onclick="switchTab('allocation')" class="text-blue-600 dark:text-blue-400 font-bold hover:underline">Виж всички записи →</button>
+                        </div>
+                    </section>
                 </div>
             </div>
 
-            <div class="p-4 sm:p-6">
-                <div id="panel-overview" class="panel active">
-                    <div class="mb-6">
-                        <h2 class="text-xl font-bold text-[var(--primary)] mb-1">Архитектура и Управление на Ресурсите</h2>
-                        <p class="text-sm text-[var(--muted-foreground)]">Централизирана платформа за контрол на академични данни, биометрична обработка и периферен хардуерен мониторинг.</p>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="border border-[var(--border)] rounded-[var(--radius)] p-5 bg-[var(--card)] shadow-[0_2px_8px_hsl(0_0%_20%/0.04)] flex flex-col justify-between">
-                            <div>
-                                <div class="flex items-center gap-3 mb-3">
-                                    <span class="text-xl p-2 rounded-lg bg-[var(--input)] text-[var(--primary)]">1.</span>
-                                    <h3 class="text-base font-bold">Управление на Студентски Профили</h3>
-                                </div>
-                                <p class="text-sm text-[var(--muted-foreground)] leading-relaxed">
-                                    Поддържа масов импорт на студентски бази данни директно от университетски Excel таблици. Системата автоматично изолира дублирани записи, генерира криптографски сигурни временни пароли и управлява опашки за разпращане на имейл известия през защитен SMTP протокол.
-                                </p>
-                            </div>
+            <!-- =============================================== -->
+            <!-- 2. PANEL: STUDENTS                              -->
+            <!-- =============================================== -->
+            <div id="panel-students" class="panel space-y-6">
+                <div class="grid grid-cols-1 xl:grid-cols-[380px_1fr] gap-6">
+                    <section class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 sm:p-6 shadow-xs space-y-4">
+                        <div class="border-b border-[var(--border)] pb-3">
+                            <h2 class="text-base font-bold text-[var(--text-main)]">Excel Студентски Импорт</h2>
+                            <p class="text-xs text-[var(--text-muted)] mt-0.5">Качете списък със студенти за избраната група.</p>
                         </div>
-
-                        <div class="border border-[var(--border)] rounded-[var(--radius)] p-5 bg-[var(--card)] shadow-[0_2px_8px_hsl(0_0%_20%/0.04)] flex flex-col justify-between">
+                        <form id="studentsForm" class="space-y-3.5">
                             <div>
-                                <div class="flex items-center gap-3 mb-3">
-                                    <span class="text-xl p-2 rounded-lg bg-[var(--input)] text-[var(--primary)]">2.</span>
-                                    <h3 class="text-base font-bold">Изпитни Сесии и Разпределение</h3>
-                                </div>
-                                <p class="text-sm text-[var(--muted-foreground)] leading-relaxed">
-                                    Служи за автоматизирано въвеждане на семестриални изпитни графици и за зали. Интелигентният алгоритъм за разпределение извършва софтуерен мост, филтрира одобрените студенти по курс, поток, група и специалност, и ги зачислява към съответните изпитни събития в реално време.
-                                </p>
+                                <label class="text-[11px] uppercase tracking-wider font-bold text-[var(--text-muted)] block mb-1">Факултет</label>
+                                <input type="text" id="studFaculty" required placeholder="напр. ФКСУ" class="w-full bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)] px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500/30 outline-none">
                             </div>
-                        </div>
-
-                        <div class="border border-[var(--border)] rounded-[var(--radius)] p-5 bg-[var(--card)] shadow-[0_2px_8px_hsl(0_0%_20%/0.04)] flex flex-col justify-between">
                             <div>
-                                <div class="flex items-center gap-3 mb-3">
-                                    <span class="text-xl p-2 rounded-lg bg-[var(--input)] text-[var(--primary)]">3.</span>
-                                    <h3 class="text-base font-bold">Биометричен ИИ Контрол</h3>
-                                </div>
-                                <p class="text-sm text-[var(--muted-foreground)] leading-relaxed">
-                                    Интерфейс за администриране на чакащи верификации. Системата осъществява сигурна връзка с MinIO обектно хранилище за изтегляне на снимки, след което чрез изкуствен интелект анализира и капсулира лицевите структури в 128-измерни вектори, записвани в PostgreSQL чрез pgvector.
-                                </p>
+                                <label class="text-[11px] uppercase tracking-wider font-bold text-[var(--text-muted)] block mb-1">Специалност</label>
+                                <input type="text" id="studSpecialty" required placeholder="напр. КСИ" class="w-full bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)] px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500/30 outline-none">
                             </div>
-                        </div>
-
-                        <div class="border border-[var(--border)] rounded-[var(--radius)] p-5 bg-[var(--card)] shadow-[0_2px_8px_hsl(0_0%_20%/0.04)] flex flex-col justify-between">
-                            <div>
-                                <div class="flex items-center gap-3 mb-3">
-                                    <span class="text-xl p-2 rounded-lg bg-[var(--input)] text-[var(--primary)]">4.</span>
-                                    <h3 class="text-base font-bold">Мониторинг и Изпитни Квестори</h3>
-                                </div>
-                                <p class="text-sm text-[var(--muted-foreground)] leading-relaxed">
-                                    Осигурява пълна отчетност и сигурност чрез регистрация на оторизирани квестори. Контролира мрежовия статус на периферните терминални устройства (ESP32-CAM) и визуализира асинхронни MJPEG видео стриймове и журнали за достъп директно от изпитните зали.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="panel-students" class="panel">
-                    <div class="grid grid-cols-1 xl:grid-cols-[360px_1fr] gap-4 mb-4">
-                        <section class="border border-[var(--border)] rounded-[var(--radius)] p-4 bg-[var(--card)]">
-                            <h2 class="text-lg font-bold mb-2">Excel Students Import</h2>
-                            <p class="text-sm text-[var(--muted-foreground)] mb-4">Качете Excel файл за конкретната група. След това логът ще покаже всички студенти от същата група.</p>
-                            <form id="studentsForm" class="space-y-4">
+                            <div class="grid grid-cols-3 gap-2.5">
                                 <div>
-                                    <label class="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)] block mb-1">Факултет</label>
-                                    <input type="text" id="studFaculty" required class="w-full bg-[var(--input)] border border-[var(--border)] rounded-[var(--radius)] px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]">
+                                    <label class="text-[11px] uppercase tracking-wider font-bold text-[var(--text-muted)] block mb-1">Курс</label>
+                                    <input type="number" id="studCourse" required placeholder="3" class="w-full bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)] px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500/30 outline-none">
                                 </div>
                                 <div>
-                                    <label class="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)] block mb-1">Специалност</label>
-                                    <input type="text" id="studSpecialty" required class="w-full bg-[var(--input)] border border-[var(--border)] rounded-[var(--radius)] px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]">
-                                </div>
-                                <div class="grid grid-cols-3 gap-3">
-                                    <div>
-                                        <label class="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)] block mb-1">Курс</label>
-                                        <input type="number" id="studCourse" required class="w-full bg-[var(--input)] border border-[var(--border)] rounded-[var(--radius)] px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]">
-                                    </div>
-                                    <div>
-                                        <label class="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)] block mb-1">Поток</label>
-                                        <input type="number" id="studStream" required class="w-full bg-[var(--input)] border border-[var(--border)] rounded-[var(--radius)] px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]">
-                                    </div>
-                                    <div>
-                                        <label class="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)] block mb-1">Група</label>
-                                        <input type="number" id="studGroup" required class="w-full bg-[var(--input)] border border-[var(--border)] rounded-[var(--radius)] px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]">
-                                    </div>
+                                    <label class="text-[11px] uppercase tracking-wider font-bold text-[var(--text-muted)] block mb-1">Поток</label>
+                                    <input type="number" id="studStream" required placeholder="1" class="w-full bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)] px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500/30 outline-none">
                                 </div>
                                 <div>
-                                    <label class="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)] block mb-1">Excel файл</label>
-                                    <input type="file" id="studFile" accept=".xlsx,.xls" required class="w-full text-sm bg-[var(--input)] border border-[var(--border)] rounded-[var(--radius)] p-2 file:mr-4 file:py-2 file:px-4 file:rounded-[var(--radius)] file:border-0 file:bg-[var(--primary)] file:text-[var(--primary-foreground)] file:font-semibold">
-                                </div>
-                                <div id="studStatus" class="hidden text-sm p-3 rounded-[var(--radius)] border"></div>
-                                <button type="submit" class="w-full bg-[var(--primary)] text-[var(--primary-foreground)] font-semibold py-3 rounded-[var(--radius)] hover:opacity-90">Импортирай Студенти</button>
-                            </form>
-                        </section>
-
-                        <section class="border border-[var(--border)] rounded-[var(--radius)] p-4 bg-[var(--card)] min-h-[60vh]">
-                            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-                                <div>
-                                    <p class="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)]">Selected log</p>
-                                    <h3 id="studentLogTitle" class="text-xl font-bold">Изберете лог отляво</h3>
-                                </div>
-                                <div class="flex flex-wrap items-center gap-2">
-                                    <button id="studentSelectAllBtn" class="px-3 py-2 rounded-[var(--radius)] border border-[var(--border)] text-sm font-semibold hover:bg-[var(--input)]">Select all</button>
-                                    <button id="studentSendBtn" class="px-3 py-2 rounded-[var(--radius)] bg-[var(--primary)] text-[var(--primary-foreground)] text-sm font-semibold hover:opacity-90">Send notifications</button>
+                                    <label class="text-[11px] uppercase tracking-wider font-bold text-[var(--text-muted)] block mb-1">Група</label>
+                                    <input type="number" id="studGroup" required placeholder="42" class="w-full bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)] px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500/30 outline-none">
                                 </div>
                             </div>
-                            <p id="studentLogMeta" class="text-sm text-[var(--muted-foreground)] mb-4"></p>
-                            <div class="overflow-auto border border-[var(--border)] rounded-[var(--radius)]">
-                                <table class="min-w-full text-sm">
-                                    <thead class="bg-[var(--input)]/60 text-left">
+                            <div>
+                                <label class="text-[11px] uppercase tracking-wider font-bold text-[var(--text-muted)] block mb-1">Excel файл (.xlsx, .xls)</label>
+                                <input type="file" id="studFile" accept=".xlsx,.xls" required class="w-full text-xs bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)] p-2 file:mr-3 file:py-1 file:px-3 file:rounded-[var(--radius)] file:border-0 file:bg-blue-600 file:text-white file:text-xs file:font-semibold">
+                            </div>
+                            <div id="studStatus" class="hidden text-xs p-3 rounded-[var(--radius)] border"></div>
+                            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-[var(--radius)] text-xs shadow-md shadow-blue-500/20 transition cursor-pointer">Импортирай Студенти</button>
+                        </form>
+                    </section>
+
+                    <section class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 sm:p-6 shadow-xs flex flex-col justify-between min-h-[500px]">
+                        <div>
+                            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] pb-3 mb-4">
+                                <div>
+                                    <span class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)]">Избрана партида</span>
+                                    <h3 id="studentLogTitle" class="text-base font-bold text-[var(--text-main)]">Изберете лог от списъка</h3>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <button id="studentSelectAllBtn" class="px-3 py-1.5 rounded-[var(--radius)] border border-[var(--border)] text-xs font-semibold hover:bg-[var(--border-subtle)] transition">Всички</button>
+                                    <button id="studentSendBtn" class="px-3 py-1.5 rounded-[var(--radius)] bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition shadow-sm">Изпрати известия</button>
+                                </div>
+                            </div>
+                            <p id="studentLogMeta" class="text-xs text-[var(--text-muted)] mb-3"></p>
+                            <div class="overflow-x-auto border border-[var(--border)] rounded-[var(--radius)]">
+                                <table class="min-w-full text-xs">
+                                    <thead class="bg-[var(--bg-body)] text-left text-[var(--text-muted)] font-bold">
                                         <tr>
-                                            <th class="px-3 py-2 w-12"><input type="checkbox" id="studentSelectAllCheckbox"></th>
-                                            <th class="px-3 py-2">Име</th>
-                                            <th class="px-3 py-2">Фак. №</th>
-                                            <th class="px-3 py-2">Статус</th>
-                                            <th class="px-3 py-2">Email</th>
+                                            <th class="px-3 py-2.5 w-10"><input type="checkbox" id="studentSelectAllCheckbox"></th>
+                                            <th class="px-3 py-2.5">Име</th>
+                                            <th class="px-3 py-2.5">Фак. №</th>
+                                            <th class="px-3 py-2.5">Статус</th>
+                                            <th class="px-3 py-2.5">Email</th>
                                         </tr>
                                     </thead>
-                                    <tbody id="studentLogTableBody"></tbody>
+                                    <tbody id="studentLogTableBody" class="divide-y divide-[var(--border)]"></tbody>
                                 </table>
                             </div>
-                        </section>
-                    </div>
-
-                    <aside class="border border-[var(--border)] rounded-[var(--radius)] p-4 bg-[var(--input)]/35 max-h-[78vh] overflow-auto">
-                        <div class="flex items-center justify-between mb-3">
-                            <h2 class="text-lg font-bold">Студентски импорти</h2>
-                            <span id="studentsLogCount" class="text-xs px-2 py-1 rounded-full bg-[var(--accent)]/50">0</span>
                         </div>
-                        <div id="studentImportLogList" class="space-y-3"></div>
-                    </aside>
+                    </section>
                 </div>
 
-                <div id="panel-exams" class="panel">
-                    <div class="grid grid-cols-1 xl:grid-cols-[420px_1fr] gap-4 mb-4">
-                        
-                        <section class="border border-[var(--border)] rounded-[var(--radius)] p-4 bg-[var(--card)]">
-                            <h2 class="text-lg font-bold mb-2">Excel Exams Import</h2>
-                            <p class="text-sm text-[var(--muted-foreground)] mb-4">Качете изпитния Excel файл. Импорт логът ще показва batch-а през създадените изпити.</p>
-                            <form id="examsForm" class="space-y-4">
-                                <div class="border-2 border-dashed border-[var(--border)] rounded-[var(--radius)] p-8 text-center bg-[var(--input)]/45 hover:border-[var(--ring)] transition relative flex flex-col items-center justify-center min-h-[220px]">
-                                    <span class="text-4xl mb-2">📊</span>
-                                    <label class="block cursor-pointer">
-                                        <span class="text-[var(--primary)] font-bold text-sm hover:underline">Изберете файл с графици</span>
-                                        <input type="file" id="examFile" accept=".xlsx,.xls" required class="hidden">
-                                    </label>
-                                    <p id="examFileName" class="text-xs text-[var(--muted-foreground)] mt-2">Само файлове с разширение .xlsx или .xls</p>
-                                </div>
-                                <div id="examStatus" class="hidden text-sm p-3 rounded-[var(--radius)] border"></div>
-                                <button type="submit" class="w-full bg-[var(--primary)] text-[var(--primary-foreground)] font-semibold py-3 rounded-[var(--radius)] hover:opacity-90 cursor-pointer">Импортирай Изпитен График</button>
-                            </form>
-                        </section>
-
-                        <section class="border border-[var(--border)] rounded-[var(--radius)] p-4 bg-[var(--card)] min-h-[60vh] flex flex-col justify-between">
-                            <div>
-                                <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-                                    <div>
-                                        <p class="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)]">Selected batch</p>
-                                        <h3 id="examLogTitle" class="text-xl font-bold">Изберете изпитен лог отдолу</h3>
-                                    </div>
-                                </div>
-                                <p id="examBatchSummary" class="text-sm text-[var(--muted-foreground)] mb-4"></p>
-                                <div class="overflow-auto border border-[var(--border)] rounded-[var(--radius)]">
-                                    <table class="min-w-full text-sm">
-                                        <thead class="bg-[var(--input)]/60 text-left">
-                                            <tr>
-                                                <th class="px-3 py-2">Дисциплина</th>
-                                                <th class="px-3 py-2">Зала</th>
-                                                <th class="px-3 py-2">Дата и час</th>
-                                                <th class="px-3 py-2">Курс</th>
-                                                <th class="px-3 py-2">Група</th>
-                                                <th class="px-3 py-2">Действие</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="examBatchTableBody"></tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </section>
+                <aside class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 shadow-xs">
+                    <div class="flex items-center justify-between border-b border-[var(--border)] pb-3 mb-3">
+                        <h3 class="text-sm font-bold text-[var(--text-main)]">История на студентските импорти</h3>
+                        <span id="studentsLogCount" class="text-xs px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold">0</span>
                     </div>
+                    <div id="studentImportLogList" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3"></div>
+                </aside>
+            </div>
 
-                    <aside class="border border-[var(--border)] rounded-[var(--radius)] p-4 bg-[var(--input)]/35 max-h-[40vh] overflow-auto">
-                        <div class="flex items-center justify-between mb-3">
-                            <h2 class="text-lg font-bold">Изпитни импорти</h2>
-                            <span id="examsLogCount" class="text-xs px-2 py-1 rounded-full bg-[var(--accent)]/50">0</span>
+            <!-- =============================================== -->
+            <!-- 3. PANEL: EXAMS                                 -->
+            <!-- =============================================== -->
+            <div id="panel-exams" class="panel space-y-6">
+                <div class="grid grid-cols-1 xl:grid-cols-[400px_1fr] gap-6">
+                    <section class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 sm:p-6 shadow-xs space-y-4">
+                        <div class="border-b border-[var(--border)] pb-3">
+                            <h2 class="text-base font-bold text-[var(--text-main)]">Excel Изпитен График</h2>
+                            <p class="text-xs text-[var(--text-muted)] mt-0.5">Качете файл с семестриални изпитни дати, часове и зали.</p>
                         </div>
-                        <div id="examImportLogList" class="space-y-3"></div>
-                    </aside>
-                </div>
-
-                <div id="panel-allocation" class="panel">
-                    <div class="grid grid-cols-1 xl:grid-cols-[360px_1fr] gap-4">
-                        <aside class="border border-[var(--border)] rounded-[var(--radius)] p-4 bg-[var(--input)]/35 max-h-[78vh] overflow-auto">
-                            <div class="flex items-center justify-between mb-3">
-                                <h2 class="text-lg font-bold">Allocation execution history</h2>
-                                <span id="allocationLogCount" class="text-xs px-2 py-1 rounded-full bg-[var(--accent)]/50">0</span>
+                        <form id="examsForm" class="space-y-4">
+                            <div class="border-2 border-dashed border-[var(--border)] rounded-[var(--radius)] p-6 text-center bg-[var(--bg-body)] hover:border-blue-500 transition relative flex flex-col items-center justify-center min-h-[180px]">
+                                <span class="text-3xl mb-2">📊</span>
+                                <label class="block cursor-pointer">
+                                    <span class="text-blue-600 dark:text-blue-400 font-bold text-xs hover:underline">Изберете файл с графици</span>
+                                    <input type="file" id="examFile" accept=".xlsx,.xls" required class="hidden">
+                                </label>
+                                <p id="examFileName" class="text-[11px] text-[var(--text-muted)] mt-2">Само файлове .xlsx или .xls</p>
                             </div>
-                            <div id="allocationLogList" class="space-y-3"></div>
-                        </aside>
+                            <div id="examStatus" class="hidden text-xs p-3 rounded-[var(--radius)] border"></div>
+                            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-[var(--radius)] text-xs shadow-md shadow-blue-500/20 transition cursor-pointer">Импортирай Изпитен График</button>
+                        </form>
+                    </section>
 
-                        <section class="border border-[var(--border)] rounded-[var(--radius)] p-4 bg-[var(--card)] min-h-[60vh]">
-                            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-                                <div>
-                                    <p class="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)]">Selected execution</p>
-                                    <h3 id="allocationLogTitle" class="text-xl font-bold">Изберете allocation лог отляво</h3>
-                                </div>
-                                <button id="allocationSendBtn" class="px-3 py-2 rounded-[var(--radius)] bg-[var(--primary)] text-[var(--primary-foreground)] text-sm font-semibold hover:opacity-90">Send exam emails</button>
+                    <section class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 sm:p-6 shadow-xs flex flex-col justify-between min-h-[500px]">
+                        <div>
+                            <div class="border-b border-[var(--border)] pb-3 mb-4">
+                                <span class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)]">Избран лог</span>
+                                <h3 id="examLogTitle" class="text-base font-bold text-[var(--text-main)]">Изберете изпитен лог отдолу</h3>
                             </div>
-                            <div id="allocationSummary" class="text-sm text-[var(--muted-foreground)] mb-4"></div>
-                            <div class="overflow-auto border border-[var(--border)] rounded-[var(--radius)]">
-                                <table class="min-w-full text-sm">
-                                    <thead class="bg-[var(--input)]/60 text-left">
+                            <p id="examBatchSummary" class="text-xs text-[var(--text-muted)] mb-3"></p>
+                            <div class="overflow-x-auto border border-[var(--border)] rounded-[var(--radius)]">
+                                <table class="min-w-full text-xs">
+                                    <thead class="bg-[var(--bg-body)] text-left text-[var(--text-muted)] font-bold">
                                         <tr>
-                                            <th class="px-3 py-2">Студент</th>
-                                            <th class="px-3 py-2">Фак. №</th>
-                                            <th class="px-3 py-2">Дисциплина</th>
-                                            <th class="px-3 py-2">Зала</th>
-                                            <th class="px-3 py-2">Дата и час</th>
+                                            <th class="px-3 py-2.5">Дисциплина</th>
+                                            <th class="px-3 py-2.5">Зала</th>
+                                            <th class="px-3 py-2.5">Дата и час</th>
+                                            <th class="px-3 py-2.5">Курс</th>
+                                            <th class="px-3 py-2.5">Група</th>
+                                            <th class="px-3 py-2.5">Действие</th>
                                         </tr>
                                     </thead>
-                                    <tbody id="allocationStudentsBody"></tbody>
+                                    <tbody id="examBatchTableBody" class="divide-y divide-[var(--border)]"></tbody>
                                 </table>
                             </div>
-                        </section>
-                    </div>
+                        </div>
+                    </section>
                 </div>
 
-                <div id="panel-approval" class="panel">
-                    <div class="grid grid-cols-1 xl:grid-cols-[320px_1fr] gap-4">
-                        <aside class="border border-[var(--border)] rounded-[var(--radius)] p-4 bg-[var(--input)]/35 max-h-[78vh] overflow-auto">
-                            <div class="flex items-center justify-between mb-3">
-                                <h2 class="text-lg font-bold">Очакващи одобрение</h2>
-                                <span id="pendingCountBadge" class="text-xs px-2 py-1 rounded-full bg-[var(--accent)]/50">0</span>
-                            </div>
-                            <button id="startApprovalBtn" class="w-full px-3 py-2 rounded-[var(--radius)] bg-[var(--primary)] text-[var(--primary-foreground)] text-sm font-semibold hover:opacity-90 mb-4">Старт на одобрения, чакащи: 0</button>
-                            <div id="pendingStudentList" class="space-y-3"></div>
-                        </aside>
+                <aside class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 shadow-xs">
+                    <div class="flex items-center justify-between border-b border-[var(--border)] pb-3 mb-3">
+                        <h3 class="text-sm font-bold text-[var(--text-main)]">Изпитни импорти</h3>
+                        <span id="examsLogCount" class="text-xs px-2.5 py-0.5 rounded-full bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 font-bold">0</span>
+                    </div>
+                    <div id="examImportLogList" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3"></div>
+                </aside>
+            </div>
 
-                        <section class="border border-[var(--border)] rounded-[var(--radius)] p-4 bg-[var(--card)] min-h-[60vh]">
-                            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <!-- =============================================== -->
+            <!-- 4. PANEL: ALLOCATION                            -->
+            <!-- =============================================== -->
+            <div id="panel-allocation" class="panel space-y-6">
+                <div class="grid grid-cols-1 xl:grid-cols-[380px_1fr] gap-6">
+                    <aside class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 shadow-xs max-h-[75vh] overflow-y-auto">
+                        <div class="flex items-center justify-between border-b border-[var(--border)] pb-3 mb-3">
+                            <h3 class="text-sm font-bold text-[var(--text-main)]">История на разпределенията</h3>
+                            <span id="allocationLogCount" class="text-xs px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold">0</span>
+                        </div>
+                        <div id="allocationLogList" class="space-y-2.5"></div>
+                    </aside>
+
+                    <section class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 sm:p-6 shadow-xs flex flex-col justify-between min-h-[500px]">
+                        <div>
+                            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] pb-3 mb-4">
                                 <div>
-                                    <p class="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)]">Current queue item</p>
-                                    <h3 id="approvalTitle" class="text-xl font-bold">Натиснете старт, за да видите студентите един по един</h3>
+                                    <span class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)]">Избрано изпълнение</span>
+                                    <h3 id="allocationLogTitle" class="text-base font-bold text-[var(--text-main)]">Изберете allocation лог отляво</h3>
                                 </div>
+                                <button id="allocationSendBtn" class="px-3 py-1.5 rounded-[var(--radius)] bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-sm">Изпрати изпитни имейли</button>
+                            </div>
+                            <div id="allocationSummary" class="text-xs text-[var(--text-muted)] mb-3"></div>
+                            <div class="overflow-x-auto border border-[var(--border)] rounded-[var(--radius)]">
+                                <table class="min-w-full text-xs">
+                                    <thead class="bg-[var(--bg-body)] text-left text-[var(--text-muted)] font-bold">
+                                        <tr>
+                                            <th class="px-3 py-2.5">Студент</th>
+                                            <th class="px-3 py-2.5">Фак. №</th>
+                                            <th class="px-3 py-2.5">Дисциплина</th>
+                                            <th class="px-3 py-2.5">Зала</th>
+                                            <th class="px-3 py-2.5">Дата и час</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="allocationStudentsBody" class="divide-y divide-[var(--border)]"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
 
+            <!-- =============================================== -->
+            <!-- 5. PANEL: APPROVALS                             -->
+            <!-- =============================================== -->
+            <div id="panel-approval" class="panel space-y-6">
+                <div class="grid grid-cols-1 xl:grid-cols-[340px_1fr] gap-6">
+                    <aside class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 shadow-xs max-h-[75vh] overflow-y-auto space-y-3">
+                        <div class="flex items-center justify-between border-b border-[var(--border)] pb-3">
+                            <h3 class="text-sm font-bold text-[var(--text-main)]">Очакващи биометрия</h3>
+                            <span id="pendingCountBadge" class="text-xs px-2.5 py-0.5 rounded-full bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold">0</span>
+                        </div>
+                        <button id="startApprovalBtn" class="w-full px-3 py-2 rounded-[var(--radius)] bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition cursor-pointer">Старт на одобрения, чакащи: 0</button>
+                        <div id="pendingStudentList" class="space-y-2.5"></div>
+                    </aside>
+
+                    <section class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 sm:p-6 shadow-xs flex flex-col justify-between min-h-[500px]">
+                        <div>
+                            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] pb-3 mb-4">
+                                <div>
+                                    <span class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)]">Текущ студент</span>
+                                    <h3 id="approvalTitle" class="text-base font-bold text-[var(--text-main)]">Натиснете старт, за да започнете преглед</h3>
+                                </div>
                                 <div id="approvalActions" class="flex flex-wrap gap-2 hidden">
-                                    <button id="approveBtn" class="px-3 py-2 rounded-[var(--radius)] bg-[var(--primary)] text-[var(--primary-foreground)] text-sm font-semibold hover:opacity-90 cursor-pointer">Одобри</button>
-                                    <button id="rejectBtn" class="px-3 py-2 rounded-[var(--radius)] bg-[var(--destructive)] text-[var(--destructive-foreground)] text-sm font-semibold hover:opacity-90 cursor-pointer">Отхвърли</button>
+                                    <button id="approveBtn" class="px-4 py-2 rounded-[var(--radius)] bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition cursor-pointer">Одобри (AI Embedding)</button>
+                                    <button id="rejectBtn" class="px-4 py-2 rounded-[var(--radius)] bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition cursor-pointer">Отхвърли</button>
                                 </div>
                             </div>
-                            
-                            <p id="approvalMeta" class="text-sm text-[var(--muted-foreground)] mb-4"></p>
+
+                            <p id="approvalMeta" class="text-xs text-[var(--text-muted)] mb-4"></p>
                             <div class="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-4">
                                 <div class="space-y-3">
-                                    <div class="grid grid-cols-2 gap-3 text-sm">
-                                        <div class="border border-[var(--border)] rounded-[var(--radius)] p-3"><p class="text-xs text-[var(--muted-foreground)]">Факултетен номер</p><p id="approvalStudentNumber" class="font-semibold mt-1">-</p></div>
-                                        <div class="border border-[var(--border)] rounded-[var(--radius)] p-3"><p class="text-xs text-[var(--muted-foreground)]">Email</p><p id="approvalStudentEmail" class="font-semibold mt-1 break-all">-</p></div>
-                                        <div class="border border-[var(--border)] rounded-[var(--radius)] p-3"><p class="text-xs text-[var(--muted-foreground)]">Специалност</p><p id="approvalStudentSpecialty" class="font-semibold mt-1">-</p></div>
-                                        <div class="border border-[var(--border)] rounded-[var(--radius)] p-3"><p class="text-xs text-[var(--muted-foreground)]">Група</p><p id="approvalStudentGroup" class="font-semibold mt-1">-</p></div>
+                                    <div class="grid grid-cols-2 gap-3 text-xs">
+                                        <div class="border border-[var(--border)] rounded-[var(--radius)] p-3"><p class="text-[10px] uppercase text-[var(--text-muted)] font-bold">Факултетен №</p><p id="approvalStudentNumber" class="font-bold text-sm mt-0.5">-</p></div>
+                                        <div class="border border-[var(--border)] rounded-[var(--radius)] p-3"><p class="text-[10px] uppercase text-[var(--text-muted)] font-bold">Email</p><p id="approvalStudentEmail" class="font-bold text-xs mt-0.5 break-all">-</p></div>
+                                        <div class="border border-[var(--border)] rounded-[var(--radius)] p-3"><p class="text-[10px] uppercase text-[var(--text-muted)] font-bold">Специалност</p><p id="approvalStudentSpecialty" class="font-bold text-xs mt-0.5">-</p></div>
+                                        <div class="border border-[var(--border)] rounded-[var(--radius)] p-3"><p class="text-[10px] uppercase text-[var(--text-muted)] font-bold">Група</p><p id="approvalStudentGroup" class="font-bold text-xs mt-0.5">-</p></div>
                                     </div>
-                                    <textarea id="rejectionReason" class="w-full min-h-[120px] bg-[var(--input)] border border-[var(--border)] rounded-[var(--radius)] px-4 py-3 text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]" placeholder="Причина за отхвърляне..."></textarea>
+                                    <textarea id="rejectionReason" class="w-full min-h-[100px] bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)] p-3 text-xs focus:ring-2 focus:ring-blue-500/30 outline-none" placeholder="Въведете причина за отхвърляне..."></textarea>
                                 </div>
-                                <div class="border border-[var(--border)] rounded-[var(--radius)] p-3 bg-[var(--input)]/35">
-                                    <p class="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)] mb-2">Photo preview</p>
-                                    <img id="approvalPhoto" alt="Student preview" class="w-full aspect-[4/5] object-cover rounded-[var(--radius)] border border-[var(--border)] bg-white">
+                                <div class="border border-[var(--border)] rounded-[var(--radius)] p-3 bg-[var(--bg-body)] flex flex-col items-center justify-center">
+                                    <p class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)] mb-2 self-start">Снимка за биометрия</p>
+                                    <img id="approvalPhoto" alt="Преглед на студент" class="w-full max-w-[220px] aspect-[4/5] object-cover rounded-[var(--radius)] border border-[var(--border)] bg-white shadow-xs">
                                 </div>
                             </div>
-                        </section>
-                    </div>
+                        </div>
+                    </section>
                 </div>
+            </div>
 
-                <div id="panel-examiners" class="panel">
-                    <div class="grid grid-cols-1 xl:grid-cols-[420px_1fr] gap-4">
-                        <section class="border border-[var(--border)] rounded-[var(--radius)] p-4 bg-[var(--card)]">
-                            <h2 class="text-lg font-bold mb-4">Регистрация на квестор</h2>
-                            <form id="examinerForm" class="space-y-4">
-                                <div>
-                                    <label class="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)] block mb-1">Пълно име</label>
-                                    <input id="examinerFullName" type="text" required class="w-full bg-[var(--input)] border border-[var(--border)] rounded-[var(--radius)] px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]">
-                                </div>
-                                <div>
-                                    <label class="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)] block mb-1">Email</label>
-                                    <input id="examinerEmail" type="email" required class="w-full bg-[var(--input)] border border-[var(--border)] rounded-[var(--radius)] px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]">
-                                </div>
-                                <div>
-                                    <label class="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)] block mb-1">Парола</label>
-                                    <input id="examinerPassword" type="password" required class="w-full bg-[var(--input)] border border-[var(--border)] rounded-[var(--radius)] px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]">
-                                </div>
-                                <button type="submit" class="w-full bg-[var(--primary)] text-[var(--primary-foreground)] font-semibold py-3 rounded-[var(--radius)] hover:opacity-90">Register examiner</button>
-                                <div id="examinerStatus" class="hidden text-sm p-3 rounded-[var(--radius)] border"></div>
-                            </form>
-                        </section>
+            <!-- =============================================== -->
+            <!-- 6. PANEL: EXAMINERS                             -->
+            <!-- =============================================== -->
+            <div id="panel-examiners" class="panel space-y-6">
+                <div class="grid grid-cols-1 xl:grid-cols-[400px_1fr] gap-6">
+                    <section class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 sm:p-6 shadow-xs space-y-4">
+                        <div class="border-b border-[var(--border)] pb-3">
+                            <h2 class="text-base font-bold text-[var(--text-main)]">Регистрация на Квестор</h2>
+                            <p class="text-xs text-[var(--text-muted)] mt-0.5">Създаване на профил за наблюдение на изпитна зала.</p>
+                        </div>
+                        <form id="examinerForm" class="space-y-3.5">
+                            <div>
+                                <label class="text-[11px] uppercase tracking-wider font-bold text-[var(--text-muted)] block mb-1">Пълно име</label>
+                                <input id="examinerFullName" type="text" required placeholder="проф. Иван Иванов" class="w-full bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)] px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500/30 outline-none">
+                            </div>
+                            <div>
+                                <label class="text-[11px] uppercase tracking-wider font-bold text-[var(--text-muted)] block mb-1">Email</label>
+                                <input id="examinerEmail" type="email" required placeholder="i.ivanov@tu-sofia.bg" class="w-full bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)] px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500/30 outline-none">
+                            </div>
+                            <div>
+                                <label class="text-[11px] uppercase tracking-wider font-bold text-[var(--text-muted)] block mb-1">Парола</label>
+                                <input id="examinerPassword" type="password" required placeholder="••••••••" class="w-full bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)] px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500/30 outline-none">
+                            </div>
+                            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-[var(--radius)] text-xs shadow-md shadow-blue-500/20 transition cursor-pointer">Регистрирай квестор</button>
+                            <div id="examinerStatus" class="hidden text-xs p-3 rounded-[var(--radius)] border"></div>
+                        </form>
+                    </section>
 
-                        <section class="border border-[var(--border)] rounded-[var(--radius)] p-4 bg-[var(--input)]/35">
-                            <div class="flex items-center justify-between mb-4">
-                                <h2 class="text-lg font-bold">Регистрирани квестори</h2>
-                                <span id="examinersCount" class="text-xs px-2 py-1 rounded-full bg-[var(--accent)]/50">0</span>
+                    <section class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 sm:p-6 shadow-xs flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between border-b border-[var(--border)] pb-3 mb-4">
+                                <h3 class="text-base font-bold text-[var(--text-main)]">Оторизирани Квестори</h3>
+                                <span id="examinersCount" class="text-xs px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold">0</span>
                             </div>
                             <div id="examinerList" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3"></div>
-                        </section>
-                    </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            {% if is_superadmin %}
+            <!-- =============================================== -->
+            <!-- 7. PANEL: VERIFICATIONS (Superadmin Only)       -->
+            <!-- =============================================== -->
+            <div id="panel-verifications" class="panel space-y-6">
+                <div class="border-b border-[var(--border)] pb-4">
+                    <span class="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Superadmin Control</span>
+                    <h2 class="text-xl font-bold text-[var(--text-main)] mt-0.5">Управление на верификации & Secure Key</h2>
+                    <p class="text-xs text-[var(--text-muted)]">Преглед на чакащи персонални акаунти и управление на ключове за автоматично одобрение.</p>
                 </div>
 
-                {% if is_superadmin %}
-                <!-- PANEL: VERIFICATIONS (Superadmin Only) -->
-                <div id="panel-verifications" class="panel">
-                    <div class="mb-6">
-                        <h2 class="text-xl font-bold text-[var(--primary)] mb-1">Управление на верификации & Secure Key</h2>
-                        <p class="text-sm text-[var(--muted-foreground)]">Преглед и валидация на чакащи заявки за създаване на персонални акаунти и управление на ключове за необслужвана регистрация.</p>
-                    </div>
+                <div class="grid grid-cols-1 xl:grid-cols-[420px_1fr] gap-6">
+                    <!-- SECURE KEY CARD -->
+                    <section class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 sm:p-6 shadow-xs space-y-4">
+                        <div class="border-b border-[var(--border)] pb-3">
+                            <h3 class="text-sm font-bold text-[var(--text-main)]">Необслужвана регистрация</h3>
+                            <p class="text-xs text-[var(--text-muted)] mt-0.5">Позволява мигновена активация на нови администратори и квестори със Secure Key.</p>
+                        </div>
 
-                    <div class="grid grid-cols-1 xl:grid-cols-[400px_1fr] gap-6">
-                        <!-- LEFT: SECURE KEY MANAGEMENT -->
-                        <section class="border border-[var(--border)] rounded-[var(--radius)] p-5 bg-[var(--card)] shadow-sm space-y-4">
-                            <div class="border-b border-[var(--border)] pb-3">
-                                <h3 class="text-base font-bold text-[var(--foreground)]">Необслужвано създаване на акаунти</h3>
-                                <p class="text-xs text-[var(--muted-foreground)] mt-0.5">Позволява мигновена верификация на нови администратори и квестори чрез Secure Key.</p>
+                        <!-- TOGGLE SWITCH -->
+                        <div class="flex items-center justify-between py-1">
+                            <span class="text-xs font-semibold text-[var(--text-main)]">Активиране без намеса на администратор</span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="unattendedToggle" class="sr-only peer">
+                                <div class="w-11 h-6 bg-[var(--border)] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600 peer-disabled:opacity-60 peer-disabled:cursor-not-allowed"></div>
+                            </label>
+                        </div>
+                        <p id="toggleLockNotice" class="hidden text-xs text-amber-700 bg-amber-50 dark:bg-amber-500/10 border border-amber-500/20 p-2.5 rounded-[var(--radius)] font-medium leading-relaxed">
+                            🔒 Превключвателят е заключен, докато има активен Secure Key. Използвайте "Анулирай Secure Key", за да го изтриете.
+                        </p>
+
+                        <!-- GENERATE BUTTON AREA -->
+                        <div id="generateKeyArea" class="hidden pt-1">
+                            <button id="generateKeyBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-[var(--radius)] shadow-sm transition text-xs cursor-pointer">
+                                Генерирай Secure Key
+                            </button>
+                        </div>
+
+                        <!-- LOADING SPINNER -->
+                        <div id="keyLoadingSpinner" class="hidden flex items-center justify-center gap-2 py-4 text-xs font-semibold text-blue-600">
+                            <svg class="animate-spin h-5 w-5 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span>Генериране на Secure Key...</span>
+                        </div>
+
+                        <!-- KEY DISPLAY AREA -->
+                        <div id="keyDisplayArea" class="hidden space-y-3 p-4 bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)]">
+                            <div>
+                                <label class="text-[10px] uppercase tracking-wider text-[var(--text-muted)] font-bold block mb-1">Активен Secure Key</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="text" id="keyDisplayInput" readonly class="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] px-3 py-2 text-xs font-mono select-all focus:outline-none" value="********">
+                                    <button id="copyKeyBtn" title="Копирай в клипборда" class="px-3 py-2 bg-blue-600 text-white rounded-[var(--radius)] text-xs font-semibold hover:bg-blue-700 transition cursor-pointer shrink-0">
+                                        Копирай
+                                    </button>
+                                </div>
                             </div>
 
-                            <!-- TOGGLE SWITCH -->
-                            <div class="flex items-center justify-between py-1">
-                                <span class="text-sm font-semibold text-[var(--foreground)]">Активиране на създаването на акаунти без намеса на администратор</span>
-                                <label class="relative inline-flex items-center cursor-pointer">
-                                    <input type="checkbox" id="unattendedToggle" class="sr-only peer">
-                                    <div class="w-11 h-6 bg-[var(--border)] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600 peer-disabled:opacity-60 peer-disabled:cursor-not-allowed"></div>
-                                </label>
-                            </div>
-                            <p id="toggleLockNotice" class="hidden text-xs text-amber-700 bg-amber-500/10 border border-amber-500/20 p-2.5 rounded-[var(--radius)] font-medium leading-relaxed">
-                                🔒 Превключвателят е заключен, докато има активен Secure Key. Използвайте "Delete Secure Key", за да го анулирате.
+                            <p id="keyWarningNotice" class="text-xs font-bold italic text-amber-700 bg-amber-50 dark:bg-amber-500/10 border border-amber-500/20 p-2.5 rounded-[var(--radius)] leading-relaxed">
+                                Please store this Secure Key somewhere outside of this page, you will see this key only once so be sure to not lose this key!
                             </p>
 
-                            <!-- GENERATE BUTTON AREA -->
-                            <div id="generateKeyArea" class="hidden pt-1">
-                                <button id="generateKeyBtn" class="w-full bg-[var(--primary)] hover:opacity-90 text-[var(--primary-foreground)] font-bold py-2.5 px-4 rounded-[var(--radius)] shadow-sm transition text-sm cursor-pointer">
-                                    Генерирай Secure Key
-                                </button>
+                            <div class="text-xs text-[var(--text-muted)] space-y-0.5">
+                                <p id="keyDurationMeta">-</p>
+                                <p id="keyExpiryMeta">-</p>
                             </div>
 
-                            <!-- LOADING SPINNER -->
-                            <div id="keyLoadingSpinner" class="hidden flex items-center justify-center gap-2 py-4 text-sm font-semibold text-[var(--primary)]">
-                                <svg class="animate-spin h-5 w-5 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                <span>Генериране на Secure Key...</span>
-                            </div>
+                            <button id="deleteKeyBtn" class="w-full border border-red-500 text-red-600 hover:bg-red-600 hover:text-white font-bold py-2 px-3 rounded-[var(--radius)] text-xs transition cursor-pointer mt-2">
+                                Анулирай Secure Key
+                            </button>
+                        </div>
+                    </section>
 
-                            <!-- KEY DISPLAY AREA -->
-                            <div id="keyDisplayArea" class="hidden space-y-3 p-4 bg-white/80 border border-[var(--border)] rounded-[var(--radius)]">
+                    <!-- PENDING VERIFICATIONS LIST -->
+                    <section class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 sm:p-6 shadow-xs flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between border-b border-[var(--border)] pb-3 mb-4">
                                 <div>
-                                    <label class="text-xs uppercase tracking-wider text-[var(--muted-foreground)] font-bold block mb-1">Активен Secure Key</label>
-                                    <div class="flex items-center gap-2">
-                                        <input type="text" id="keyDisplayInput" readonly class="w-full bg-[var(--input)] border border-[var(--border)] rounded-[var(--radius)] px-3 py-2 text-xs font-mono select-all focus:outline-none" value="********">
-                                        <button id="copyKeyBtn" title="Копирай в клипборда" class="px-3 py-2 bg-[var(--primary)] text-[var(--primary-foreground)] rounded-[var(--radius)] text-xs font-semibold hover:opacity-90 transition cursor-pointer shrink-0">
-                                            Копирай
-                                        </button>
-                                    </div>
+                                    <h3 class="text-sm font-bold text-[var(--text-main)]">Чакащи заявки за верификация</h3>
+                                    <p class="text-xs text-[var(--text-muted)] mt-0.5">Заявки за администратори и квестори (най-старите първи).</p>
                                 </div>
-
-                                <!-- WARNING NOTICE (VISIBLE ONLY ON INITIAL GENERATION) -->
-                                <p id="keyWarningNotice" class="text-xs font-bold italic text-amber-700 bg-amber-500/10 border border-amber-500/20 p-2.5 rounded-[var(--radius)] leading-relaxed">
-                                    Please store this Secure Key somewhere outside of this page, you will see this key only once so be sure to not lose this key!
-                                </p>
-
-                                <div class="text-xs text-[var(--muted-foreground)] space-y-0.5">
-                                    <p id="keyDurationMeta">-</p>
-                                    <p id="keyExpiryMeta">-</p>
-                                </div>
-
-                                <!-- DELETE SECURE KEY BUTTON -->
-                                <button id="deleteKeyBtn" class="w-full border-2 border-[var(--destructive)] text-[var(--destructive)] hover:bg-[var(--destructive)] hover:text-[var(--destructive-foreground)] font-bold py-2 px-3 rounded-[var(--radius)] text-xs transition cursor-pointer mt-2">
-                                    Анулирай Secure Key
-                                </button>
+                                <span id="verificationsListCount" class="text-xs px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold">0</span>
                             </div>
-                        </section>
 
-                        <!-- RIGHT: PENDING VERIFICATIONS LIST -->
-                        <section class="border border-[var(--border)] rounded-[var(--radius)] p-5 bg-[var(--card)] shadow-sm flex flex-col justify-between">
-                            <div>
-                                <div class="flex items-center justify-between border-b border-[var(--border)] pb-3 mb-4">
-                                    <div>
-                                        <h3 class="text-base font-bold text-[var(--foreground)]">Чакащи заявки за верификация</h3>
-                                        <p class="text-xs text-[var(--muted-foreground)] mt-0.5">Списък на чакащи одобрение акаунти, подредени хронологично (най-старите първи).</p>
-                                    </div>
-                                    <span id="verificationsListCount" class="text-xs px-2.5 py-1 rounded-full bg-[var(--accent)]/50 font-bold">0</span>
-                                </div>
-
-                                <div id="verificationsList" class="space-y-3">
-                                    <div class="text-sm text-[var(--muted-foreground)] text-center py-6">Зареждане на чакащите заявки...</div>
-                                </div>
+                            <div id="verificationsList" class="space-y-2.5">
+                                <div class="text-xs text-[var(--text-muted)] text-center py-6">Зареждане на чакащите заявки...</div>
                             </div>
-                        </section>
-                    </div>
+                        </div>
+                    </section>
                 </div>
-                {% endif %}
             </div>
-        </section>
+            {% endif %}
 
-        {% if is_superadmin %}
-        <!-- CONFIRMATION & DURATION MODAL -->
-        <div id="generateKeyModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-            <div class="bg-white border border-[var(--border)] rounded-[var(--radius)] max-w-md w-full p-6 shadow-2xl space-y-4">
-                <div id="modalStep1">
-                    <h3 class="text-lg font-bold text-[var(--primary)] mb-2">Генериране на Secure Key</h3>
-                    <p class="text-sm text-[var(--foreground)] leading-relaxed mb-4">
-                        Сигурен ли сте, че искате да генерирате Secure Key? Това действие ще позволи създаването на акаунти на администратори и квестори, които притежават Secure Key. Натиснете „Продължи“, ако сте сигурни.
-                    </p>
-                    <div class="flex justify-end gap-2 pt-2">
-                        <button id="modalCancelBtn1" class="px-4 py-2 border border-[var(--border)] rounded-[var(--radius)] text-sm font-semibold hover:bg-[var(--input)] transition cursor-pointer">
-                            Отказ
-                        </button>
-                        <button id="modalProceedBtn" class="px-4 py-2 bg-[var(--primary)] text-[var(--primary-foreground)] rounded-[var(--radius)] text-sm font-bold hover:opacity-90 transition cursor-pointer">
-                            Продължи
-                        </button>
-                    </div>
+        </main>
+    </div>
+
+    {% if is_superadmin %}
+    <!-- =============================================== -->
+    <!-- SECURE KEY MODAL DIALOG                         -->
+    <!-- =============================================== -->
+    <div id="generateKeyModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+        <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div id="modalStep1">
+                <h3 class="text-base font-bold text-[var(--text-main)] mb-2">Генериране на Secure Key</h3>
+                <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-4">
+                    Сигурен ли сте, че искате да генерирате Secure Key? Това действие ще позволи създаването на акаунти на администратори и квестори, които притежават ключа.
+                </p>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button id="modalCancelBtn1" class="px-4 py-2 border border-[var(--border)] rounded-[var(--radius)] text-xs font-semibold hover:bg-[var(--border-subtle)] transition cursor-pointer">
+                        Отказ
+                    </button>
+                    <button id="modalProceedBtn" class="px-4 py-2 bg-blue-600 text-white rounded-[var(--radius)] text-xs font-bold hover:bg-blue-700 transition cursor-pointer">
+                        Продължи
+                    </button>
+                </div>
+            </div>
+
+            <div id="modalStep2" class="hidden space-y-4">
+                <h3 class="text-base font-bold text-[var(--text-main)]">Избор на валидност на ключа</h3>
+                <p class="text-xs text-[var(--text-muted)]">Изберете за какъв период от време генерираният ключ да бъде активен:</p>
+                
+                <div class="space-y-2">
+                    <label class="flex items-center gap-3 p-3 border border-[var(--border)] rounded-[var(--radius)] cursor-pointer hover:bg-[var(--border-subtle)] transition">
+                        <input type="radio" name="keyDuration" value="1_day" checked class="w-4 h-4 text-blue-600">
+                        <div>
+                            <p class="text-xs font-bold text-[var(--text-main)]">1 ден</p>
+                            <p class="text-[11px] text-[var(--text-muted)]">Валиден за следващите 24 часа</p>
+                        </div>
+                    </label>
+                    <label class="flex items-center gap-3 p-3 border border-[var(--border)] rounded-[var(--radius)] cursor-pointer hover:bg-[var(--border-subtle)] transition">
+                        <input type="radio" name="keyDuration" value="1_week" class="w-4 h-4 text-blue-600">
+                        <div>
+                            <p class="text-xs font-bold text-[var(--text-main)]">1 седмица</p>
+                            <p class="text-[11px] text-[var(--text-muted)]">Валиден за 7 дни</p>
+                        </div>
+                    </label>
+                    <label class="flex items-center gap-3 p-3 border border-[var(--border)] rounded-[var(--radius)] cursor-pointer hover:bg-[var(--border-subtle)] transition">
+                        <input type="radio" name="keyDuration" value="1_month" class="w-4 h-4 text-blue-600">
+                        <div>
+                            <p class="text-xs font-bold text-[var(--text-main)]">1 месец</p>
+                            <p class="text-[11px] text-[var(--text-muted)]">Валиден за 30 дни</p>
+                        </div>
+                    </label>
+                    <label class="flex items-center gap-3 p-3 border border-[var(--border)] rounded-[var(--radius)] cursor-pointer hover:bg-[var(--border-subtle)] transition">
+                        <input type="radio" name="keyDuration" value="indefinite" class="w-4 h-4 text-blue-600">
+                        <div>
+                            <p class="text-xs font-bold text-[var(--text-main)]">Безсрочен</p>
+                            <p class="text-[11px] text-[var(--text-muted)]">Валиден до изрично анулиране</p>
+                        </div>
+                    </label>
                 </div>
 
-                <div id="modalStep2" class="hidden space-y-4">
-                    <h3 class="text-lg font-bold text-[var(--primary)]">Избор на валидност на ключа</h3>
-                    <p class="text-xs text-[var(--muted-foreground)]">Изберете за какъв период от време генерираният Secure Key да бъде валиден:</p>
-                    
-                    <div class="space-y-2">
-                        <label class="flex items-center gap-3 p-3 border border-[var(--border)] rounded-[var(--radius)] cursor-pointer hover:bg-[var(--input)]/40 transition">
-                            <input type="radio" name="keyDuration" value="1_day" checked class="w-4 h-4 text-[var(--primary)]">
-                            <div>
-                                <p class="text-sm font-bold">1 ден</p>
-                                <p class="text-xs text-[var(--muted-foreground)]">Валиден за следващите 24 часа</p>
-                            </div>
-                        </label>
-                        <label class="flex items-center gap-3 p-3 border border-[var(--border)] rounded-[var(--radius)] cursor-pointer hover:bg-[var(--input)]/40 transition">
-                            <input type="radio" name="keyDuration" value="1_week" class="w-4 h-4 text-[var(--primary)]">
-                            <div>
-                                <p class="text-sm font-bold">1 седмица</p>
-                                <p class="text-xs text-[var(--muted-foreground)]">Валиден за 7 дни</p>
-                            </div>
-                        </label>
-                        <label class="flex items-center gap-3 p-3 border border-[var(--border)] rounded-[var(--radius)] cursor-pointer hover:bg-[var(--input)]/40 transition">
-                            <input type="radio" name="keyDuration" value="1_month" class="w-4 h-4 text-[var(--primary)]">
-                            <div>
-                                <p class="text-sm font-bold">1 месец</p>
-                                <p class="text-xs text-[var(--muted-foreground)]">Валиден за 30 дни</p>
-                            </div>
-                        </label>
-                        <label class="flex items-center gap-3 p-3 border border-[var(--border)] rounded-[var(--radius)] cursor-pointer hover:bg-[var(--input)]/40 transition">
-                            <input type="radio" name="keyDuration" value="indefinite" class="w-4 h-4 text-[var(--primary)]">
-                            <div>
-                                <p class="text-sm font-bold">Безсрочен</p>
-                                <p class="text-xs text-[var(--muted-foreground)]">Валиден до изрично анулиране</p>
-                            </div>
-                        </label>
-                    </div>
-
-                    <div class="flex justify-end gap-2 pt-2">
-                        <button id="modalCancelBtn2" class="px-4 py-2 border border-[var(--border)] rounded-[var(--radius)] text-sm font-semibold hover:bg-[var(--input)] transition cursor-pointer">
-                            Отказ
-                        </button>
-                        <button id="modalConfirmGenerateBtn" class="px-4 py-2 bg-emerald-600 text-white rounded-[var(--radius)] text-sm font-bold hover:opacity-90 transition cursor-pointer">
-                            Потвърди и генерирай
-                        </button>
-                    </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button id="modalCancelBtn2" class="px-4 py-2 border border-[var(--border)] rounded-[var(--radius)] text-xs font-semibold hover:bg-[var(--border-subtle)] transition cursor-pointer">
+                        Отказ
+                    </button>
+                    <button id="modalConfirmGenerateBtn" class="px-4 py-2 bg-emerald-600 text-white rounded-[var(--radius)] text-xs font-bold hover:bg-emerald-700 transition cursor-pointer">
+                        Потвърди и генерирай
+                    </button>
                 </div>
             </div>
         </div>
-        {% endif %}
-    </main>
+    </div>
+    {% endif %}
 
+    <!-- =============================================== -->
+    <!-- ADMINATOR COMMAND PALETTE SEARCH POPUP MODAL    -->
+    <!-- =============================================== -->
+    <div id="commandPaletteModal" class="hidden fixed inset-0 z-50 flex items-start justify-center pt-14 sm:pt-20 p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity">
+        <div id="commandPaletteCard" class="w-full max-w-lg bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl shadow-2xl overflow-hidden flex flex-col transition-all">
+            
+            <!-- SEARCH INPUT HEADER -->
+            <div class="flex items-center gap-3 px-4 py-3 border-b border-[var(--border)]">
+                <svg class="w-4 h-4 text-[var(--text-muted)] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input id="paletteSearchInput" type="text" placeholder="Search pages, actions..." class="w-full bg-transparent text-xs sm:text-sm text-[var(--text-main)] placeholder-[var(--text-muted)] outline-none border-0 focus:ring-0 p-0" autocomplete="off" spellcheck="false">
+                <button id="paletteCloseBtn" class="text-[10px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[var(--bg-body)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer">
+                    esc
+                </button>
+            </div>
+
+            <!-- RESULTS LIST -->
+            <div id="paletteResultsList" class="max-h-[380px] overflow-y-auto p-2 space-y-1">
+                <!-- Dynamically populated -->
+            </div>
+
+            <!-- FOOTER KEYBOARD NAVIGATION HINTS -->
+            <div class="px-4 py-2 border-t border-[var(--border)] bg-[var(--bg-body)]/60 flex items-center justify-between text-[11px] text-[var(--text-muted)] select-none">
+                <div class="flex items-center gap-4">
+                    <span class="flex items-center gap-1">
+                        <kbd class="px-1.5 py-0.5 rounded bg-[var(--bg-card)] border border-[var(--border)] text-[10px] font-mono">↑</kbd>
+                        <kbd class="px-1.5 py-0.5 rounded bg-[var(--bg-card)] border border-[var(--border)] text-[10px] font-mono">↓</kbd>
+                        navigate
+                    </span>
+                    <span class="flex items-center gap-1">
+                        <kbd class="px-1.5 py-0.5 rounded bg-[var(--bg-card)] border border-[var(--border)] text-[10px] font-mono">↵</kbd>
+                        select
+                    </span>
+                </div>
+                <span class="flex items-center gap-1">
+                    <kbd class="px-1.5 py-0.5 rounded bg-[var(--bg-card)] border border-[var(--border)] text-[10px] font-mono">esc</kbd>
+                    close
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- =============================================== -->
+    <!-- JAVASCRIPT STATE & LOGIC                        -->
+    <!-- =============================================== -->
     <script>
+        // ===============================================
+        // 1. THEME TOGGLE & INITIALIZATION
+        // ===============================================
+        function initTheme() {
+            const savedTheme = localStorage.getItem("admin_theme") || "light";
+            setTheme(savedTheme);
+        }
+
+        function setTheme(theme) {
+            document.documentElement.setAttribute("data-theme", theme);
+            localStorage.setItem("admin_theme", theme);
+            const sunIcon = document.getElementById("sunIcon");
+            const moonIcon = document.getElementById("moonIcon");
+            if (theme === "dark") {
+                sunIcon?.classList.remove("hidden");
+                moonIcon?.classList.add("hidden");
+            } else {
+                sunIcon?.classList.add("hidden");
+                moonIcon?.classList.remove("hidden");
+            }
+        }
+
+        document.getElementById("themeToggleBtn")?.addEventListener("click", () => {
+            const current = document.documentElement.getAttribute("data-theme") || "light";
+            setTheme(current === "dark" ? "light" : "dark");
+        });
+
+        initTheme();
+
+        // ===============================================
+        // 2. SIDEBAR COLLAPSE & MOBILE DRAWER
+        // ===============================================
+        const appSidebar = document.getElementById("appSidebar");
+        const desktopSidebarToggle = document.getElementById("desktopSidebarToggle");
+        const mobileMenuBtn = document.getElementById("mobileMenuBtn");
+        const mobileBackdrop = document.getElementById("mobileBackdrop");
+        const collapseIcon = document.getElementById("collapseIcon");
+
+        function toggleDesktopSidebar() {
+            const isCollapsed = document.body.classList.toggle("sidebar-collapsed");
+            if (isCollapsed) {
+                appSidebar.classList.remove("w-64");
+                appSidebar.classList.add("w-20");
+                collapseIcon?.classList.add("rotate-180");
+                localStorage.setItem("admin_sidebar_collapsed", "true");
+            } else {
+                appSidebar.classList.remove("w-20");
+                appSidebar.classList.add("w-64");
+                collapseIcon?.classList.remove("rotate-180");
+                localStorage.setItem("admin_sidebar_collapsed", "false");
+            }
+        }
+
+        if (localStorage.getItem("admin_sidebar_collapsed") === "true") {
+            toggleDesktopSidebar();
+        }
+
+        desktopSidebarToggle?.addEventListener("click", toggleDesktopSidebar);
+
+        function toggleMobileMenu(open) {
+            if (open) {
+                appSidebar.classList.remove("-translate-x-full");
+                mobileBackdrop.classList.remove("hidden");
+            } else {
+                appSidebar.classList.add("-translate-x-full");
+                mobileBackdrop.classList.add("hidden");
+            }
+        }
+
+        mobileMenuBtn?.addEventListener("click", () => toggleMobileMenu(true));
+        mobileBackdrop?.addEventListener("click", () => toggleMobileMenu(false));
+
+        // Live hero date
+        function updateHeroDate() {
+            const heroDate = document.getElementById("heroDate");
+            if (heroDate) {
+                const now = new Date();
+                heroDate.textContent = new Intl.DateTimeFormat('bg-BG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).format(now);
+            }
+        }
+        updateHeroDate();
+
+        // ===============================================
+        // 3. AUTH & API UTILITIES
+        // ===============================================
         function getCookie(name) {
             return document.cookie.split('; ').find((row) => row.startsWith(name + '='))?.split('=')[1] || '';
         }
@@ -611,8 +1119,11 @@
 
         function setStatus(message, error = false) {
             const node = document.getElementById('dashboardStatus');
+            if (!node) return;
             node.textContent = message;
-            node.className = error ? 'text-sm font-semibold text-[var(--destructive)] hidden sm:block' : 'text-sm font-semibold text-[var(--foreground)] hidden sm:block';
+            node.parentElement.className = error 
+                ? 'hidden md:flex items-center gap-2 px-2.5 py-1 rounded-full bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs font-semibold'
+                : 'hidden md:flex items-center gap-2 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold';
         }
 
         function formatDateTime(value) {
@@ -631,41 +1142,317 @@
                 .replaceAll("'", '&#39;');
         }
 
+        // ===============================================
+        // 4. TAB NAVIGATION & BREADCRUMBS
+        // ===============================================
+        const tabTitles = {
+            overview: "Обзор",
+            students: "Студенти",
+            exams: "Изпити",
+            allocation: "Разпределение",
+            approval: "Одобрения",
+            examiners: "Квестори",
+            verifications: "Верификации & Secure Key"
+        };
+
         function switchTab(tabName) {
             if (tabName === 'verifications' && (!state.data || !state.data.is_superadmin)) {
                 return;
             }
-            document.querySelectorAll('.tab-button').forEach((button) => {
-                button.setAttribute('aria-selected', String(button.dataset.tab === tabName));
+
+            // Update sidebar nav items
+            document.querySelectorAll('#sidebarNav .nav-item').forEach((item) => {
+                const isActive = item.dataset.tab === tabName;
+                if (isActive) {
+                    item.className = "nav-item w-full flex items-center justify-between px-3 py-2.5 rounded-[var(--radius)] text-xs font-semibold bg-blue-600 text-white shadow-md shadow-blue-500/20 transition cursor-pointer group";
+                } else {
+                    item.className = "nav-item w-full flex items-center justify-between px-3 py-2.5 rounded-[var(--radius)] text-xs font-semibold text-slate-300 hover:text-white hover:bg-[var(--bg-sidebar-hover)] transition cursor-pointer group";
+                }
             });
+
+            // Update panels
             document.querySelectorAll('.panel').forEach((panel) => {
                 panel.classList.toggle('active', panel.id === `panel-${tabName}`);
             });
 
+            // Update breadcrumbs
+            const breadcrumb = document.getElementById("currentBreadcrumb");
+            if (breadcrumb) {
+                breadcrumb.textContent = tabTitles[tabName] || tabName;
+            }
+
+            // Close mobile menu if open
+            toggleMobileMenu(false);
+
+            // Trigger specific tab data reload
             if (tabName === 'verifications') {
                 setStatus('Верификации и Secure Key');
                 loadVerificationsData();
             } else if (tabName !== 'approval') {
-                setStatus('Актуално спрямо базата данни');
+                setStatus('База данни: Свързана');
                 const btn = document.getElementById('startApprovalBtn');
                 if (btn) {
                     btn.dataset.mode = "idle";
-                    btn.className = "w-full px-3 py-2 rounded-[var(--radius)] bg-[var(--primary)] text-[var(--primary-foreground)] text-sm font-semibold hover:opacity-90 mb-4";
+                    btn.className = "w-full px-3 py-2 rounded-[var(--radius)] bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition cursor-pointer";
                 }
             } else {
                 const btn = document.getElementById('startApprovalBtn');
                 if (btn && btn.dataset.mode === "reviewing" && state.pendingQueue?.length > 0) {
                     setStatus(`Започна опашка с ${state.pendingQueue.length} студенти`);
                 } else {
-                    setStatus('Актуално спрямо базата данни');
+                    setStatus('База данни: Свързана');
                 }
             }
         }
 
-        document.querySelectorAll('.tab-button').forEach((button) => {
+        document.querySelectorAll('#sidebarNav .nav-item').forEach((button) => {
             button.addEventListener('click', () => switchTab(button.dataset.tab));
         });
 
+        // ===============================================
+        // 5. ADMINATOR COMMAND PALETTE SEARCH POPUP
+        // ===============================================
+        const paletteItems = [
+            {
+                id: "overview",
+                title: "Dashboard",
+                category: "WORKSPACE",
+                tags: "обзор dashboard начална страница kpi статистика",
+                icon: `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>`,
+                action: () => switchTab('overview')
+            },
+            {
+                id: "students",
+                title: "Students Management",
+                category: "WORKSPACE",
+                tags: "студенти students импорт excel партиди списък",
+                icon: `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>`,
+                action: () => switchTab('students')
+            },
+            {
+                id: "exams",
+                title: "Exam Schedules",
+                category: "WORKSPACE",
+                tags: "изпити exams графици зали график сесия",
+                icon: `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>`,
+                action: () => switchTab('exams')
+            },
+            {
+                id: "allocation",
+                title: "Allocation Engine",
+                category: "WORKSPACE",
+                tags: "разпределение allocation алокация зали зачисляване",
+                icon: `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>`,
+                action: () => switchTab('allocation')
+            },
+            {
+                id: "approval",
+                title: "Biometric Approvals",
+                category: "SECURITY",
+                tags: "одобрения approval биометрия лицево разпознаване pgvector верификация",
+                icon: `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`,
+                action: () => switchTab('approval')
+            },
+            {
+                id: "examiners",
+                title: "Examiners & Invigilators",
+                category: "MANAGEMENT",
+                tags: "квестори examiners персонал надзор зали",
+                icon: `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>`,
+                action: () => switchTab('examiners')
+            },
+            {
+                id: "verifications",
+                title: "Verifications & Secure Key",
+                category: "SUPERADMIN",
+                tags: "верификации verifications secure key супер админ ключ",
+                icon: `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>`,
+                superadmin: true,
+                action: () => switchTab('verifications')
+            },
+            {
+                id: "act-import-students",
+                title: "Import Students (Excel)",
+                category: "ACTIONS",
+                tags: "нов импорт студенти качи excel",
+                icon: `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>`,
+                action: () => { switchTab('students'); document.getElementById('studFaculty')?.focus(); }
+            },
+            {
+                id: "act-upload-exams",
+                title: "Upload Exam Schedule",
+                category: "ACTIONS",
+                tags: "качи изпитен график изпити excel",
+                icon: `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>`,
+                action: () => switchTab('exams')
+            },
+            {
+                id: "act-toggle-theme",
+                title: "Toggle Theme (Light / Dark)",
+                category: "SETTINGS",
+                tags: "смени тема тъмна светла dark light mode",
+                icon: `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>`,
+                action: () => document.getElementById('themeToggleBtn')?.click()
+            },
+            {
+                id: "act-logout",
+                title: "Log Out",
+                category: "ACCOUNT",
+                tags: "изход logout отписване",
+                icon: `<svg class="w-4 h-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>`,
+                action: () => adminLogout()
+            }
+        ];
+
+        let paletteSelectedIndex = 0;
+        let paletteCurrentResults = [];
+
+        const commandPaletteModal = document.getElementById("commandPaletteModal");
+        const paletteSearchInput = document.getElementById("paletteSearchInput");
+        const paletteResultsList = document.getElementById("paletteResultsList");
+        const paletteCloseBtn = document.getElementById("paletteCloseBtn");
+        const searchPaletteTrigger = document.getElementById("searchPaletteTrigger");
+
+        function openCommandPalette() {
+            if (!commandPaletteModal) return;
+            commandPaletteModal.classList.remove("hidden");
+            paletteSearchInput.value = "";
+            paletteSelectedIndex = 0;
+            renderPaletteResults();
+            setTimeout(() => paletteSearchInput?.focus(), 40);
+        }
+
+        function closeCommandPalette() {
+            if (!commandPaletteModal) return;
+            commandPaletteModal.classList.add("hidden");
+        }
+
+        function renderPaletteResults() {
+            const query = paletteSearchInput.value.toLowerCase().trim();
+            paletteCurrentResults = paletteItems.filter(item => {
+                if (item.superadmin && (!state.data || !state.data.is_superadmin)) return false;
+                if (!query) return true;
+                return item.title.toLowerCase().includes(query) || 
+                       item.category.toLowerCase().includes(query) || 
+                       item.tags.toLowerCase().includes(query);
+            });
+
+            if (paletteSelectedIndex >= paletteCurrentResults.length) {
+                paletteSelectedIndex = Math.max(0, paletteCurrentResults.length - 1);
+            }
+
+            if (!paletteCurrentResults.length) {
+                paletteResultsList.innerHTML = '<div class="text-xs text-[var(--text-muted)] py-8 text-center">Няма намерени резултати</div>';
+                return;
+            }
+
+            paletteResultsList.innerHTML = paletteCurrentResults.map((item, index) => {
+                const isSelected = index === paletteSelectedIndex;
+                return `
+                    <div class="palette-item flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs cursor-pointer transition select-none ${isSelected ? 'bg-blue-600 text-white font-semibold shadow-xs' : 'text-[var(--text-main)] hover:bg-[var(--bg-body)]'}" data-index="${index}">
+                        <div class="flex items-center gap-3 min-w-0">
+                            <span class="w-5 h-5 flex items-center justify-center shrink-0 ${isSelected ? 'text-white' : 'text-[var(--text-muted)]'}">
+                                ${item.icon}
+                            </span>
+                            <span class="truncate text-xs font-semibold">${escapeHtml(item.title)}</span>
+                        </div>
+                        <span class="text-[10px] font-mono tracking-wider uppercase shrink-0 ${isSelected ? 'text-blue-100 font-bold' : 'text-[var(--text-muted)]'}">${item.category}</span>
+                    </div>
+                `;
+            }).join('');
+
+            paletteResultsList.querySelectorAll('.palette-item').forEach(el => {
+                el.addEventListener('click', () => {
+                    const index = Number(el.dataset.index);
+                    executePaletteItem(index);
+                });
+                el.addEventListener('mouseenter', () => {
+                    paletteSelectedIndex = Number(el.dataset.index);
+                    updatePaletteSelectionVisuals();
+                });
+            });
+
+            scrollPaletteSelectionIntoView();
+        }
+
+        function updatePaletteSelectionVisuals() {
+            paletteResultsList.querySelectorAll('.palette-item').forEach((el, index) => {
+                const isSelected = index === paletteSelectedIndex;
+                el.className = `palette-item flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs cursor-pointer transition select-none ${isSelected ? 'bg-blue-600 text-white font-semibold shadow-xs' : 'text-[var(--text-main)] hover:bg-[var(--bg-body)]'}`;
+                const iconSpan = el.querySelector('span:first-child');
+                const catSpan = el.querySelector('span:last-child');
+                if (iconSpan) iconSpan.className = `w-5 h-5 flex items-center justify-center shrink-0 ${isSelected ? 'text-white' : 'text-[var(--text-muted)]'}`;
+                if (catSpan) catSpan.className = `text-[10px] font-mono tracking-wider uppercase shrink-0 ${isSelected ? 'text-blue-100 font-bold' : 'text-[var(--text-muted)]'}`;
+            });
+        }
+
+        function scrollPaletteSelectionIntoView() {
+            const activeEl = paletteResultsList.querySelector(`[data-index="${paletteSelectedIndex}"]`);
+            activeEl?.scrollIntoView({ block: 'nearest' });
+        }
+
+        function executePaletteItem(index) {
+            const item = paletteCurrentResults[index];
+            if (item && typeof item.action === 'function') {
+                closeCommandPalette();
+                item.action();
+            }
+        }
+
+        searchPaletteTrigger?.addEventListener('click', openCommandPalette);
+        paletteCloseBtn?.addEventListener('click', closeCommandPalette);
+
+        paletteSearchInput?.addEventListener('input', () => {
+            paletteSelectedIndex = 0;
+            renderPaletteResults();
+        });
+
+        paletteSearchInput?.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (paletteCurrentResults.length > 0) {
+                    paletteSelectedIndex = (paletteSelectedIndex + 1) % paletteCurrentResults.length;
+                    updatePaletteSelectionVisuals();
+                    scrollPaletteSelectionIntoView();
+                }
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (paletteCurrentResults.length > 0) {
+                    paletteSelectedIndex = (paletteSelectedIndex - 1 + paletteCurrentResults.length) % paletteCurrentResults.length;
+                    updatePaletteSelectionVisuals();
+                    scrollPaletteSelectionIntoView();
+                }
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                executePaletteItem(paletteSelectedIndex);
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                closeCommandPalette();
+            }
+        });
+
+        commandPaletteModal?.addEventListener('click', (e) => {
+            if (e.target === commandPaletteModal) {
+                closeCommandPalette();
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+                e.preventDefault();
+                if (commandPaletteModal?.classList.contains('hidden')) {
+                    openCommandPalette();
+                } else {
+                    closeCommandPalette();
+                }
+            } else if (e.key === 'Escape' && !commandPaletteModal?.classList.contains('hidden')) {
+                closeCommandPalette();
+            }
+        });
+
+        // ===============================================
+        // 6. DASHBOARD DATA LOADING & RENDERING
+        // ===============================================
         async function loadDashboardData() {
             setStatus('Зареждане на данните...');
             const response = await authFetch('/admins/dashboard-data');
@@ -676,12 +1463,12 @@
             const data = await response.json();
             state.data = data;
 
-            // Проверка за Superadmin права и активиране на таб Верификации
+            // Superadmin verifications tab visibility
             const verificationsTabBtn = document.getElementById('verificationsTabBtn');
             const verificationsBadge = document.getElementById('verificationsBadge');
             if (verificationsTabBtn) {
                 if (data.is_superadmin) {
-                    verificationsTabBtn.style.display = 'inline-flex';
+                    verificationsTabBtn.style.display = 'flex';
                     const pCount = data.pending_verifications_count || 0;
                     if (verificationsBadge) {
                         verificationsBadge.textContent = pCount;
@@ -689,18 +1476,28 @@
                     }
                 } else {
                     verificationsTabBtn.style.display = 'none';
-                    const activeTabBtn = document.querySelector('.tab-button[aria-selected="true"]');
+                    const activeTabBtn = document.querySelector('#sidebarNav .nav-item.bg-blue-600');
                     if (activeTabBtn && activeTabBtn.dataset.tab === 'verifications') {
                         switchTab('overview');
                     }
                 }
             }
 
+            // KPI Counts
             document.getElementById('countStudentImports').textContent = data.counts?.student_import_logs ?? 0;
             document.getElementById('countExamImports').textContent = data.counts?.exam_import_logs ?? 0;
             document.getElementById('countPendingStudents').textContent = data.counts?.pending_students ?? 0;
             document.getElementById('countAllocationLogs').textContent = data.counts?.allocation_logs ?? 0;
 
+            // Nav Badge
+            const pendingNavBadge = document.getElementById('pendingCountBadgeNav');
+            if (pendingNavBadge) {
+                const pendingCount = data.pending_students?.length ?? 0;
+                pendingNavBadge.textContent = pendingCount;
+                pendingNavBadge.classList.toggle('hidden', pendingCount === 0);
+            }
+
+            // Panel Sub-counts
             document.getElementById('studentsLogCount').textContent = data.student_import_logs?.length ?? 0;
             document.getElementById('examsLogCount').textContent = data.exam_import_logs?.length ?? 0;
             document.getElementById('allocationLogCount').textContent = data.allocation_logs?.length ?? 0;
@@ -708,35 +1505,99 @@
             document.getElementById('startApprovalBtn').textContent = `Старт на одобрения, чакащи: ${data.pending_students?.length ?? 0}`;
             document.getElementById('examinersCount').textContent = data.examiners?.length ?? 0;
 
+            renderActivityFeed(data);
             renderStudentImportLogs();
             renderExamImportLogs();
             renderAllocationLogs();
             renderPendingStudents();
             renderExaminers();
-            setStatus('Актуално спрямо базата данни');
+            setStatus('База данни: Свързана');
+        }
+
+        // Render Recent Activity on Overview Tab
+        function renderActivityFeed(data) {
+            const feed = document.getElementById('overviewActivityFeed');
+            if (!feed) return;
+
+            const events = [];
+
+            (data.student_import_logs || []).slice(0, 4).forEach(log => {
+                events.push({
+                    type: 'student',
+                    title: log.parsed_details?.message || log.details || 'Студентски импорт',
+                    subtitle: `${log.specialty || '-'}, група ${log.group || '-'}`,
+                    time: log.created_at,
+                    badge: log.notification_sent ? 'Изпратен' : 'Готов',
+                    color: 'blue'
+                });
+            });
+
+            (data.exam_import_logs || []).slice(0, 3).forEach(log => {
+                events.push({
+                    type: 'exam',
+                    title: log.parsed_details?.summary || log.details || 'Импорт на изпитен график',
+                    subtitle: `${log.exams?.length || 0} изпита добавени/обновени`,
+                    time: log.created_at,
+                    badge: 'График',
+                    color: 'purple'
+                });
+            });
+
+            (data.allocation_logs || []).slice(0, 3).forEach(log => {
+                events.push({
+                    type: 'allocation',
+                    title: log.parsed_details?.summary || 'Изпълнено разпределение',
+                    subtitle: `${log.students?.length || 0} разпределени студенти`,
+                    time: log.created_at,
+                    badge: 'Алокация',
+                    color: 'emerald'
+                });
+            });
+
+            events.sort((a, b) => new Date(b.time) - new Date(a.time));
+
+            if (!events.length) {
+                feed.innerHTML = '<div class="text-xs text-[var(--text-muted)] text-center py-6">Няма регистрирани скорошни събития.</div>';
+                return;
+            }
+
+            feed.innerHTML = events.slice(0, 5).map(ev => `
+                <div class="flex items-center justify-between gap-3 p-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--bg-body)]/60">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <span class="w-2 h-2 rounded-full ${ev.color === 'blue' ? 'bg-blue-500' : ev.color === 'purple' ? 'bg-purple-500' : 'bg-emerald-500'} shrink-0"></span>
+                        <div class="min-w-0">
+                            <p class="text-xs font-bold text-[var(--text-main)] truncate">${escapeHtml(ev.title)}</p>
+                            <p class="text-[11px] text-[var(--text-muted)] truncate">${escapeHtml(ev.subtitle)}</p>
+                        </div>
+                    </div>
+                    <div class="text-right shrink-0">
+                        <span class="text-[10px] text-[var(--text-muted)]">${formatDateTime(ev.time)}</span>
+                    </div>
+                </div>
+            `).join('');
         }
 
         function statusBadgeHtml(flag) {
             return flag
-                ? '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-[var(--primary)] text-[var(--primary-foreground)]">sent</span>'
-                : '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-[var(--accent)]/60 text-[var(--foreground)]">pending</span>';
+                ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">изпратен</span>'
+                : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-[var(--text-muted)]">чакащ</span>';
         }
 
         function renderStudentImportLogs() {
             const list = document.getElementById('studentImportLogList');
             const logs = state.data?.student_import_logs || [];
             if (!logs.length) {
-                list.innerHTML = '<div class="text-sm text-[var(--muted-foreground)]">Няма студентски импорти.</div>';
+                list.innerHTML = '<div class="text-xs text-[var(--text-muted)] col-span-full">Няма студентски импорти.</div>';
                 return;
             }
 
             list.innerHTML = logs.map((log, index) => `
-                <button class="w-full text-left border rounded-[var(--radius)] p-3 ${state.selectedStudentLog?.id === log.id ? 'border-[var(--primary)] ring-1 ring-[var(--primary)]/20 bg-[var(--primary)]/10' : 'border-[var(--border)] bg-white/70'} hover:bg-[var(--input)]/70 transition" data-index="${index}" data-kind="student">
-                    <div class="flex items-start justify-between gap-3">
-                        <div>
-                            <p class="font-semibold">${escapeHtml(log.parsed_details?.message || log.details || 'Лог за студентски импорти')}</p>
-                            <p class="text-xs text-[var(--muted-foreground)] mt-1">${escapeHtml(log.specialty || '-')}, група ${escapeHtml(log.group || '-')}</p>
-                            <p class="text-xs text-[var(--muted-foreground)] mt-1">${escapeHtml(formatDateTime(log.created_at))}</p>
+                <button class="w-full text-left border rounded-[var(--radius)] p-3 ${state.selectedStudentLog?.id === log.id ? 'border-blue-500 bg-blue-50/20 dark:bg-blue-500/10' : 'border-[var(--border)] bg-[var(--bg-card)]'} hover:border-blue-400 transition" data-index="${index}" data-kind="student">
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="min-w-0">
+                            <p class="font-bold text-xs truncate">${escapeHtml(log.parsed_details?.message || log.details || 'Лог за студентски импорти')}</p>
+                            <p class="text-[11px] text-[var(--text-muted)] mt-0.5">${escapeHtml(log.specialty || '-')}, група ${escapeHtml(log.group || '-')}</p>
+                            <p class="text-[10px] text-[var(--text-muted)] mt-1">${escapeHtml(formatDateTime(log.created_at))}</p>
                         </div>
                         ${statusBadgeHtml(log.notification_sent)}
                     </div>
@@ -759,23 +1620,23 @@
 
         function renderSelectedStudentLog() {
             const log = state.selectedStudentLog;
-            document.getElementById('studentLogTitle').textContent = log ? (log.parsed_details?.message || 'Лог за студентски импорти') : 'Изберете лог отляво';
-            document.getElementById('studentLogMeta').textContent = log ? `${log.specialty || '-'} | group ${log.group || '-'} | ${formatDateTime(log.created_at)}` : '';
+            document.getElementById('studentLogTitle').textContent = log ? (log.parsed_details?.message || 'Лог за студентски импорти') : 'Изберете лог отдолу';
+            document.getElementById('studentLogMeta').textContent = log ? `${log.specialty || '-'} | група ${log.group || '-'} | ${formatDateTime(log.created_at)}` : '';
 
             const body = document.getElementById('studentLogTableBody');
             const students = log?.students || [];
             if (!students.length) {
-                body.innerHTML = '<tr><td colspan="5" class="px-3 py-4 text-[var(--muted-foreground)]">Няма налични студенти за този лог.</td></tr>';
+                body.innerHTML = '<tr><td colspan="5" class="px-3 py-4 text-center text-xs text-[var(--text-muted)]">Няма налични студенти за този лог.</td></tr>';
                 return;
             }
 
             body.innerHTML = students.map((student) => `
-                <tr class="border-t border-[var(--border)]">
+                <tr class="hover:bg-[var(--border-subtle)] transition">
                     <td class="px-3 py-2"><input type="checkbox" class="student-row-checkbox" value="${student.id}" checked></td>
-                    <td class="px-3 py-2 font-medium">${escapeHtml(student.full_name)}</td>
-                    <td class="px-3 py-2">${escapeHtml(student.student_id_number)}</td>
-                    <td class="px-3 py-2">${student.status === 'REJECTED' ? '<span class="px-2 py-1 text-xs rounded-full border border-[var(--destructive)] text-[var(--destructive)]">REJECTED</span>' : '<span class="px-2 py-1 text-xs rounded-full bg-[var(--accent)]/50">' + escapeHtml(student.status) + '</span>'}</td>
-                    <td class="px-3 py-2 break-all">${escapeHtml(student.email)}</td>
+                    <td class="px-3 py-2 font-semibold text-[var(--text-main)]">${escapeHtml(student.full_name)}</td>
+                    <td class="px-3 py-2 font-mono text-[var(--text-muted)]">${escapeHtml(student.student_id_number)}</td>
+                    <td class="px-3 py-2">${student.status === 'REJECTED' ? '<span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-red-50 text-red-600 border border-red-200">REJECTED</span>' : '<span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-50 text-emerald-700">' + escapeHtml(student.status) + '</span>'}</td>
+                    <td class="px-3 py-2 break-all text-[var(--text-muted)]">${escapeHtml(student.email)}</td>
                 </tr>
             `).join('');
 
@@ -786,16 +1647,16 @@
             const list = document.getElementById('examImportLogList');
             const logs = state.data?.exam_import_logs || [];
             if (!logs.length) {
-                list.innerHTML = '<div class="text-sm text-[var(--muted-foreground)]">Няма изпитни импорти.</div>';
+                list.innerHTML = '<div class="text-xs text-[var(--text-muted)] col-span-full">Няма изпитни импорти.</div>';
                 return;
             }
 
             list.innerHTML = logs.map((log, index) => `
-                <button class="w-full text-left border rounded-[var(--radius)] p-3 ${state.selectedExamLog?.id === log.id ? 'border-[var(--primary)] ring-1 ring-[var(--primary)]/20 bg-[var(--primary)]/10' : 'border-[var(--border)] bg-white/70'} hover:bg-[var(--input)]/70 transition" data-index="${index}" data-kind="exam">
-                    <div class="flex items-start justify-between gap-3">
-                        <div>
-                            <p class="font-semibold">${escapeHtml(log.parsed_details?.message || log.details || 'Лог на импорта на изпити')}</p>
-                            <p class="text-xs text-[var(--muted-foreground)] mt-1">${escapeHtml(formatDateTime(log.created_at))}</p>
+                <button class="w-full text-left border rounded-[var(--radius)] p-3 ${state.selectedExamLog?.id === log.id ? 'border-purple-500 bg-purple-50/20 dark:bg-purple-500/10' : 'border-[var(--border)] bg-[var(--bg-card)]'} hover:border-purple-400 transition" data-index="${index}" data-kind="exam">
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="min-w-0">
+                            <p class="font-bold text-xs truncate">${escapeHtml(log.parsed_details?.message || log.details || 'Лог на импорта на изпити')}</p>
+                            <p class="text-[10px] text-[var(--text-muted)] mt-1">${escapeHtml(formatDateTime(log.created_at))}</p>
                         </div>
                         ${statusBadgeHtml(log.notification_sent)}
                     </div>
@@ -818,25 +1679,25 @@
 
         function renderSelectedExamLog() {
             const log = state.selectedExamLog;
-            document.getElementById('examLogTitle').textContent = log ? (log.parsed_details?.summary || 'Лог на импорта на изпити') : 'Изберете изпитен лог отляво';
-            document.getElementById('examBatchSummary').textContent = log ? `${log.exams?.length || 0} изпита в този batch` : '';
+            document.getElementById('examLogTitle').textContent = log ? (log.parsed_details?.summary || 'Лог на импорта на изпити') : 'Изберете изпитен лог отдолу';
+            document.getElementById('examBatchSummary').textContent = log ? `${log.exams?.length || 0} изпита в тази партида` : '';
 
             const body = document.getElementById('examBatchTableBody');
             const exams = log?.exams || [];
             if (!exams.length) {
-                body.innerHTML = '<tr><td colspan="6" class="px-3 py-4 text-[var(--muted-foreground)]">Няма налични изпити за този batch.</td></tr>';
+                body.innerHTML = '<tr><td colspan="6" class="px-3 py-4 text-center text-xs text-[var(--text-muted)]">Няма налични изпити за този batch.</td></tr>';
                 return;
             }
 
             body.innerHTML = exams.map((exam) => `
-                <tr class="border-t border-[var(--border)]">
-                    <td class="px-3 py-2 font-medium">${escapeHtml(exam.subject)}</td>
-                    <td class="px-3 py-2">${escapeHtml(exam.room_number)}</td>
-                    <td class="px-3 py-2">${escapeHtml(formatDateTime(exam.date_time))}</td>
+                <tr class="hover:bg-[var(--border-subtle)] transition">
+                    <td class="px-3 py-2 font-semibold text-[var(--text-main)]">${escapeHtml(exam.subject)}</td>
+                    <td class="px-3 py-2 font-mono font-bold text-blue-600">${escapeHtml(exam.room_number)}</td>
+                    <td class="px-3 py-2 text-[var(--text-muted)]">${escapeHtml(formatDateTime(exam.date_time))}</td>
                     <td class="px-3 py-2">${escapeHtml(exam.course)}</td>
                     <td class="px-3 py-2">${escapeHtml(exam.group)}</td>
                     <td class="px-3 py-2">
-                        <button class="px-3 py-1 rounded-[var(--radius)] bg-[var(--primary)] text-[var(--primary-foreground)] text-xs font-semibold run-allocation-row" data-exam-id="${exam.id}">Allocate</button>
+                        <button class="px-2.5 py-1 rounded-[var(--radius)] bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold run-allocation-row transition cursor-pointer" data-exam-id="${exam.id}">Разпредели</button>
                     </td>
                 </tr>
             `).join('');
@@ -860,16 +1721,16 @@
             const list = document.getElementById('allocationLogList');
             const logs = state.data?.allocation_logs || [];
             if (!logs.length) {
-                list.innerHTML = '<div class="text-sm text-[var(--muted-foreground)]">Няма allocation изпълнения.</div>';
+                list.innerHTML = '<div class="text-xs text-[var(--text-muted)]">Няма allocation изпълнения.</div>';
                 return;
             }
 
             list.innerHTML = logs.map((log, index) => `
-                <button class="w-full text-left border rounded-[var(--radius)] p-3 ${state.selectedAllocationLog?.id === log.id ? 'border-[var(--primary)] ring-1 ring-[var(--primary)]/20 bg-[var(--primary)]/10' : 'border-[var(--border)] bg-white/70'} hover:bg-[var(--input)]/70 transition" data-index="${index}" data-kind="allocation">
-                    <div class="flex items-start justify-between gap-3">
-                        <div>
-                            <p class="font-semibold">${escapeHtml(log.parsed_details?.summary || 'Allocation execution')}</p>
-                            <p class="text-xs text-[var(--muted-foreground)] mt-1">${escapeHtml(formatDateTime(log.created_at))}</p>
+                <button class="w-full text-left border rounded-[var(--radius)] p-3 ${state.selectedAllocationLog?.id === log.id ? 'border-emerald-500 bg-emerald-50/20 dark:bg-emerald-500/10' : 'border-[var(--border)] bg-[var(--bg-card)]'} hover:border-emerald-400 transition" data-index="${index}" data-kind="allocation">
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="min-w-0">
+                            <p class="font-bold text-xs truncate">${escapeHtml(log.parsed_details?.summary || 'Allocation execution')}</p>
+                            <p class="text-[10px] text-[var(--text-muted)] mt-1">${escapeHtml(formatDateTime(log.created_at))}</p>
                         </div>
                         ${statusBadgeHtml(log.notification_sent)}
                     </div>
@@ -898,17 +1759,17 @@
             const body = document.getElementById('allocationStudentsBody');
             const students = log?.students || [];
             if (!students.length) {
-                body.innerHTML = '<tr><td colspan="5" class="px-3 py-4 text-[var(--muted-foreground)]">Няма регистрирани студенти за този execution.</td></tr>';
+                body.innerHTML = '<tr><td colspan="5" class="px-3 py-4 text-center text-xs text-[var(--text-muted)]">Няма регистрирани студенти за този execution.</td></tr>';
                 return;
             }
 
             body.innerHTML = students.map((student) => `
-                <tr class="border-t border-[var(--border)]">
-                    <td class="px-3 py-2 font-medium">${escapeHtml(student.full_name)}</td>
-                    <td class="px-3 py-2">${escapeHtml(student.student_id_number)}</td>
+                <tr class="hover:bg-[var(--border-subtle)] transition">
+                    <td class="px-3 py-2 font-semibold text-[var(--text-main)]">${escapeHtml(student.full_name)}</td>
+                    <td class="px-3 py-2 font-mono text-[var(--text-muted)]">${escapeHtml(student.student_id_number)}</td>
                     <td class="px-3 py-2">${escapeHtml(student.exam_subject || '-')}</td>
-                    <td class="px-3 py-2">${escapeHtml(student.room_number || '-')}</td>
-                    <td class="px-3 py-2">${escapeHtml(formatDateTime(student.date_time))}</td>
+                    <td class="px-3 py-2 font-mono font-bold text-blue-600">${escapeHtml(student.room_number || '-')}</td>
+                    <td class="px-3 py-2 text-[var(--text-muted)]">${escapeHtml(formatDateTime(student.date_time))}</td>
                 </tr>
             `).join('');
         }
@@ -920,29 +1781,28 @@
             const btn = document.getElementById('startApprovalBtn');
             if (students.length === 0) {
                 btn.dataset.mode = "idle";
-                btn.className = "w-full px-3 py-2 rounded-[var(--radius)] bg-[var(--primary)] text-[var(--primary-foreground)] text-sm font-semibold hover:opacity-90 mb-4";
+                btn.className = "w-full px-3 py-2 rounded-[var(--radius)] bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition";
                 btn.textContent = `Старт на одобрения, чакащи: 0`;
                 state.queueIndex = 0;
             } else if (btn.dataset.mode !== "reviewing") {
                 state.queueIndex = 0;
                 btn.textContent = `Старт на одобрения, чакащи: ${students.length}`;
             } else {
-                // Ако сме в режим на преглед, държим бутона като опция за изход
                 btn.textContent = "Спри прегледа (Изход)";
-                btn.className = "w-full px-3 py-2 rounded-[var(--radius)] bg-[var(--destructive)] text-[var(--destructive-foreground)] text-sm font-semibold hover:opacity-90 mb-4 cursor-pointer";
+                btn.className = "w-full px-3 py-2 rounded-[var(--radius)] bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition cursor-pointer";
             }
 
             const list = document.getElementById('pendingStudentList');
             if (!students.length) {
-                list.innerHTML = '<div class="text-sm text-[var(--muted-foreground)]">Няма чакащи за одобрение студенти.</div>';
+                list.innerHTML = '<div class="text-xs text-[var(--text-muted)]">Няма чакащи за одобрение студенти.</div>';
                 renderCurrentApprovalItem();
                 return;
             }
 
             list.innerHTML = students.map((student, index) => `
-                <div class="border rounded-[var(--radius)] p-3 bg-white/70 ${index === state.queueIndex && btn.dataset.mode === 'reviewing' ? 'border-[var(--primary)] ring-1 ring-[var(--primary)]/20 bg-[var(--primary)]/5' : 'border-[var(--border)]'}">
-                    <p class="font-semibold">${escapeHtml(student.full_name)}</p>
-                    <p class="text-xs text-[var(--muted-foreground)] mt-1">${escapeHtml(student.student_id_number)} | ${escapeHtml(student.specialty)} | group ${escapeHtml(student.group)}</p>
+                <div class="border rounded-[var(--radius)] p-2.5 bg-[var(--bg-body)] ${index === state.queueIndex && btn.dataset.mode === 'reviewing' ? 'border-blue-500 ring-1 ring-blue-500/20' : 'border-[var(--border)]'}">
+                    <p class="font-bold text-xs text-[var(--text-main)]">${escapeHtml(student.full_name)}</p>
+                    <p class="text-[11px] text-[var(--text-muted)] mt-0.5 font-mono">${escapeHtml(student.student_id_number)} | ${escapeHtml(student.specialty)} | гр. ${escapeHtml(student.group)}</p>
                 </div>
             `).join('');
 
@@ -965,15 +1825,14 @@
                 approvalPhoto.removeAttribute('src');
 
                 if (actionsDiv) actionsDiv.classList.add('hidden');
-
-                setStatus('Актуално спрямо базата данни');
+                setStatus('База данни: Свързана');
                 return;
             }
 
             if (startBtn && startBtn.dataset.mode === "reviewing") {
-                if (actionsDiv) actionsDiv.classList.remove('hidden'); // Показваме ги
+                if (actionsDiv) actionsDiv.classList.remove('hidden');
             } else {
-                if (actionsDiv) actionsDiv.classList.add('hidden');    // Държим ги скрити
+                if (actionsDiv) actionsDiv.classList.add('hidden');
             }
 
             document.getElementById('approvalTitle').textContent = student.full_name;
@@ -982,33 +1841,36 @@
             document.getElementById('approvalStudentEmail').textContent = student.email;
             document.getElementById('approvalStudentSpecialty').textContent = student.specialty;
             document.getElementById('approvalStudentGroup').textContent = student.group;
-            approvalPhoto.src = student.photo_url ?`${student.photo_url}?token=${adminToken}` : '';
+            approvalPhoto.src = student.photo_url ? `${student.photo_url}?token=${adminToken}` : '';
         }
 
         function renderExaminers() {
             const list = document.getElementById('examinerList');
             const examiners = state.data?.examiners || [];
             if (!examiners.length) {
-                list.innerHTML = '<div class="text-sm text-[var(--muted-foreground)]">Няма регистрирани квестори.</div>';
+                list.innerHTML = '<div class="text-xs text-[var(--text-muted)] col-span-full">Няма регистрирани квестори.</div>';
                 return;
             }
 
             list.innerHTML = examiners.map((examiner) => `
-                <div class="border border-[var(--border)] rounded-[var(--radius)] p-4 bg-white/70">
-                    <p class="font-semibold">${escapeHtml(examiner.full_name)}</p>
-                    <p class="text-sm text-[var(--muted-foreground)] mt-1 break-all">${escapeHtml(examiner.email)}</p>
-                    <p class="text-xs text-[var(--muted-foreground)] mt-2">${examiner.is_verified ? 'verified' : 'pending verification'}</p>
+                <div class="border border-[var(--border)] rounded-[var(--radius)] p-4 bg-[var(--bg-body)]">
+                    <p class="font-bold text-xs text-[var(--text-main)]">${escapeHtml(examiner.full_name)}</p>
+                    <p class="text-xs text-[var(--text-muted)] mt-1 break-all">${escapeHtml(examiner.email)}</p>
+                    <span class="inline-block mt-2 px-2 py-0.5 rounded-full text-[10px] font-bold ${examiner.is_verified ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}">
+                        ${examiner.is_verified ? 'verified' : 'pending verification'}
+                    </span>
                 </div>
             `).join('');
         }
 
-        document.getElementById('studentSelectAllCheckbox').addEventListener('change', (event) => {
+        // Event listeners
+        document.getElementById('studentSelectAllCheckbox')?.addEventListener('change', (event) => {
             document.querySelectorAll('.student-row-checkbox').forEach((checkbox) => {
                 checkbox.checked = event.target.checked;
             });
         });
 
-        document.getElementById('studentSelectAllBtn').addEventListener('click', () => {
+        document.getElementById('studentSelectAllBtn')?.addEventListener('click', () => {
             const nextValue = !document.getElementById('studentSelectAllCheckbox').checked;
             document.getElementById('studentSelectAllCheckbox').checked = nextValue;
             document.querySelectorAll('.student-row-checkbox').forEach((checkbox) => {
@@ -1016,7 +1878,7 @@
             });
         });
 
-        document.getElementById('studentSendBtn').addEventListener('click', async () => {
+        document.getElementById('studentSendBtn')?.addEventListener('click', async () => {
             const log = state.selectedStudentLog;
             if (!log) return;
             const studentIds = Array.from(document.querySelectorAll('.student-row-checkbox:checked')).map((checkbox) => checkbox.value);
@@ -1030,7 +1892,7 @@
             await loadDashboardData();
         });
 
-        document.getElementById('allocationSendBtn').addEventListener('click', async () => {
+        document.getElementById('allocationSendBtn')?.addEventListener('click', async () => {
             const log = state.selectedAllocationLog;
             if (!log) return;
             const response = await authFetch(`/admins/notifications/send/${log.id}`, {
@@ -1043,81 +1905,73 @@
             await loadDashboardData();
         });
 
-        document.getElementById('startApprovalBtn').addEventListener('click', () => {
+        document.getElementById('startApprovalBtn')?.addEventListener('click', () => {
             const btn = document.getElementById('startApprovalBtn');
             const actionsDiv = document.getElementById('approvalActions');
             
-            // АКО СМЕ В РЕЖИМ НА ПРЕГЛЕД -> ТОЗИ КЛИК Е ЗА ИЗХОД/ОТКАЗ
             if (btn.dataset.mode === "reviewing") {
                 btn.dataset.mode = "idle";
-                btn.className = "w-full px-3 py-2 rounded-[var(--radius)] bg-[var(--primary)] text-[var(--primary-foreground)] text-sm font-semibold hover:opacity-90 mb-4 cursor-pointer";
-                
-                if (actionsDiv) actionsDiv.classList.add('hidden'); // Сега вече работи без ReferenceError!
-                
+                btn.className = "w-full px-3 py-2 rounded-[var(--radius)] bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition";
+                if (actionsDiv) actionsDiv.classList.add('hidden');
                 state.queueIndex = 0;
-                setStatus('Актуално спрямо базата данни');
+                setStatus('База данни: Свързана');
                 loadDashboardData();
                 return;
             }
 
-            // ЗАЩИТА: Ако няма студенти, прекратяваме операцията веднага
             if (!state.pendingQueue || state.pendingQueue.length === 0) {
                 alert("Няма чакащи студенти за одобрение.");
-                setStatus('Актуално спрямо базата данни');
+                setStatus('База данни: Свързана');
                 return;
             }
             
             btn.dataset.mode = "reviewing";
             btn.textContent = "Спри прегледа (Изход)";
-            btn.className = "w-full px-3 py-2 rounded-[var(--radius)] bg-[var(--destructive)] text-[var(--destructive-foreground)] text-sm font-semibold hover:opacity-90 mb-4 cursor-pointer";
+            btn.className = "w-full px-3 py-2 rounded-[var(--radius)] bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition cursor-pointer";
             
             state.queueIndex = 0;
             renderCurrentApprovalItem();
             setStatus(`Започна опашка с ${state.pendingQueue.length} студенти`);
         });
 
-        document.getElementById('approveBtn').addEventListener('click', async () => {
+        document.getElementById('approveBtn')?.addEventListener('click', async () => {
             const btn = document.getElementById('approveBtn');
             const student = state.pendingQueue[state.queueIndex];
             if (!student) return;
 
-            // 1. Хващаме текущия текст и вкарваме бутона в режим "Зареждане"
             const originalContent = btn.innerHTML;
-            btn.disabled = true; // Защита срещу двойно кликане
+            btn.disabled = true;
             btn.classList.add('opacity-60', 'pointer-events-none');
             
-            // Вграждаме Tailwind SVG колелото с плавна анимация на въртене
             btn.innerHTML = `
-                <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-current inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <svg class="animate-spin -ml-1 mr-2 h-3.5 w-3.5 text-current inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg> Анализиране...
             `;
 
             try {
-                // Изпращаме POST заявката към ИИ модела във FastAPI бекенда
                 const response = await authFetch(`/admins/approve-student/${student.id}`, { method: 'POST' });
                 const data = await response.json();
                 
                 if (response.ok) {
-                    alert(data.message || 'Студентът е одобрен успешно и биометричният модел е записан.');
+                    alert(data.message || 'Студентът е одобрен успешно.');
                     state.queueIndex += 1;
                     await loadDashboardData();
                 } else {
-                    alert(`Грешка при обработка: ${data.detail || 'Неуспешно одобрение.'}`);
+                    alert(`Грешка: ${data.detail || 'Неуспешно одобрение.'}`);
                 }
             } catch (err) {
                 console.error("Грешка при биометричен анализ:", err);
-                alert('Критична грешка: Връзката със сървъра пропадна по време на извличане на вектора.');
+                alert('Критична грешка при връзка със сървъра.');
             } finally {
-                // 2. Връщаме оригиналния софтуерен облик на бутона след приключване на асинхронния процес
                 btn.disabled = false;
                 btn.classList.remove('opacity-60', 'pointer-events-none');
                 btn.innerHTML = originalContent;
             }
         });
 
-        document.getElementById('rejectBtn').addEventListener('click', async () => {
+        document.getElementById('rejectBtn')?.addEventListener('click', async () => {
             const student = state.pendingQueue[state.queueIndex];
             if (!student) return;
             const reason = document.getElementById('rejectionReason').value.trim();
@@ -1137,10 +1991,10 @@
             await loadDashboardData();
         });
 
-        document.getElementById('examinerForm').addEventListener('submit', async (event) => {
+        document.getElementById('examinerForm')?.addEventListener('submit', async (event) => {
             event.preventDefault();
             const statusDiv = document.getElementById('examinerStatus');
-            statusDiv.className = 'text-sm p-3 rounded-[var(--radius)] border bg-[var(--primary)]/10 border-[var(--primary)] text-[var(--primary)]';
+            statusDiv.className = 'text-xs p-3 rounded-[var(--radius)] border bg-blue-50 text-blue-700 border-blue-200';
             statusDiv.textContent = 'Регистриране...';
             statusDiv.classList.remove('hidden');
 
@@ -1155,23 +2009,21 @@
             });
             const data = await response.json();
             if (response.ok) {
-                statusDiv.className = 'text-sm p-3 rounded-[var(--radius)] border bg-[var(--primary)]/10 border-[var(--primary)] text-[var(--primary)]';
+                statusDiv.className = 'text-xs p-3 rounded-[var(--radius)] border bg-emerald-50 text-emerald-700 border-emerald-200';
                 statusDiv.textContent = data.message || 'Квесторът е регистриран.';
                 event.target.reset();
                 await loadDashboardData();
             } else {
-                statusDiv.className = 'text-sm p-3 rounded-[var(--radius)] border bg-[var(--destructive)]/15 border-[var(--destructive)] text-[var(--destructive)]';
+                statusDiv.className = 'text-xs p-3 rounded-[var(--radius)] border bg-red-50 text-red-700 border-red-200';
                 statusDiv.textContent = data.detail || 'Възникна грешка при регистрацията.';
             }
         });
 
-        document.getElementById('studentsForm').addEventListener('submit', async (e) => {
+        document.getElementById('studentsForm')?.addEventListener('submit', async (e) => {
             e.preventDefault();
             const statusDiv = document.getElementById('studStatus');
-            
-            // Визуализираме състояние на зареждане спрямо дизайн токените
-            statusDiv.className = 'text-sm p-3 rounded-[var(--radius)] border bg-[var(--primary)]/10 border-[var(--primary)] text-[var(--primary)] font-semibold text-center';
-            statusDiv.textContent = '🔄 Изпращане и обработка на Excel таблицата...';
+            statusDiv.className = 'text-xs p-3 rounded-[var(--radius)] border bg-blue-50 text-blue-700 font-semibold text-center';
+            statusDiv.textContent = '🔄 Обработка на Excel таблицата...';
             statusDiv.classList.remove('hidden');
 
             const formData = new FormData();
@@ -1183,7 +2035,6 @@
             formData.append("file", document.getElementById("studFile").files[0]);
 
             try {
-                // Използваме твоята authFetch функция за автоматично Bearer JWT автентикиране
                 const response = await authFetch('/admins/upload/students', {
                     method: 'POST',
                     body: formData
@@ -1191,28 +2042,25 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    statusDiv.className = 'text-sm p-3 rounded-[var(--radius)] border bg-emerald-500/10 border-emerald-500 text-emerald-600 font-bold text-center';
+                    statusDiv.className = 'text-xs p-3 rounded-[var(--radius)] border bg-emerald-50 text-emerald-700 font-bold text-center';
                     statusDiv.textContent = `✅ Успех: ${data.message}`;
                     document.getElementById('studentsForm').reset();
-                    
-                    // Световно релоудване на данните в таблото (броячите и списъците се обновяват)
                     await loadDashboardData();
                 } else {
-                    statusDiv.className = 'text-sm p-3 rounded-[var(--radius)] border bg-[var(--destructive)]/15 border-[var(--destructive)] text-[var(--destructive)] font-semibold text-center';
+                    statusDiv.className = 'text-xs p-3 rounded-[var(--radius)] border bg-red-50 text-red-700 font-semibold text-center';
                     statusDiv.textContent = `❌ Грешка: ${data.detail || 'Възникна проблем при импорта.'}`;
                 }
             } catch (err) {
-                statusDiv.className = 'text-sm p-3 rounded-[var(--radius)] border bg-[var(--destructive)]/15 border-[var(--destructive)] text-[var(--destructive)] font-semibold text-center';
-                statusDiv.textContent = '❌ Критична грешка: Липсва връзка с бекенд сървъра.';
+                statusDiv.className = 'text-xs p-3 rounded-[var(--radius)] border bg-red-50 text-red-700 font-semibold text-center';
+                statusDiv.textContent = '❌ Критична грешка: Липсва връзка със сървъра.';
             }
         });
 
-        document.getElementById('examsForm').addEventListener('submit', async (e) => {
+        document.getElementById('examsForm')?.addEventListener('submit', async (e) => {
             e.preventDefault();
             const statusDiv = document.getElementById('examStatus');
-            
-            statusDiv.className = 'text-sm p-3 rounded-[var(--radius)] border bg-[var(--primary)]/10 border-[var(--primary)] text-[var(--primary)] font-semibold text-center';
-            statusDiv.textContent = '🔄 Системата анализира и напасва изпитния график...';
+            statusDiv.className = 'text-xs p-3 rounded-[var(--radius)] border bg-blue-50 text-blue-700 font-semibold text-center';
+            statusDiv.textContent = '🔄 Анализиране на изпитния график...';
             statusDiv.classList.remove('hidden');
 
             const formData = new FormData();
@@ -1226,29 +2074,24 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    statusDiv.className = 'text-sm p-3 rounded-[var(--radius)] border bg-emerald-500/10 border-emerald-500 text-emerald-600 font-bold text-center';
+                    statusDiv.className = 'text-xs p-3 rounded-[var(--radius)] border bg-emerald-50 text-emerald-700 font-bold text-center';
                     statusDiv.textContent = `✅ Успех! Създадени изпити: ${data.created}, Обновени: ${data.updated}`;
                     document.getElementById('examsForm').reset();
-                    
-                    // Връщаме дефолтния текст на drag & drop кутията
-                    document.getElementById('examFileName').textContent = 'Само файлове с разширение .xlsx или .xls';
-                    document.getElementById('examFileName').className = 'text-xs text-[var(--muted-foreground)] mt-2';
-                    
+                    document.getElementById('examFileName').textContent = 'Само файлове .xlsx или .xls';
                     await loadDashboardData();
                 } else {
-                    statusDiv.className = 'text-sm p-3 rounded-[var(--radius)] border bg-[var(--destructive)]/15 border-[var(--destructive)] text-[var(--destructive)] font-semibold text-center';
-                    statusDiv.textContent = `❌ Грешка: ${data.detail || 'Проблем при обработка на редовете.'}`;
+                    statusDiv.className = 'text-xs p-3 rounded-[var(--radius)] border bg-red-50 text-red-700 font-semibold text-center';
+                    statusDiv.textContent = `❌ Грешка: ${data.detail || 'Проблем при обработка на графика.'}`;
                 }
             } catch (err) {
-                statusDiv.className = 'text-sm p-3 rounded-[var(--radius)] border bg-[var(--destructive)]/15 border-[var(--destructive)] text-[var(--destructive)] font-semibold text-center';
-                statusDiv.textContent = '❌ Критична грешка: Липсва отговор от FastAPI.';
+                statusDiv.className = 'text-xs p-3 rounded-[var(--radius)] border bg-red-50 text-red-700 font-semibold text-center';
+                statusDiv.textContent = '❌ Критична грешка: Липсва отговор от сървъра.';
             }
         });
 
         // ===============================================
-        // SUPERADMIN: VERIFICATIONS & SECURE KEY LOGIC
+        // 7. SUPERADMIN: SECURE KEY & VERIFICATIONS
         // ===============================================
-
         const unattendedToggle = document.getElementById('unattendedToggle');
         const generateKeyArea = document.getElementById('generateKeyArea');
         const generateKeyBtn = document.getElementById('generateKeyBtn');
@@ -1338,36 +2181,35 @@
                 }
 
                 if (!items.length) {
-                    list.innerHTML = '<div class="text-sm text-[var(--muted-foreground)] text-center py-8 bg-white/50 rounded-[var(--radius)] border border-[var(--border)]">Няма чакащи заявки за верификация на персонал.</div>';
+                    list.innerHTML = '<div class="text-xs text-[var(--text-muted)] text-center py-8 bg-[var(--bg-body)] rounded-[var(--radius)] border border-[var(--border)]">Няма чакащи заявки за верификация на персонал.</div>';
                     return;
                 }
 
                 list.innerHTML = items.map((item) => `
-                    <div class="flex items-center justify-between gap-4 p-3.5 border border-[var(--border)] rounded-[var(--radius)] bg-white/80 hover:bg-[var(--input)]/30 transition">
+                    <div class="flex items-center justify-between gap-3 p-3 border border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-body)]">
                         <div class="flex items-center gap-3 min-w-0">
-                            <!-- Бутони от крайно лявата страна (Far Left) -->
                             <div class="flex items-center gap-1.5 shrink-0">
-                                <button title="Grant Access (Одобри достъп)" data-id="${item.id}" data-role="${item.role}" data-name="${escapeHtml(item.full_name)}" class="btn-grant-access w-8 h-8 rounded-[var(--radius)] bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center justify-center shadow-xs transition cursor-pointer active:scale-95">
+                                <button title="Grant Access" data-id="${item.id}" data-role="${item.role}" data-name="${escapeHtml(item.full_name)}" class="btn-grant-access w-7 h-7 rounded-[var(--radius)] bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center justify-center text-xs shadow-xs transition cursor-pointer">
                                     ✓
                                 </button>
-                                <button title="Reject (Отхвърли)" data-id="${item.id}" data-role="${item.role}" data-name="${escapeHtml(item.full_name)}" class="btn-reject-access w-8 h-8 rounded-[var(--radius)] bg-[var(--destructive)] hover:opacity-90 text-white font-bold flex items-center justify-center shadow-xs transition cursor-pointer active:scale-95">
+                                <button title="Reject" data-id="${item.id}" data-role="${item.role}" data-name="${escapeHtml(item.full_name)}" class="btn-reject-access w-7 h-7 rounded-[var(--radius)] bg-red-600 hover:bg-red-700 text-white font-bold flex items-center justify-center text-xs shadow-xs transition cursor-pointer">
                                     ✕
                                 </button>
                             </div>
 
                             <div class="min-w-0">
                                 <div class="flex items-center gap-2 flex-wrap">
-                                    <span class="text-sm font-bold text-[var(--foreground)] truncate">${escapeHtml(item.full_name)}</span>
-                                    <span class="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${item.role === 'admin' ? 'bg-[var(--primary)] text-[var(--primary-foreground)]' : 'bg-[var(--accent)] text-[var(--foreground)]'}">
+                                    <span class="text-xs font-bold text-[var(--text-main)] truncate">${escapeHtml(item.full_name)}</span>
+                                    <span class="text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${item.role === 'admin' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'}">
                                         ${escapeHtml(item.role_display)}
                                     </span>
                                 </div>
-                                <p class="text-xs text-[var(--muted-foreground)] truncate mt-0.5">${escapeHtml(item.email)}</p>
+                                <p class="text-[11px] text-[var(--text-muted)] truncate">${escapeHtml(item.email)}</p>
                             </div>
                         </div>
 
                         <div class="text-right shrink-0">
-                            <span class="text-xs text-[var(--muted-foreground)]">${formatDateTime(item.created_at)}</span>
+                            <span class="text-[10px] text-[var(--text-muted)]">${formatDateTime(item.created_at)}</span>
                         </div>
                     </div>
                 `).join('');
@@ -1377,7 +2219,6 @@
                         const id = btn.dataset.id;
                         const role = btn.dataset.role;
                         const name = btn.dataset.name;
-                        
                         btn.disabled = true;
                         try {
                             const resp = await authFetch(`/admins/verifications/${role}/${id}/grant`, { method: 'POST' });
@@ -1402,10 +2243,7 @@
                         const id = btn.dataset.id;
                         const role = btn.dataset.role;
                         const name = btn.dataset.name;
-
-                        if (!confirm(`Сигурни ли сте, че искате да отхвърлите заявката за регистрация на ${name}?`)) {
-                            return;
-                        }
+                        if (!confirm(`Сигурни ли сте, че искате да отхвърлите заявката на ${name}?`)) return;
 
                         btn.disabled = true;
                         try {
@@ -1452,17 +2290,8 @@
             });
         }
 
-        if (modalCancelBtn1) {
-            modalCancelBtn1.addEventListener('click', () => {
-                generateKeyModal.classList.add('hidden');
-            });
-        }
-
-        if (modalCancelBtn2) {
-            modalCancelBtn2.addEventListener('click', () => {
-                generateKeyModal.classList.add('hidden');
-            });
-        }
+        if (modalCancelBtn1) modalCancelBtn1.addEventListener('click', () => generateKeyModal.classList.add('hidden'));
+        if (modalCancelBtn2) modalCancelBtn2.addEventListener('click', () => generateKeyModal.classList.add('hidden'));
 
         if (modalProceedBtn) {
             modalProceedBtn.addEventListener('click', () => {
@@ -1494,7 +2323,6 @@
                         keyWarningNotice.classList.remove('hidden');
                         copyKeyBtn.disabled = false;
                         copyKeyBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-                        copyKeyBtn.title = "Копирай в клипборда";
                         copyKeyBtn.innerText = "Копирай";
 
                         const durationLabel = {
@@ -1549,10 +2377,7 @@
 
         if (deleteKeyBtn) {
             deleteKeyBtn.addEventListener('click', async () => {
-                if (!confirm('Сигурни ли сте, че искате да анулирате и изтриете активния Secure Key? Това ще спре възможността за автоматична регистрация с този ключ.')) {
-                    return;
-                }
-
+                if (!confirm('Сигурни ли сте, че искате да анулирате активния Secure Key?')) return;
                 deleteKeyBtn.disabled = true;
                 try {
                     const resp = await authFetch('/admins/secure-key', { method: 'DELETE' });

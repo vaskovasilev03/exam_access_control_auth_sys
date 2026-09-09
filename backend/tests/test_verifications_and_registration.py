@@ -11,7 +11,7 @@ os.environ["SUPERADMIN_NAME"] = "Super Administrator"
 
 from app.main import app
 from app.database import get_db, SessionLocal, init_db
-from app.models import Admin, Examiner, SecureKey
+from app.models import Admin, Examiner, SecureKey, Student
 from app.seed import seed_superadmin
 from app.auth import get_password_hash, SECRET_KEY, ALGORITHM
 
@@ -22,8 +22,31 @@ class VerificationsAndRegistrationTestCase(unittest.TestCase):
     def setUpClass(cls):
         init_db()
 
+    @classmethod
+    def tearDownClass(cls):
+        db: Session = SessionLocal()
+        try:
+            db.query(Admin).filter(Admin.is_superadmin == False).delete()
+            db.query(Examiner).delete()
+            db.query(SecureKey).delete()
+            db.query(Student).filter(Student.student_id_number != "000000000").delete()
+            db.commit()
+        except Exception:
+            db.rollback()
+        finally:
+            db.close()
+
     def setUp(self):
         self.db: Session = SessionLocal()
+        # Clean any preexisting non-superadmin test records
+        try:
+            self.db.query(Admin).filter(Admin.is_superadmin == False).delete()
+            self.db.query(Examiner).delete()
+            self.db.query(SecureKey).delete()
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+
         self.superadmin = seed_superadmin(self.db)
         # Login as superadmin to get token
         login_res = client.post(
@@ -38,7 +61,21 @@ class VerificationsAndRegistrationTestCase(unittest.TestCase):
         self.superadmin_headers = {"Authorization": f"Bearer {self.superadmin_token}"}
 
     def tearDown(self):
-        self.db.close()
+        try:
+            # Autodelete all newly created test entries
+            self.db.query(Admin).filter(Admin.is_superadmin == False).delete()
+            self.db.query(Examiner).delete()
+            self.db.query(SecureKey).delete()
+            self.db.query(Student).filter(Student.student_id_number != "000000000").delete()
+            # Ensure superadmin password is reset to default SuperAdmin123!
+            superadmin = self.db.query(Admin).filter(Admin.is_superadmin == True).first()
+            if superadmin:
+                superadmin.hashed_password = get_password_hash("SuperAdmin123!")
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+        finally:
+            self.db.close()
 
     def test_01_html_views_served_successfully(self):
         """ Test that /login and /register HTML endpoints serve 200 OK """

@@ -12,7 +12,7 @@ os.environ["SUPERADMIN_NAME"] = "Super Administrator"
 
 from app.main import app
 from app.database import get_db, SessionLocal, init_db
-from app.models import Admin, Student, Examiner, Exam, SessionType
+from app.models import Admin, Student, Examiner, Exam, SessionType, SecureKey
 from app.seed import seed_superadmin
 from app.auth import get_password_hash, SECRET_KEY, ALGORITHM
 
@@ -23,13 +23,41 @@ class SuperadminVersatilityTestCase(unittest.TestCase):
     def setUpClass(cls):
         init_db()
 
+    @classmethod
+    def tearDownClass(cls):
+        db: Session = SessionLocal()
+        try:
+            db.query(Admin).filter(Admin.is_superadmin == False).delete()
+            db.query(Examiner).delete()
+            db.query(SecureKey).delete()
+            db.query(Student).filter(Student.student_id_number != "000000000").delete()
+            db.commit()
+        except Exception:
+            db.rollback()
+        finally:
+            db.close()
+
     def setUp(self):
         self.db: Session = SessionLocal()
         # Ensure database is seeded with the superadmin
         self.superadmin = seed_superadmin(self.db)
 
     def tearDown(self):
-        self.db.close()
+        try:
+            # Autodelete all newly created test entries
+            self.db.query(Admin).filter(Admin.is_superadmin == False).delete()
+            self.db.query(Examiner).delete()
+            self.db.query(SecureKey).delete()
+            self.db.query(Student).filter(Student.student_id_number != "000000000").delete()
+            # Ensure superadmin password is reset to default SuperAdmin123!
+            superadmin = self.db.query(Admin).filter(Admin.is_superadmin == True).first()
+            if superadmin:
+                superadmin.hashed_password = get_password_hash("SuperAdmin123!")
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+        finally:
+            self.db.close()
 
     def test_01_seed_superadmin_creates_or_updates(self):
         """ Test that seed_superadmin creates exactly 1 superadmin and is idempotent """
