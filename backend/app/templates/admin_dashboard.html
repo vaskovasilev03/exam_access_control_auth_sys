@@ -105,6 +105,12 @@
                     <button class="tab-button px-4 py-2 rounded-[var(--radius)] border border-[var(--border)] text-sm font-semibold transition" data-tab="allocation">Разпределение</button>
                     <button class="tab-button px-4 py-2 rounded-[var(--radius)] border border-[var(--border)] text-sm font-semibold transition" data-tab="approval">Одобрения</button>
                     <button class="tab-button px-4 py-2 rounded-[var(--radius)] border border-[var(--border)] text-sm font-semibold transition" data-tab="examiners">Квестори</button>
+                    {% if is_superadmin %}
+                    <button id="verificationsTabBtn" class="tab-button px-4 py-2 rounded-[var(--radius)] border border-[var(--border)] text-sm font-semibold transition items-center gap-1.5" style="display: inline-flex;" data-tab="verifications">
+                        <span>Верификации</span>
+                        <span id="verificationsBadge" class="hidden px-1.5 py-0.5 rounded-full text-xs bg-[var(--destructive)] text-[var(--destructive-foreground)] font-bold">0</span>
+                    </button>
+                    {% endif %}
                 </div>
             </div>
 
@@ -410,8 +416,168 @@
                         </section>
                     </div>
                 </div>
+
+                {% if is_superadmin %}
+                <!-- PANEL: VERIFICATIONS (Superadmin Only) -->
+                <div id="panel-verifications" class="panel">
+                    <div class="mb-6">
+                        <h2 class="text-xl font-bold text-[var(--primary)] mb-1">Управление на верификации & Secure Key</h2>
+                        <p class="text-sm text-[var(--muted-foreground)]">Преглед и валидация на чакащи заявки за създаване на персонални акаунти и управление на ключове за необслужвана регистрация.</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 xl:grid-cols-[400px_1fr] gap-6">
+                        <!-- LEFT: SECURE KEY MANAGEMENT -->
+                        <section class="border border-[var(--border)] rounded-[var(--radius)] p-5 bg-[var(--card)] shadow-sm space-y-4">
+                            <div class="border-b border-[var(--border)] pb-3">
+                                <h3 class="text-base font-bold text-[var(--foreground)]">Необслужвано създаване на акаунти</h3>
+                                <p class="text-xs text-[var(--muted-foreground)] mt-0.5">Позволява мигновена верификация на нови администратори и квестори чрез Secure Key.</p>
+                            </div>
+
+                            <!-- TOGGLE SWITCH -->
+                            <div class="flex items-center justify-between py-1">
+                                <span class="text-sm font-semibold text-[var(--foreground)]">Активиране на създаването на акаунти без намеса на администратор</span>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="unattendedToggle" class="sr-only peer">
+                                    <div class="w-11 h-6 bg-[var(--border)] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600 peer-disabled:opacity-60 peer-disabled:cursor-not-allowed"></div>
+                                </label>
+                            </div>
+                            <p id="toggleLockNotice" class="hidden text-xs text-amber-700 bg-amber-500/10 border border-amber-500/20 p-2.5 rounded-[var(--radius)] font-medium leading-relaxed">
+                                🔒 Превключвателят е заключен, докато има активен Secure Key. Използвайте "Delete Secure Key", за да го анулирате.
+                            </p>
+
+                            <!-- GENERATE BUTTON AREA -->
+                            <div id="generateKeyArea" class="hidden pt-1">
+                                <button id="generateKeyBtn" class="w-full bg-[var(--primary)] hover:opacity-90 text-[var(--primary-foreground)] font-bold py-2.5 px-4 rounded-[var(--radius)] shadow-sm transition text-sm cursor-pointer">
+                                    Генерирай Secure Key
+                                </button>
+                            </div>
+
+                            <!-- LOADING SPINNER -->
+                            <div id="keyLoadingSpinner" class="hidden flex items-center justify-center gap-2 py-4 text-sm font-semibold text-[var(--primary)]">
+                                <svg class="animate-spin h-5 w-5 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span>Генериране на Secure Key...</span>
+                            </div>
+
+                            <!-- KEY DISPLAY AREA -->
+                            <div id="keyDisplayArea" class="hidden space-y-3 p-4 bg-white/80 border border-[var(--border)] rounded-[var(--radius)]">
+                                <div>
+                                    <label class="text-xs uppercase tracking-wider text-[var(--muted-foreground)] font-bold block mb-1">Активен Secure Key</label>
+                                    <div class="flex items-center gap-2">
+                                        <input type="text" id="keyDisplayInput" readonly class="w-full bg-[var(--input)] border border-[var(--border)] rounded-[var(--radius)] px-3 py-2 text-xs font-mono select-all focus:outline-none" value="********">
+                                        <button id="copyKeyBtn" title="Копирай в клипборда" class="px-3 py-2 bg-[var(--primary)] text-[var(--primary-foreground)] rounded-[var(--radius)] text-xs font-semibold hover:opacity-90 transition cursor-pointer shrink-0">
+                                            Копирай
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- WARNING NOTICE (VISIBLE ONLY ON INITIAL GENERATION) -->
+                                <p id="keyWarningNotice" class="text-xs font-bold italic text-amber-700 bg-amber-500/10 border border-amber-500/20 p-2.5 rounded-[var(--radius)] leading-relaxed">
+                                    Please store this Secure Key somewhere outside of this page, you will see this key only once so be sure to not lose this key!
+                                </p>
+
+                                <div class="text-xs text-[var(--muted-foreground)] space-y-0.5">
+                                    <p id="keyDurationMeta">-</p>
+                                    <p id="keyExpiryMeta">-</p>
+                                </div>
+
+                                <!-- DELETE SECURE KEY BUTTON -->
+                                <button id="deleteKeyBtn" class="w-full border-2 border-[var(--destructive)] text-[var(--destructive)] hover:bg-[var(--destructive)] hover:text-[var(--destructive-foreground)] font-bold py-2 px-3 rounded-[var(--radius)] text-xs transition cursor-pointer mt-2">
+                                    Анулирай Secure Key
+                                </button>
+                            </div>
+                        </section>
+
+                        <!-- RIGHT: PENDING VERIFICATIONS LIST -->
+                        <section class="border border-[var(--border)] rounded-[var(--radius)] p-5 bg-[var(--card)] shadow-sm flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center justify-between border-b border-[var(--border)] pb-3 mb-4">
+                                    <div>
+                                        <h3 class="text-base font-bold text-[var(--foreground)]">Чакащи заявки за верификация</h3>
+                                        <p class="text-xs text-[var(--muted-foreground)] mt-0.5">Списък на чакащи одобрение акаунти, подредени хронологично (най-старите първи).</p>
+                                    </div>
+                                    <span id="verificationsListCount" class="text-xs px-2.5 py-1 rounded-full bg-[var(--accent)]/50 font-bold">0</span>
+                                </div>
+
+                                <div id="verificationsList" class="space-y-3">
+                                    <div class="text-sm text-[var(--muted-foreground)] text-center py-6">Зареждане на чакащите заявки...</div>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+                {% endif %}
             </div>
         </section>
+
+        {% if is_superadmin %}
+        <!-- CONFIRMATION & DURATION MODAL -->
+        <div id="generateKeyModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+            <div class="bg-white border border-[var(--border)] rounded-[var(--radius)] max-w-md w-full p-6 shadow-2xl space-y-4">
+                <div id="modalStep1">
+                    <h3 class="text-lg font-bold text-[var(--primary)] mb-2">Генериране на Secure Key</h3>
+                    <p class="text-sm text-[var(--foreground)] leading-relaxed mb-4">
+                        Сигурен ли сте, че искате да генерирате Secure Key? Това действие ще позволи създаването на акаунти на администратори и квестори, които притежават Secure Key. Натиснете „Продължи“, ако сте сигурни.
+                    </p>
+                    <div class="flex justify-end gap-2 pt-2">
+                        <button id="modalCancelBtn1" class="px-4 py-2 border border-[var(--border)] rounded-[var(--radius)] text-sm font-semibold hover:bg-[var(--input)] transition cursor-pointer">
+                            Отказ
+                        </button>
+                        <button id="modalProceedBtn" class="px-4 py-2 bg-[var(--primary)] text-[var(--primary-foreground)] rounded-[var(--radius)] text-sm font-bold hover:opacity-90 transition cursor-pointer">
+                            Продължи
+                        </button>
+                    </div>
+                </div>
+
+                <div id="modalStep2" class="hidden space-y-4">
+                    <h3 class="text-lg font-bold text-[var(--primary)]">Избор на валидност на ключа</h3>
+                    <p class="text-xs text-[var(--muted-foreground)]">Изберете за какъв период от време генерираният Secure Key да бъде валиден:</p>
+                    
+                    <div class="space-y-2">
+                        <label class="flex items-center gap-3 p-3 border border-[var(--border)] rounded-[var(--radius)] cursor-pointer hover:bg-[var(--input)]/40 transition">
+                            <input type="radio" name="keyDuration" value="1_day" checked class="w-4 h-4 text-[var(--primary)]">
+                            <div>
+                                <p class="text-sm font-bold">1 ден</p>
+                                <p class="text-xs text-[var(--muted-foreground)]">Валиден за следващите 24 часа</p>
+                            </div>
+                        </label>
+                        <label class="flex items-center gap-3 p-3 border border-[var(--border)] rounded-[var(--radius)] cursor-pointer hover:bg-[var(--input)]/40 transition">
+                            <input type="radio" name="keyDuration" value="1_week" class="w-4 h-4 text-[var(--primary)]">
+                            <div>
+                                <p class="text-sm font-bold">1 седмица</p>
+                                <p class="text-xs text-[var(--muted-foreground)]">Валиден за 7 дни</p>
+                            </div>
+                        </label>
+                        <label class="flex items-center gap-3 p-3 border border-[var(--border)] rounded-[var(--radius)] cursor-pointer hover:bg-[var(--input)]/40 transition">
+                            <input type="radio" name="keyDuration" value="1_month" class="w-4 h-4 text-[var(--primary)]">
+                            <div>
+                                <p class="text-sm font-bold">1 месец</p>
+                                <p class="text-xs text-[var(--muted-foreground)]">Валиден за 30 дни</p>
+                            </div>
+                        </label>
+                        <label class="flex items-center gap-3 p-3 border border-[var(--border)] rounded-[var(--radius)] cursor-pointer hover:bg-[var(--input)]/40 transition">
+                            <input type="radio" name="keyDuration" value="indefinite" class="w-4 h-4 text-[var(--primary)]">
+                            <div>
+                                <p class="text-sm font-bold">Безсрочен</p>
+                                <p class="text-xs text-[var(--muted-foreground)]">Валиден до изрично анулиране</p>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div class="flex justify-end gap-2 pt-2">
+                        <button id="modalCancelBtn2" class="px-4 py-2 border border-[var(--border)] rounded-[var(--radius)] text-sm font-semibold hover:bg-[var(--input)] transition cursor-pointer">
+                            Отказ
+                        </button>
+                        <button id="modalConfirmGenerateBtn" class="px-4 py-2 bg-emerald-600 text-white rounded-[var(--radius)] text-sm font-bold hover:opacity-90 transition cursor-pointer">
+                            Потвърди и генерирай
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
     </main>
 
     <script>
@@ -419,12 +585,13 @@
             return document.cookie.split('; ').find((row) => row.startsWith(name + '='))?.split('=')[1] || '';
         }
 
-        const adminToken = localStorage.getItem("admin_token") || getCookie("admin_token");
-        if (adminToken) {
-            localStorage.setItem("admin_token", adminToken);
+        const cookieToken = getCookie("admin_token");
+        const adminToken = cookieToken || localStorage.getItem("admin_token");
+        if (cookieToken) {
+            localStorage.setItem("admin_token", cookieToken);
         }
         if (!adminToken) {
-            window.location.href = "/admins/login-view";
+            window.location.href = "/login";
         }
 
         const state = {
@@ -465,6 +632,9 @@
         }
 
         function switchTab(tabName) {
+            if (tabName === 'verifications' && (!state.data || !state.data.is_superadmin)) {
+                return;
+            }
             document.querySelectorAll('.tab-button').forEach((button) => {
                 button.setAttribute('aria-selected', String(button.dataset.tab === tabName));
             });
@@ -472,7 +642,10 @@
                 panel.classList.toggle('active', panel.id === `panel-${tabName}`);
             });
 
-            if (tabName !== 'approval') {
+            if (tabName === 'verifications') {
+                setStatus('Верификации и Secure Key');
+                loadVerificationsData();
+            } else if (tabName !== 'approval') {
                 setStatus('Актуално спрямо базата данни');
                 const btn = document.getElementById('startApprovalBtn');
                 if (btn) {
@@ -497,11 +670,31 @@
             setStatus('Зареждане на данните...');
             const response = await authFetch('/admins/dashboard-data');
             if (response.status === 401 || response.status === 403) {
-                window.location.href = '/admins/login-view';
+                window.location.href = '/login';
                 return;
             }
             const data = await response.json();
             state.data = data;
+
+            // Проверка за Superadmin права и активиране на таб Верификации
+            const verificationsTabBtn = document.getElementById('verificationsTabBtn');
+            const verificationsBadge = document.getElementById('verificationsBadge');
+            if (verificationsTabBtn) {
+                if (data.is_superadmin) {
+                    verificationsTabBtn.style.display = 'inline-flex';
+                    const pCount = data.pending_verifications_count || 0;
+                    if (verificationsBadge) {
+                        verificationsBadge.textContent = pCount;
+                        verificationsBadge.classList.toggle('hidden', pCount === 0);
+                    }
+                } else {
+                    verificationsTabBtn.style.display = 'none';
+                    const activeTabBtn = document.querySelector('.tab-button[aria-selected="true"]');
+                    if (activeTabBtn && activeTabBtn.dataset.tab === 'verifications') {
+                        switchTab('overview');
+                    }
+                }
+            }
 
             document.getElementById('countStudentImports').textContent = data.counts?.student_import_logs ?? 0;
             document.getElementById('countExamImports').textContent = data.counts?.exam_import_logs ?? 0;
@@ -1052,10 +1245,341 @@
             }
         });
 
+        // ===============================================
+        // SUPERADMIN: VERIFICATIONS & SECURE KEY LOGIC
+        // ===============================================
+
+        const unattendedToggle = document.getElementById('unattendedToggle');
+        const generateKeyArea = document.getElementById('generateKeyArea');
+        const generateKeyBtn = document.getElementById('generateKeyBtn');
+        const keyLoadingSpinner = document.getElementById('keyLoadingSpinner');
+        const keyDisplayArea = document.getElementById('keyDisplayArea');
+        const keyDisplayInput = document.getElementById('keyDisplayInput');
+        const copyKeyBtn = document.getElementById('copyKeyBtn');
+        const keyWarningNotice = document.getElementById('keyWarningNotice');
+        const keyDurationMeta = document.getElementById('keyDurationMeta');
+        const keyExpiryMeta = document.getElementById('keyExpiryMeta');
+        const deleteKeyBtn = document.getElementById('deleteKeyBtn');
+        const toggleLockNotice = document.getElementById('toggleLockNotice');
+
+        const generateKeyModal = document.getElementById('generateKeyModal');
+        const modalStep1 = document.getElementById('modalStep1');
+        const modalStep2 = document.getElementById('modalStep2');
+        const modalCancelBtn1 = document.getElementById('modalCancelBtn1');
+        const modalCancelBtn2 = document.getElementById('modalCancelBtn2');
+        const modalProceedBtn = document.getElementById('modalProceedBtn');
+        const modalConfirmGenerateBtn = document.getElementById('modalConfirmGenerateBtn');
+
+        let isKeyJustGenerated = false;
+
+        async function loadSecureKeyStatus() {
+            if (!unattendedToggle) return;
+            try {
+                const res = await authFetch('/admins/secure-key/status');
+                if (!res.ok) return;
+                const data = await res.json();
+
+                if (data.has_active_key) {
+                    unattendedToggle.checked = true;
+                    unattendedToggle.disabled = true;
+                    toggleLockNotice.classList.remove('hidden');
+                    generateKeyArea.classList.add('hidden');
+                    keyDisplayArea.classList.remove('hidden');
+
+                    if (!isKeyJustGenerated) {
+                        keyDisplayInput.value = data.masked_key || "********";
+                        keyWarningNotice.classList.add('hidden');
+                        copyKeyBtn.disabled = true;
+                        copyKeyBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                        copyKeyBtn.title = "Ключът е маскиран и не може да бъде копиран отново";
+                    }
+
+                    const durationLabel = {
+                        "1_day": "1 ден (24 часа)",
+                        "1_week": "1 седмица (7 дни)",
+                        "1_month": "1 месец (30 дни)",
+                        "indefinite": "Безсрочен (Indefinite)"
+                    }[data.duration_type] || data.duration_type || "-";
+
+                    keyDurationMeta.textContent = `Период: ${durationLabel}`;
+                    keyExpiryMeta.textContent = data.expires_at ? `Валиден до: ${formatDateTime(data.expires_at)}` : "Валиден до: Безсрочен";
+                } else {
+                    isKeyJustGenerated = false;
+                    unattendedToggle.disabled = false;
+                    toggleLockNotice.classList.add('hidden');
+                    keyDisplayArea.classList.add('hidden');
+                    if (unattendedToggle.checked) {
+                        generateKeyArea.classList.remove('hidden');
+                    } else {
+                        generateKeyArea.classList.add('hidden');
+                    }
+                }
+            } catch (err) {
+                console.error("Грешка при зареждане на статус на Secure Key:", err);
+            }
+        }
+
+        async function loadPendingVerifications() {
+            const list = document.getElementById('verificationsList');
+            const countBadge = document.getElementById('verificationsListCount');
+            const tabBadge = document.getElementById('verificationsBadge');
+            if (!list) return;
+
+            try {
+                const res = await authFetch('/admins/verifications/pending');
+                if (!res.ok) return;
+                const data = await res.json();
+                const items = data.pending_verifications || [];
+
+                countBadge.textContent = items.length;
+                if (tabBadge) {
+                    tabBadge.textContent = items.length;
+                    tabBadge.classList.toggle('hidden', items.length === 0);
+                }
+
+                if (!items.length) {
+                    list.innerHTML = '<div class="text-sm text-[var(--muted-foreground)] text-center py-8 bg-white/50 rounded-[var(--radius)] border border-[var(--border)]">Няма чакащи заявки за верификация на персонал.</div>';
+                    return;
+                }
+
+                list.innerHTML = items.map((item) => `
+                    <div class="flex items-center justify-between gap-4 p-3.5 border border-[var(--border)] rounded-[var(--radius)] bg-white/80 hover:bg-[var(--input)]/30 transition">
+                        <div class="flex items-center gap-3 min-w-0">
+                            <!-- Бутони от крайно лявата страна (Far Left) -->
+                            <div class="flex items-center gap-1.5 shrink-0">
+                                <button title="Grant Access (Одобри достъп)" data-id="${item.id}" data-role="${item.role}" data-name="${escapeHtml(item.full_name)}" class="btn-grant-access w-8 h-8 rounded-[var(--radius)] bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center justify-center shadow-xs transition cursor-pointer active:scale-95">
+                                    ✓
+                                </button>
+                                <button title="Reject (Отхвърли)" data-id="${item.id}" data-role="${item.role}" data-name="${escapeHtml(item.full_name)}" class="btn-reject-access w-8 h-8 rounded-[var(--radius)] bg-[var(--destructive)] hover:opacity-90 text-white font-bold flex items-center justify-center shadow-xs transition cursor-pointer active:scale-95">
+                                    ✕
+                                </button>
+                            </div>
+
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <span class="text-sm font-bold text-[var(--foreground)] truncate">${escapeHtml(item.full_name)}</span>
+                                    <span class="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${item.role === 'admin' ? 'bg-[var(--primary)] text-[var(--primary-foreground)]' : 'bg-[var(--accent)] text-[var(--foreground)]'}">
+                                        ${escapeHtml(item.role_display)}
+                                    </span>
+                                </div>
+                                <p class="text-xs text-[var(--muted-foreground)] truncate mt-0.5">${escapeHtml(item.email)}</p>
+                            </div>
+                        </div>
+
+                        <div class="text-right shrink-0">
+                            <span class="text-xs text-[var(--muted-foreground)]">${formatDateTime(item.created_at)}</span>
+                        </div>
+                    </div>
+                `).join('');
+
+                list.querySelectorAll('.btn-grant-access').forEach((btn) => {
+                    btn.addEventListener('click', async () => {
+                        const id = btn.dataset.id;
+                        const role = btn.dataset.role;
+                        const name = btn.dataset.name;
+                        
+                        btn.disabled = true;
+                        try {
+                            const resp = await authFetch(`/admins/verifications/${role}/${id}/grant`, { method: 'POST' });
+                            const result = await resp.json();
+                            if (resp.ok) {
+                                alert(result.message || `Достъпът за ${name} е одобрен.`);
+                                await loadPendingVerifications();
+                                await loadDashboardData();
+                            } else {
+                                alert(`Грешка: ${result.detail || 'Неуспешно одобрение.'}`);
+                            }
+                        } catch (err) {
+                            alert('Възникна грешка при връзката със сървъра.');
+                        } finally {
+                            btn.disabled = false;
+                        }
+                    });
+                });
+
+                list.querySelectorAll('.btn-reject-access').forEach((btn) => {
+                    btn.addEventListener('click', async () => {
+                        const id = btn.dataset.id;
+                        const role = btn.dataset.role;
+                        const name = btn.dataset.name;
+
+                        if (!confirm(`Сигурни ли сте, че искате да отхвърлите заявката за регистрация на ${name}?`)) {
+                            return;
+                        }
+
+                        btn.disabled = true;
+                        try {
+                            const resp = await authFetch(`/admins/verifications/${role}/${id}/reject`, { method: 'POST' });
+                            const result = await resp.json();
+                            if (resp.ok) {
+                                alert(result.message || `Заявката за ${name} е отхвърлена.`);
+                                await loadPendingVerifications();
+                                await loadDashboardData();
+                            } else {
+                                alert(`Грешка: ${result.detail || 'Неуспешно отхвърляне.'}`);
+                            }
+                        } catch (err) {
+                            alert('Възникна грешка при връзката със сървъра.');
+                        } finally {
+                            btn.disabled = false;
+                        }
+                    });
+                });
+            } catch (err) {
+                console.error("Грешка при зареждане на чакащи верификации:", err);
+            }
+        }
+
+        async function loadVerificationsData() {
+            await Promise.all([loadSecureKeyStatus(), loadPendingVerifications()]);
+        }
+
+        if (unattendedToggle) {
+            unattendedToggle.addEventListener('change', () => {
+                if (unattendedToggle.checked) {
+                    generateKeyArea.classList.remove('hidden');
+                } else {
+                    generateKeyArea.classList.add('hidden');
+                }
+            });
+        }
+
+        if (generateKeyBtn) {
+            generateKeyBtn.addEventListener('click', () => {
+                modalStep1.classList.remove('hidden');
+                modalStep2.classList.add('hidden');
+                generateKeyModal.classList.remove('hidden');
+            });
+        }
+
+        if (modalCancelBtn1) {
+            modalCancelBtn1.addEventListener('click', () => {
+                generateKeyModal.classList.add('hidden');
+            });
+        }
+
+        if (modalCancelBtn2) {
+            modalCancelBtn2.addEventListener('click', () => {
+                generateKeyModal.classList.add('hidden');
+            });
+        }
+
+        if (modalProceedBtn) {
+            modalProceedBtn.addEventListener('click', () => {
+                modalStep1.classList.add('hidden');
+                modalStep2.classList.remove('hidden');
+            });
+        }
+
+        if (modalConfirmGenerateBtn) {
+            modalConfirmGenerateBtn.addEventListener('click', async () => {
+                const selectedRadio = document.querySelector('input[name="keyDuration"]:checked');
+                const duration = selectedRadio ? selectedRadio.value : '1_day';
+
+                generateKeyModal.classList.add('hidden');
+                generateKeyArea.classList.add('hidden');
+                keyLoadingSpinner.classList.remove('hidden');
+
+                try {
+                    const resp = await authFetch('/admins/secure-key/generate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ duration })
+                    });
+                    const data = await resp.json();
+
+                    if (resp.ok) {
+                        isKeyJustGenerated = true;
+                        keyDisplayInput.value = data.secure_key;
+                        keyWarningNotice.classList.remove('hidden');
+                        copyKeyBtn.disabled = false;
+                        copyKeyBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                        copyKeyBtn.title = "Копирай в клипборда";
+                        copyKeyBtn.innerText = "Копирай";
+
+                        const durationLabel = {
+                            "1_day": "1 ден (24 часа)",
+                            "1_week": "1 седмица (7 дни)",
+                            "1_month": "1 месец (30 дни)",
+                            "indefinite": "Безсрочен (Indefinite)"
+                        }[data.duration_type] || data.duration_type || "-";
+
+                        keyDurationMeta.textContent = `Период: ${durationLabel}`;
+                        keyExpiryMeta.textContent = data.expires_at ? `Валиден до: ${formatDateTime(data.expires_at)}` : "Валиден до: Безсрочен";
+
+                        keyDisplayArea.classList.remove('hidden');
+                        unattendedToggle.checked = true;
+                        unattendedToggle.disabled = true;
+                        toggleLockNotice.classList.remove('hidden');
+                    } else {
+                        alert(`Грешка при генериране: ${data.detail || 'Неуспешно генериране.'}`);
+                        generateKeyArea.classList.remove('hidden');
+                    }
+                } catch (err) {
+                    alert('Критична грешка при връзка със сървъра.');
+                    generateKeyArea.classList.remove('hidden');
+                } finally {
+                    keyLoadingSpinner.classList.add('hidden');
+                }
+            });
+        }
+
+        if (copyKeyBtn) {
+            copyKeyBtn.addEventListener('click', () => {
+                if (copyKeyBtn.disabled) return;
+                const textToCopy = keyDisplayInput.value;
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(textToCopy).then(() => {
+                        copyKeyBtn.innerText = "✓ Копирано!";
+                        setTimeout(() => { copyKeyBtn.innerText = "Копирай"; }, 2000);
+                    }).catch(() => {
+                        keyDisplayInput.select();
+                        document.execCommand('copy');
+                        copyKeyBtn.innerText = "✓ Копирано!";
+                        setTimeout(() => { copyKeyBtn.innerText = "Копирай"; }, 2000);
+                    });
+                } else {
+                    keyDisplayInput.select();
+                    document.execCommand('copy');
+                    copyKeyBtn.innerText = "✓ Копирано!";
+                    setTimeout(() => { copyKeyBtn.innerText = "Копирай"; }, 2000);
+                }
+            });
+        }
+
+        if (deleteKeyBtn) {
+            deleteKeyBtn.addEventListener('click', async () => {
+                if (!confirm('Сигурни ли сте, че искате да анулирате и изтриете активния Secure Key? Това ще спре възможността за автоматична регистрация с този ключ.')) {
+                    return;
+                }
+
+                deleteKeyBtn.disabled = true;
+                try {
+                    const resp = await authFetch('/admins/secure-key', { method: 'DELETE' });
+                    const data = await resp.json();
+                    if (resp.ok) {
+                        alert(data.message || 'Secure Key беше изтрит успешно.');
+                        isKeyJustGenerated = false;
+                        keyDisplayArea.classList.add('hidden');
+                        unattendedToggle.disabled = false;
+                        unattendedToggle.checked = true;
+                        toggleLockNotice.classList.add('hidden');
+                        generateKeyArea.classList.remove('hidden');
+                    } else {
+                        alert(`Грешка при изтриване: ${data.detail || 'Неуспешно изтриване.'}`);
+                    }
+                } catch (err) {
+                    alert('Критична грешка при връзка със сървъра.');
+                } finally {
+                    deleteKeyBtn.disabled = false;
+                }
+            });
+        }
+
         function adminLogout() {
             localStorage.removeItem('admin_token');
             document.cookie = 'admin_token=; Max-Age=0; path=/';
-            window.location.reload();
+            window.location.href = '/login';
         }
 
         loadDashboardData().catch((error) => {

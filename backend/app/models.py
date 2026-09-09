@@ -159,3 +159,17 @@ class AdminLog(Base):
     group = Column(String, nullable=True) 
     notification_sent = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class SecureKey(Base):
+    """ Таблица за сигурни ключове за необслужвано създаване на акаунти """
+    __tablename__ = "secure_keys"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    key_hash = Column(String, nullable=False, unique=True, index=True)
+    duration_type = Column(String, nullable=False)  # "1_day", "1_week", "1_month", "indefinite"
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
+

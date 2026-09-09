@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exam Gate: Регистрация</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        :root {
+            --card: #f5f5f5;
+            --ring: #606060;
+            --input: #e0e0e0;
+            --muted: #d9d9d9;
+            --accent: #c0c0c0;
+            --border: #d0d0d0;
+            --radius: 0.35rem;
+            --popover: #f5f5f5;
+            --primary: #606060;
+            --sidebar: #eaeaea;
+            --font-mono: Fira Code, monospace;
+            --font-sans: Montserrat, sans-serif;
+            --secondary: #e0e0e0;
+            --background: #f0f0f0;
+            --font-serif: Georgia, serif;
+            --foreground: #333333;
+            --destructive: #cc3333;
+            --card-foreground: #333333;
+            --muted-foreground: #666666;
+            --accent-foreground: #333333;
+            --popover-foreground: #333333;
+            --primary-foreground: #ffffff;
+            --secondary-foreground: #333333;
+            --destructive-foreground: #ffffff;
+        }
+
+        body {
+            background: var(--background);
+            color: var(--foreground);
+            font-family: var(--font-sans);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div class="bg-[var(--card)] border border-[var(--border)] p-8 rounded-[var(--radius)] w-full max-w-lg shadow-[0_2px_8px_hsl(0_0%_20%/0.12)]">
+        
+        <!-- Registration Form Container -->
+        <div id="registerContainer">
+            <div class="text-center mb-6">
+                <h2 id="registerTitle" class="text-2xl font-bold text-[var(--primary)] mt-1">Регистрация в системата</h2>
+                <p id="registerSubtitle" class="text-sm text-[var(--muted-foreground)] mt-1">Изберете роля и въведете вашите данни</p>
+            </div>
+
+            <form id="registerForm" class="space-y-4">
+                <div>
+                    <label class="text-xs text-[var(--muted-foreground)] block uppercase font-bold mb-1 tracking-wider">Роля</label>
+                    <select id="role" class="w-full bg-[var(--input)] border border-[var(--border)] rounded-[var(--radius)] px-4 py-3 text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] transition">
+                        <option value="examiner">Квестор (Examiner)</option>
+                        <option value="admin">Администратор (Administrator)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="text-xs text-[var(--muted-foreground)] block uppercase font-bold mb-1 tracking-wider">Име и фамилия</label>
+                    <input type="text" id="fullName" required placeholder="напр. Иван Иванов" class="w-full bg-[var(--input)] border border-[var(--border)] rounded-[var(--radius)] px-4 py-3 text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] transition">
+                </div>
+
+                <div>
+                    <label class="text-xs text-[var(--muted-foreground)] block uppercase font-bold mb-1 tracking-wider">Университетски имейл</label>
+                    <input type="email" id="email" required placeholder="напр. i.ivanov@tu-sofia.bg" class="w-full bg-[var(--input)] border border-[var(--border)] rounded-[var(--radius)] px-4 py-3 text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] transition">
+                </div>
+
+                <div>
+                    <label class="text-xs text-[var(--muted-foreground)] block uppercase font-bold mb-1 tracking-wider">Парола</label>
+                    <p class="text-xs text-[var(--muted-foreground)] italic mb-1.5 leading-relaxed">Паролата трябва да бъде дълга поне 8 знака и да съдържа поне една главна буква, една малка буква и поне едно число. Разрешени са само официални университетски имейли (@tu-sofia.bg).</p>
+                    <input type="password" id="password" required class="w-full bg-[var(--input)] border border-[var(--border)] rounded-[var(--radius)] px-4 py-3 text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] transition">
+                </div>
+
+                <div>
+                    <label class="text-xs text-[var(--muted-foreground)] block uppercase font-bold mb-1 tracking-wider">Потвърди парола</label>
+                    <input type="password" id="confirmPassword" required class="w-full bg-[var(--input)] border border-[var(--border)] rounded-[var(--radius)] px-4 py-3 text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] transition">
+                </div>
+
+                <div class="pt-1">
+                    <label class="flex items-center gap-2.5 cursor-pointer select-none">
+                        <input type="checkbox" id="useSecureKey" class="w-4 h-4 rounded text-[var(--primary)] border-[var(--border)] focus:ring-[var(--ring)]">
+                        <span class="text-sm font-semibold text-[var(--foreground)]">Register using a Secure Key! (Регистрирай се със Secure Key)</span>
+                    </label>
+                </div>
+
+                <div id="secureKeyField" class="hidden p-3.5 bg-[var(--input)]/60 border border-[var(--border)] rounded-[var(--radius)] space-y-1.5 transition">
+                    <label class="text-xs text-[var(--muted-foreground)] block uppercase font-bold tracking-wider">Въведете Secure Key</label>
+                    <input type="text" id="secureKey" placeholder="Поставете вашия Secure Key тук" class="w-full bg-white border border-[var(--border)] rounded-[var(--radius)] px-3 py-2 text-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] transition font-mono">
+                    <p class="text-xs text-[var(--muted-foreground)]">При въвеждане на валиден Secure Key акаунтът Ви ще бъде верифициран незабавно.</p>
+                </div>
+
+                <div id="errorMessage" class="hidden text-sm bg-[var(--destructive)]/15 border border-[var(--destructive)] text-[var(--destructive)] p-3 rounded-[var(--radius)] text-center font-semibold"></div>
+
+                <button type="submit" id="submitBtn" class="w-full bg-[var(--primary)] hover:opacity-90 text-[var(--primary-foreground)] font-bold py-3 px-4 rounded-[var(--radius)] shadow-[0_2px_8px_hsl(0_0%_20%/0.12)] transition transform active:scale-95 cursor-pointer mt-3">
+                    Създай акаунт
+                </button>
+            </form>
+
+            <div class="text-center mt-5 pt-4 border-t border-[var(--border)]">
+                <a href="/login" class="text-xs text-[var(--muted-foreground)] hover:text-[var(--primary)] font-semibold transition">
+                    Вече имате акаунт? Влезте тук
+                </a>
+            </div>
+        </div>
+
+        <!-- Waiting for Superadmin Verification View -->
+        <div id="waitingContainer" class="hidden text-center py-4 space-y-4">
+            <div class="w-16 h-16 mx-auto rounded-full bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-600">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+            <div>
+                <h3 class="text-xl font-bold text-[var(--foreground)]">...Waiting for superadmin verification!</h3>
+                <p id="waitingNotice" class="text-sm text-[var(--muted-foreground)] mt-2 leading-relaxed">
+                    Вашата регистрация беше успешна! Акаунтът очаква преглед и одобрение от главния администратор (Superadmin) преди да можете да влезете в системата.
+                </p>
+            </div>
+            <div class="pt-4">
+                <a href="/login" class="inline-block bg-[var(--primary)] hover:opacity-90 text-[var(--primary-foreground)] font-bold py-2.5 px-6 rounded-[var(--radius)] text-sm transition">
+                    Към Вход в системата
+                </a>
+            </div>
+        </div>
+
+        <!-- Instant Verified Success View -->
+        <div id="verifiedSuccessContainer" class="hidden text-center py-4 space-y-4">
+            <div class="w-16 h-16 mx-auto rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-600">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+            </div>
+            <div>
+                <h3 class="text-xl font-bold text-emerald-700">Акаунтът е активиран успешно!</h3>
+                <p id="verifiedNotice" class="text-sm text-[var(--muted-foreground)] mt-2 leading-relaxed">
+                    Регистрацията Ви чрез Secure Key премина успешно! Вашият акаунт е активен и верифициран. Можете да влезете веднага.
+                </p>
+            </div>
+            <div class="pt-4">
+                <a href="/login" class="inline-block bg-[var(--primary)] hover:opacity-90 text-[var(--primary-foreground)] font-bold py-2.5 px-6 rounded-[var(--radius)] text-sm transition">
+                    Влезте в системата сега
+                </a>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const defaultRole = "{{ default_role|default('examiner') }}";
+        const roleSelect = document.getElementById("role");
+        const registerTitle = document.getElementById("registerTitle");
+        const registerSubtitle = document.getElementById("registerSubtitle");
+        const useSecureKeyCheckbox = document.getElementById("useSecureKey");
+        const secureKeyField = document.getElementById("secureKeyField");
+        const secureKeyInput = document.getElementById("secureKey");
+        const errorDiv = document.getElementById("errorMessage");
+        const registerForm = document.getElementById("registerForm");
+        const submitBtn = document.getElementById("submitBtn");
+
+        function syncRoleUi() {
+            const role = roleSelect.value;
+            if (role === "admin") {
+                registerTitle.innerText = "Регистрация на администратор";
+                registerSubtitle.innerText = "Създаване на нов административен профил";
+            } else {
+                registerTitle.innerText = "Регистрация на квестор";
+                registerSubtitle.innerText = "Създаване на профил за провеждане на изпити";
+            }
+        }
+
+        roleSelect.value = defaultRole;
+        syncRoleUi();
+        roleSelect.addEventListener("change", syncRoleUi);
+
+        useSecureKeyCheckbox.addEventListener("change", () => {
+            if (useSecureKeyCheckbox.checked) {
+                secureKeyField.classList.remove("hidden");
+                secureKeyInput.focus();
+            } else {
+                secureKeyField.classList.add("hidden");
+                secureKeyInput.value = "";
+            }
+        });
+
+        registerForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            errorDiv.classList.add("hidden");
+            errorDiv.innerText = "";
+
+            const fullName = document.getElementById("fullName").value.trim();
+            const email = document.getElementById("email").value.trim();
+            const password = document.getElementById("password").value;
+            const confirmPassword = document.getElementById("confirmPassword").value;
+            const role = roleSelect.value;
+            const secureKey = useSecureKeyCheckbox.checked ? secureKeyInput.value.trim() : null;
+
+            // Валидация за съвпадение на паролите
+            if (password !== confirmPassword) {
+                errorDiv.innerText = "Паролите не съвпадат!";
+                errorDiv.classList.remove("hidden");
+                return;
+            }
+
+            // Валидация за университетски имейл (@tu-sofia.bg)
+            if (!email.toLowerCase().endsWith("@tu-sofia.bg")) {
+                errorDiv.innerText = "Разрешени са само официални университетски имейли с домейн, завършващ на @tu-sofia.bg";
+                errorDiv.classList.remove("hidden");
+                return;
+            }
+
+            // Валидация за сложност на паролата (schemas.py)
+            if (password.length < 8) {
+                errorDiv.innerText = "Паролата трябва да бъде дълга поне 8 символа.";
+                errorDiv.classList.remove("hidden");
+                return;
+            }
+            if (!/[A-Z]/.test(password)) {
+                errorDiv.innerText = "Паролата трябва да съдържа поне една главна буква.";
+                errorDiv.classList.remove("hidden");
+                return;
+            }
+            if (!/[a-z]/.test(password)) {
+                errorDiv.innerText = "Паролата трябва да съдържа поне една малка буква.";
+                errorDiv.classList.remove("hidden");
+                return;
+            }
+            if (!/\d/.test(password)) {
+                errorDiv.innerText = "Паролата трябва да съдържа поне едно число.";
+                errorDiv.classList.remove("hidden");
+                return;
+            }
+
+            // Проверка за празен Secure Key при отметнат checkbox
+            if (useSecureKeyCheckbox.checked && !secureKey) {
+                errorDiv.innerText = "Моля, въведете Secure Key или махнете отметката.";
+                errorDiv.classList.remove("hidden");
+                return;
+            }
+
+            // Режим на зареждане на бутона
+            submitBtn.disabled = true;
+            const originalBtnText = submitBtn.innerText;
+            submitBtn.innerText = "Обработка...";
+
+            try {
+                const response = await fetch("/register", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        full_name: fullName,
+                        email: email,
+                        password: password,
+                        role: role,
+                        secure_key: secureKey
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    document.getElementById("registerContainer").classList.add("hidden");
+                    if (data.is_verified === true) {
+                        document.getElementById("verifiedSuccessContainer").classList.remove("hidden");
+                    } else {
+                        document.getElementById("waitingContainer").classList.remove("hidden");
+                    }
+                } else {
+                    errorDiv.innerText = data.detail || "Възникна грешка при регистрацията.";
+                    errorDiv.classList.remove("hidden");
+                }
+            } catch (err) {
+                errorDiv.innerText = "Няма връзка с бекенд сървъра.";
+                errorDiv.classList.remove("hidden");
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerText = originalBtnText;
+            }
+        });
+    </script>
+</body>
+</html>
+

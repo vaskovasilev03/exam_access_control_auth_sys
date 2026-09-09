@@ -25,17 +25,17 @@ from typing import Optional
 from zoneinfo import ZoneInfo
 
 from .database import init_db, get_db
-from .models import Student, Exam, Admin, ExamRegistration, AccessLog, Examiner, AdminLog, SessionType
+from .models import Student, Exam, Admin, ExamRegistration, AccessLog, Examiner, AdminLog, SessionType, SecureKey
 from .schemas import (
     AdminCreateSchema, ExaminerCreateSchema, StudentEnrollSchema,
     ExamUploadValidationSchema, StudentLoginSchema, StudentLoginResponseSchema,
     ChangePasswordSchema, CameraRegisterSchema, StudentProfileSchema,
-    StudentSummarySchema
+    StudentSummarySchema, SecureKeyGenerateSchema, UnifiedRegisterSchema
 )
 from .auth import (
     create_access_token, get_current_user, require_admin, require_examiner,
-    require_student, is_superadmin_user, verify_password, get_password_hash,
-    SECRET_KEY, ALGORITHM
+    require_student, require_superadmin, is_superadmin_user, verify_password,
+    get_password_hash, validate_secure_key, SECRET_KEY, ALGORITHM
 )
 from .seed import seed_superadmin
 from .stream_esp32 import generate_from_memory, fetch_frames_from_esp32, ACTIVE_CAMERAS, CAMERA_TASKS, AI_ROOM_STATES, CAMERA_HEALTH
@@ -478,51 +478,135 @@ async def enroll_student(
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Registration failed:{str(e)}")
 
+@app.get("/register", response_class=HTMLResponse)
+def get_register_page(request: fastapi.Request, role: Optional[str] = None):
+    """ Връща HTML страницата за унифицирана регистрация """
+    default_role = role if role in ("admin", "examiner") else "examiner"
+    return templates.TemplateResponse(
+        request=request,
+        name="register.html",
+        context={"default_role": default_role}
+    )
+
+@app.post("/register")
+def unified_register(
+    register_data: UnifiedRegisterSchema,
+    db: Session = Depends(get_db)
+):
+    """ Унифицирана регистрация за администратори и квестори със или без Secure Key """
+    role = register_data.role.strip().lower()
+    email = register_data.email.strip().lower()
+    
+    # Проверка и валидация на Secure Key при наличие
+    is_verified = False
+    if register_data.secure_key and register_data.secure_key.strip():
+        validate_secure_key(db, register_data.secure_key)
+        is_verified = True
+
+    password_bytes = register_data.password.encode('utf-8')
+    hashed_password = bcrypt.hashpw(password_bytes, bcrypt.gensalt()).decode('utf-8')
+
+    if role == "admin":
+        existing_admin = db.query(Admin).filter(func.lower(Admin.email) == email).first()
+        if existing_admin:
+            raise HTTPException(status_code=400, detail="Admin with this email already exists.")
+        
+        new_admin = Admin(
+            full_name=register_data.full_name.strip(),
+            email=email,
+            hashed_password=hashed_password,
+            is_verified=is_verified
+        )
+        db.add(new_admin)
+        db.commit()
+        db.refresh(new_admin)
+        
+        msg = f"Admin {new_admin.full_name} registered and verified successfully." if is_verified else f"Admin {new_admin.full_name} registered successfully. Waiting for superadmin verification."
+        return {
+            "status": "success",
+            "is_verified": is_verified,
+            "message": msg,
+            "id": str(new_admin.id),
+            "role": "admin"
+        }
+
+    elif role == "examiner":
+        existing_examiner = db.query(Examiner).filter(func.lower(Examiner.email) == email).first()
+        if existing_examiner:
+            raise HTTPException(status_code=400, detail="Examiner with this email already exists.")
+        
+        new_examiner = Examiner(
+            full_name=register_data.full_name.strip(),
+            email=email,
+            hashed_password=hashed_password,
+            is_verified=is_verified,
+            role="EXAMINER"
+        )
+        db.add(new_examiner)
+        db.commit()
+        db.refresh(new_examiner)
+
+        msg = f"Examiner {new_examiner.full_name} registered and verified successfully." if is_verified else f"Examiner {new_examiner.full_name} registered successfully. Waiting for superadmin verification."
+        return {
+            "status": "success",
+            "is_verified": is_verified,
+            "message": msg,
+            "id": str(new_examiner.id),
+            "role": "examiner"
+        }
+    else:
+        raise HTTPException(status_code=400, detail="Невалидна роля. Разрешени роли: 'admin', 'examiner'.")
+
 @app.post("/admins/register")
 def register_admin(
     admin_data: AdminCreateSchema,
     db: Session = Depends(get_db)
 ):
-    """ Регистрация на нов администратор за уеб портала """
-    existing_admin = db.query(Admin).filter(Admin.email == admin_data.email).first()
-    if existing_admin:
-        raise HTTPException(status_code=400, detail="Admin with this email already exists.")
-    
-    # Хеширане с чист bcrypt
-    password_bytes = admin_data.password.encode('utf-8')
-    hashed_password = bcrypt.hashpw(password_bytes, bcrypt.gensalt()).decode('utf-8')
-    
-    new_admin = Admin(
-        full_name=admin_data.full_name,
+    """ Регистрация на администратор (съвместимост с предишни извиквания) """
+    unified_data = UnifiedRegisterSchema(
         email=admin_data.email,
-        hashed_password=hashed_password
+        password=admin_data.password,
+        full_name=admin_data.full_name,
+        role="admin",
+        secure_key=admin_data.secure_key
     )
-    db.add(new_admin)
-    db.commit()
-    db.refresh(new_admin)
-    
-    return {"status": "success", "message": f"Admin {admin_data.full_name} registered successfully. Waiting for superadmin verification.", "admin_id": new_admin.id}
+    return unified_register(unified_data, db)
+
+@app.post("/examiners/register")
+def register_examiner(
+    examiner_data: ExaminerCreateSchema,
+    db: Session = Depends(get_db)
+):
+    """ Самостоятелна регистрация на квестор """
+    unified_data = UnifiedRegisterSchema(
+        email=examiner_data.email,
+        password=examiner_data.password,
+        full_name=examiner_data.full_name,
+        role="examiner",
+        secure_key=examiner_data.secure_key
+    )
+    return unified_register(unified_data, db)
 
 @app.get("/admins/dashboard", response_class=HTMLResponse)
 def get_admin_dashboard_page(request: fastapi.Request, response: Response):
     """ Връща HTML страницата за Администраторския контролен панел """
     admin_token = request.cookies.get("admin_token")
     if not admin_token:
-        return RedirectResponse(url="/admins/login-view", status_code=302)
+        return RedirectResponse(url="/login", status_code=302)
 
     try:
         payload = jwt.decode(admin_token, SECRET_KEY, algorithms=[ALGORITHM])
         if payload.get("role") not in ("admin", "superadmin") and not is_superadmin_user(payload):
-            return RedirectResponse(url="/admins/login-view", status_code=302)
+            return RedirectResponse(url="/login", status_code=302)
+        is_super = is_superadmin_user(payload)
     except Exception:
-        return RedirectResponse(url="/admins/login-view", status_code=302)
-
+        return RedirectResponse(url="/login", status_code=302)
 
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return templates.TemplateResponse(
         request=request, 
         name="admin_dashboard.html", 
-        context={}
+        context={"request": request, "is_superadmin": is_super}
     )
 
 
@@ -539,7 +623,15 @@ def get_admin_dashboard_data(db: Session = Depends(get_db), current_admin: dict 
     examiners = db.query(Examiner).order_by(Examiner.created_at.desc()).all()
     exams = db.query(Exam).order_by(Exam.date_time.asc()).all()
 
+    pending_verifications_count = 0
+    if admin.is_superadmin:
+        pending_admins_count = db.query(Admin).filter(Admin.is_verified == False, Admin.is_superadmin == False).count()
+        pending_examiners_count = db.query(Examiner).filter(Examiner.is_verified == False).count()
+        pending_verifications_count = pending_admins_count + pending_examiners_count
+
     return {
+        "is_superadmin": bool(admin.is_superadmin),
+        "pending_verifications_count": pending_verifications_count,
         "counts": {
             "student_import_logs": len(student_import_logs),
             "exam_import_logs": len(exam_import_logs),
@@ -547,8 +639,10 @@ def get_admin_dashboard_data(db: Session = Depends(get_db), current_admin: dict 
             "pending_students": len(pending_students),
             "examiners": len(examiners),
             "exams": len(exams),
+            "pending_verifications": pending_verifications_count,
         },
         "student_import_logs": [
+
             {
                 **_admin_log_payload(log),
                 "students": [
@@ -775,87 +869,305 @@ def create_examiner(examiner_data: ExaminerCreateSchema, db: Session = Depends(g
         "examiner_id": str(new_examiner.id)
     }
 
+@app.get("/login", response_class=HTMLResponse)
+def get_login_page(request: fastapi.Request, role: Optional[str] = None):
+    """ Връща унифицираната HTML страница за вход в системата """
+    default_role = role if role in ("admin", "examiner") else "examiner"
+    return templates.TemplateResponse(
+        request=request, 
+        name="login.html", 
+        context={"default_role": default_role}
+    )
+
+@app.post("/login")
+def unified_login(
+    response: Response,
+    email: str = Form(...),
+    password: str = Form(...),
+    role: Optional[str] = Form("examiner"),
+    room_number: Optional[str] = Form(None),
+    db: Session = Depends(get_db)
+):
+    """ Унифициран вход за администратори и квестори """
+    clean_email = email.strip().lower()
+    clean_role = role.strip().lower() if role else "examiner"
+
+    if clean_role == "admin":
+        admin = db.query(Admin).filter(func.lower(Admin.email) == clean_email).first()
+        if not admin:
+            raise HTTPException(status_code=400, detail="Invalid email or password.")
+        if not admin.is_verified:
+            raise HTTPException(status_code=403, detail="Your admin account is pending verification. Please contact the superadmin.")
+        if not verify_password(password, admin.hashed_password):
+            raise HTTPException(status_code=400, detail="Invalid email or password.")
+
+        access_token = create_access_token(data={
+            "sub": str(admin.id),
+            "role": "admin",
+            "is_superadmin": bool(admin.is_superadmin)
+        })
+        response.set_cookie(
+            key="admin_token",
+            value=access_token,
+            max_age=60 * 60 * 2,
+            httponly=False,
+            samesite="lax",
+            secure=False,
+            path="/"
+        )
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "role": "admin",
+            "is_superadmin": bool(admin.is_superadmin),
+            "full_name": admin.full_name
+        }
+
+    elif clean_role == "examiner":
+        examiner = db.query(Examiner).filter(func.lower(Examiner.email) == clean_email).first()
+        if examiner:
+            if not examiner.is_verified:
+                raise HTTPException(status_code=403, detail="Вашият квесторски акаунт очаква потвърждение от администратор.")
+            if not verify_password(password, examiner.hashed_password):
+                raise HTTPException(status_code=400, detail="Invalid email or password.")
+
+            access_token = create_access_token(data={"sub": str(examiner.id), "role": "examiner", "is_superadmin": False})
+            return {
+                "access_token": access_token,
+                "token_type": "bearer",
+                "role": "examiner",
+                "full_name": examiner.full_name,
+                "is_superadmin": False
+            }
+
+        # Fallback за Superadmin акаунт (Omni-Role достъп)
+        admin = db.query(Admin).filter(func.lower(Admin.email) == clean_email, Admin.is_superadmin == True).first()
+        if admin and verify_password(password, admin.hashed_password):
+            access_token = create_access_token(data={"sub": str(admin.id), "role": "examiner", "is_superadmin": True})
+            return {
+                "access_token": access_token,
+                "token_type": "bearer",
+                "role": "examiner",
+                "full_name": f"{admin.full_name} (Superadmin)",
+                "is_superadmin": True
+            }
+
+        raise HTTPException(status_code=400, detail="Invalid email or password.")
+    else:
+        raise HTTPException(status_code=400, detail="Невалидна роля. Изберете администратор или квестор.")
+
 @app.post("/admins/login")
-def admin_login(
+def admin_login_legacy(
     response: Response,
     email: str = Form(...),
     password: str = Form(...),
     db: Session = Depends(get_db)
 ):
-    # Търсим изрично в таблицата за администратори
-    clean_email = email.strip().lower()
-    admin = db.query(Admin).filter(func.lower(Admin.email) == clean_email).first()
-    if not admin:
-        raise HTTPException(status_code=400, detail="Invalid email or password.")
-    
-    if not admin.is_verified:
-        raise HTTPException(status_code=403, detail="Your admin account is pending verification. Please contact the superadmin.")
-    
-    password_bytes = password.encode('utf-8')
-    if not bcrypt.checkpw(password_bytes, admin.hashed_password.encode('utf-8')):
-        raise HTTPException(status_code=400, detail="Invalid email or password.")
-    
-    # Издаваме токен с роля admin и статус superadmin
-    access_token = create_access_token(data={
-        "sub": str(admin.id),
-        "role": "admin",
-        "is_superadmin": bool(admin.is_superadmin)
-    })
-    response.set_cookie(
-        key="admin_token",
-        value=access_token,
-        max_age=60 * 60 * 2,
-        httponly=False,
-        samesite="lax",
-        secure=False,
-        path="/"
-    )
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "is_superadmin": bool(admin.is_superadmin)
-    }
+    return unified_login(response=response, email=email, password=password, role="admin", db=db)
 
 @app.post("/examiners/login")
-def examiner_login(email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
-    """ Ендпоинт за автентикация на квестори и издаване на JWT токен """
-    clean_email = email.strip().lower()
-    examiner = db.query(Examiner).filter(func.lower(Examiner.email) == clean_email).first()
-    
-    if examiner:
-        if not examiner.is_verified:
-            raise HTTPException(status_code=403, detail="Вашият квесторски акаунт очаква потвърждение от администратор.")
-        if not verify_password(password, examiner.hashed_password):
-            raise HTTPException(status_code=400, detail="Invalid email or password.")
+def examiner_login_legacy(
+    response: Response,
+    email: str = Form(...),
+    password: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    return unified_login(response=response, email=email, password=password, role="examiner", db=db)
 
-        access_token = create_access_token(data={"sub": str(examiner.id), "role": "examiner", "is_superadmin": False})
-        return {"access_token": access_token, "token_type": "bearer", "full_name": examiner.full_name, "is_superadmin": False}
 
-    # Fallback за Superadmin акаунт (Omni-Role достъп)
-    admin = db.query(Admin).filter(func.lower(Admin.email) == clean_email, Admin.is_superadmin == True).first()
-    if admin and verify_password(password, admin.hashed_password):
-        access_token = create_access_token(data={"sub": str(admin.id), "role": "examiner", "is_superadmin": True})
-        return {"access_token": access_token, "token_type": "bearer", "full_name": f"{admin.full_name} (Superadmin)", "is_superadmin": True}
+# ==========================================
+# SUPERADMIN VERIFICATIONS & SECURE KEY APIS
+# ==========================================
 
-    raise HTTPException(status_code=400, detail="Invalid email or password.")
+@app.get("/admins/verifications/pending")
+def get_pending_verifications(
+    db: Session = Depends(get_db),
+    current_admin: dict = Depends(require_superadmin)
+):
+    """ Връща списък с чакащи верификация администратори и квестори, сортирани хронологично (най-старите първи) """
+    pending_admins = db.query(Admin).filter(
+        Admin.is_verified == False,
+        Admin.is_superadmin == False
+    ).all()
+    pending_examiners = db.query(Examiner).filter(
+        Examiner.is_verified == False
+    ).all()
 
-@app.get("/examiners/login-view", response_class=HTMLResponse)
-def get_examiner_login_page(request: fastapi.Request):
-    """ Връща HTML страницата за вход на квестори """
-    return templates.TemplateResponse(
-        request=request, 
-        name="login.html", 
-        context={"default_role": "examiner"}
+    items = []
+    for a in pending_admins:
+        items.append({
+            "id": str(a.id),
+            "role": "admin",
+            "role_display": "Администратор",
+            "full_name": a.full_name,
+            "email": a.email,
+            "created_at": a.created_at.isoformat() if a.created_at else None,
+            "created_at_dt": a.created_at or datetime.min
+        })
+    for e in pending_examiners:
+        items.append({
+            "id": str(e.id),
+            "role": "examiner",
+            "role_display": "Квестор",
+            "full_name": e.full_name,
+            "email": e.email,
+            "created_at": e.created_at.isoformat() if e.created_at else None,
+            "created_at_dt": e.created_at or datetime.min
+        })
+
+    # Сортиране най-старите първи
+    items.sort(key=lambda x: x["created_at_dt"])
+    for it in items:
+        it.pop("created_at_dt", None)
+
+    return {"pending_verifications": items, "count": len(items)}
+
+@app.post("/admins/verifications/{account_type}/{account_id}/grant")
+def grant_verification_access(
+    account_type: str,
+    account_id: str,
+    db: Session = Depends(get_db),
+    current_admin: dict = Depends(require_superadmin)
+):
+    """ Одобрява заявка за достъп (Grant Access - V) """
+    clean_type = account_type.strip().lower()
+    if clean_type == "admin":
+        target = db.query(Admin).filter(Admin.id == account_id).first()
+        if not target:
+            raise HTTPException(status_code=404, detail="Admin account not found.")
+        target.is_verified = True
+        db.commit()
+        return {"status": "success", "message": f"Достъпът за администратор {target.full_name} е одобрен."}
+    elif clean_type == "examiner":
+        target = db.query(Examiner).filter(Examiner.id == account_id).first()
+        if not target:
+            raise HTTPException(status_code=404, detail="Examiner account not found.")
+        target.is_verified = True
+        db.commit()
+        return {"status": "success", "message": f"Достъпът за квестор {target.full_name} е одобрен."}
+    else:
+        raise HTTPException(status_code=400, detail="Invalid account type.")
+
+@app.post("/admins/verifications/{account_type}/{account_id}/reject")
+def reject_verification_access(
+    account_type: str,
+    account_id: str,
+    db: Session = Depends(get_db),
+    current_admin: dict = Depends(require_superadmin)
+):
+    """ Отхвърля заявка за достъп (Reject - X) """
+    clean_type = account_type.strip().lower()
+    if clean_type == "admin":
+        target = db.query(Admin).filter(Admin.id == account_id).first()
+        if not target:
+            raise HTTPException(status_code=404, detail="Admin account not found.")
+        name = target.full_name
+        db.delete(target)
+        db.commit()
+        return {"status": "success", "message": f"Заявката за администратор {name} е отхвърлена и изтрита."}
+    elif clean_type == "examiner":
+        target = db.query(Examiner).filter(Examiner.id == account_id).first()
+        if not target:
+            raise HTTPException(status_code=404, detail="Examiner account not found.")
+        name = target.full_name
+        db.delete(target)
+        db.commit()
+        return {"status": "success", "message": f"Заявката за квестор {name} е отхвърлена и изтрита."}
+    else:
+        raise HTTPException(status_code=400, detail="Invalid account type.")
+
+@app.get("/admins/secure-key/status")
+def get_secure_key_status(
+    db: Session = Depends(get_db),
+    current_admin: dict = Depends(require_superadmin)
+):
+    """ Връща текущия статус на Secure Key (маскиран със звездички) """
+    from datetime import timezone
+    active_key = db.query(SecureKey).filter(SecureKey.is_active == True).order_by(SecureKey.created_at.desc()).first()
+    if not active_key:
+        return {
+            "unattended_enabled": False,
+            "has_active_key": False,
+            "masked_key": None,
+            "duration_type": None,
+            "expires_at": None,
+            "created_at": None
+        }
+
+    if active_key.expires_at is not None:
+        expires_at = active_key.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if datetime.now(timezone.utc) > expires_at:
+            active_key.is_active = False
+            db.commit()
+            return {
+                "unattended_enabled": False,
+                "has_active_key": False,
+                "masked_key": None,
+                "duration_type": None,
+                "expires_at": None,
+                "created_at": None
+            }
+
+    return {
+        "unattended_enabled": True,
+        "has_active_key": True,
+        "masked_key": "********",
+        "duration_type": active_key.duration_type,
+        "expires_at": active_key.expires_at.isoformat() if active_key.expires_at else None,
+        "created_at": active_key.created_at.isoformat() if active_key.created_at else None
+    }
+
+@app.post("/admins/secure-key/generate")
+def generate_secure_key_endpoint(
+    payload: SecureKeyGenerateSchema,
+    db: Session = Depends(get_db),
+    current_admin: dict = Depends(require_superadmin)
+):
+    """ Генерира нов Secure Key за необслужвано създаване на акаунти """
+    from app.auth import generate_secure_key_token
+    # Деактивираме предишни активни ключове
+    db.query(SecureKey).filter(SecureKey.is_active == True).update({
+        "is_active": False,
+        "revoked_at": func.now()
+    })
+    db.commit()
+
+    duration_str = payload.duration.value if hasattr(payload.duration, "value") else str(payload.duration)
+    raw_token, key_hash, expires_at = generate_secure_key_token(duration_str)
+
+    new_key = SecureKey(
+        key_hash=key_hash,
+        duration_type=duration_str,
+        expires_at=expires_at,
+        is_active=True
     )
+    db.add(new_key)
+    db.commit()
+    db.refresh(new_key)
 
-@app.get("/admins/login-view", response_class=HTMLResponse)
-def get_admin_login_page(request: fastapi.Request):
-    """ Връща HTML страницата за вход на администратори """
-    return templates.TemplateResponse(
-        request=request,
-        name="login.html",
-        context={"default_role": "admin"}
-    )
+    return {
+        "status": "success",
+        "secure_key": raw_token,
+        "duration_type": duration_str,
+        "expires_at": expires_at.isoformat() if expires_at else None,
+        "created_at": new_key.created_at.isoformat() if new_key.created_at else None
+    }
+
+@app.delete("/admins/secure-key")
+def delete_secure_key_endpoint(
+    db: Session = Depends(get_db),
+    current_admin: dict = Depends(require_superadmin)
+):
+    """ Анулира и изтрива активния Secure Key """
+    active_keys = db.query(SecureKey).filter(SecureKey.is_active == True).all()
+    for key in active_keys:
+        key.is_active = False
+        key.revoked_at = func.now()
+    db.commit()
+    return {"status": "success", "message": "Secure Key deleted successfully."}
+
 
 @app.post("/students/login", response_model=StudentLoginResponseSchema)
 async def student_login(

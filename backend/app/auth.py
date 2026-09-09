@@ -2,6 +2,7 @@ import os
 import jwt
 import bcrypt
 from datetime import datetime, timedelta
+from typing import Optional
 from dotenv import load_dotenv
 from fastapi import HTTPException, Security, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -55,6 +56,12 @@ def require_student(current_user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="Permission denied. Students only.")
     return current_user
 
+def require_superadmin(current_user: dict = Depends(get_current_user)):
+    """ Защитна стена: Допуска единствено потребители с права на Superadmin """
+    if not is_superadmin_user(current_user):
+        raise HTTPException(status_code=403, detail="Permission denied. Superadmin privileges required.")
+    return current_user
+
 def get_password_hash(password: str) -> str:
     """ Генерира сигурен Bcrypt хеш за новата парола """
     salt = bcrypt.gensalt()
@@ -62,3 +69,73 @@ def get_password_hash(password: str) -> str:
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+
+def hash_secure_key(raw_token: str) -> str:
+    """ Генерира SHA-256 хеш за Secure Key токен """
+    import hashlib
+    return hashlib.sha256(raw_token.strip().encode('utf-8')).hexdigest()
+
+def generate_secure_key_token(duration_type: str):
+    """ Генерира криптографски JWT Secure Key токен и неговия хеш за базата данни """
+    import uuid
+    from datetime import timezone
+    now = datetime.now(timezone.utc)
+    expires_at = None
+
+    if duration_type == "1_day":
+        expires_at = now + timedelta(days=1)
+    elif duration_type == "1_week":
+        expires_at = now + timedelta(days=7)
+    elif duration_type == "1_month":
+        expires_at = now + timedelta(days=30)
+    elif duration_type == "indefinite":
+        expires_at = None
+    else:
+        raise ValueError(f"Invalid duration type: {duration_type}")
+
+    payload = {
+        "sub": "unattended_registration",
+        "key_id": str(uuid.uuid4()),
+        "duration": duration_type,
+    }
+    if expires_at is not None:
+        payload["exp"] = expires_at
+
+    raw_token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    key_hash = hash_secure_key(raw_token)
+    return raw_token, key_hash, expires_at
+
+def validate_secure_key(db, key_token: Optional[str]) -> bool:
+    """ Валидира Secure Key токена спрямо базата данни и срока на годност """
+    from datetime import timezone
+    from .models import SecureKey
+
+    if not key_token or not key_token.strip():
+        return False
+
+    token_clean = key_token.strip()
+    try:
+        payload = jwt.decode(token_clean, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("sub") != "unattended_registration":
+            raise HTTPException(status_code=400, detail="Невалиден или изтекъл Secure Key.")
+    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
+        raise HTTPException(status_code=400, detail="Невалиден или изтекъл Secure Key.")
+
+    token_hash = hash_secure_key(token_clean)
+    db_key = db.query(SecureKey).filter(SecureKey.key_hash == token_hash, SecureKey.is_active == True).first()
+    if not db_key:
+        raise HTTPException(status_code=400, detail="Невалиден или изтекъл Secure Key.")
+
+    if db_key.revoked_at is not None:
+        raise HTTPException(status_code=400, detail="Невалиден или изтекъл Secure Key.")
+
+    if db_key.expires_at is not None:
+        expires_at = db_key.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if datetime.now(timezone.utc) > expires_at:
+            db_key.is_active = False
+            db.commit()
+            raise HTTPException(status_code=400, detail="Невалиден или изтекъл Secure Key.")
+
+    return True

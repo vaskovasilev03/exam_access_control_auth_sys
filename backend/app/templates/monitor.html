@@ -187,7 +187,7 @@
 
         // Стриктна софтуерна защита: ако няма токен, изхвърляме потребителя към login екрана
         if (!token) {
-            window.location.href = "/examiners/login-view"; // Промени адреса спрямо твоя лог-ин изглед
+            window.location.href = "/login?role=examiner";
         } else {
             checkCameraStatus();
         }

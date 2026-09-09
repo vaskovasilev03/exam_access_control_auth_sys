@@ -77,6 +77,12 @@
             <button type="submit" class="w-full bg-[var(--primary)] hover:opacity-90 text-[var(--primary-foreground)] font-bold py-3 px-4 rounded-[var(--radius)] shadow-[0_2px_8px_hsl(0_0%_20%/0.12)] transition transform active:scale-95 cursor-pointer mt-2">
                 Влез в системата
             </button>
+
+            <div class="text-center mt-4 pt-3 border-t border-[var(--border)]">
+                <a href="/register" class="text-xs text-[var(--muted-foreground)] hover:text-[var(--primary)] font-semibold transition">
+                    Нямате акаунт? Регистрирайте се тук
+                </a>
+            </div>
         </form>
     </div>
 
@@ -115,17 +121,18 @@
             errorDiv.classList.add("hidden");
             const role = roleSelect.value;
 
-            // Използваме URLSearchParams, защото и двата login ендпоинта очакват form data
+            // Използваме URLSearchParams към унифицирания /login ендпоинт
             const formData = new URLSearchParams();
             formData.append("email", document.getElementById("email").value);
             formData.append("password", document.getElementById("password").value);
+            formData.append("role", role);
 
             try {
-                const loginUrl = role === "admin" ? "/admins/login" : "/examiners/login";
-                const response = await fetch(loginUrl, {
+                const response = await fetch("/login", {
                     method: "POST",
                     body: formData
                 });
+
 
                 const data = await response.json();
 

@@ -30,11 +30,27 @@ class UserBaseSchema(BaseModel):
             raise ValueError("Паролата трябва да съдържа поне едно число.")
         return v.strip()
 
+class SecureKeyDuration(str, enum.Enum):
+    ONE_DAY = "1_day"
+    ONE_WEEK = "1_week"
+    ONE_MONTH = "1_month"
+    INDEFINITE = "indefinite"
+
+class SecureKeyGenerateSchema(BaseModel):
+    duration: SecureKeyDuration
+
+class UnifiedRegisterSchema(UserBaseSchema):
+    full_name: str
+    role: str = "examiner" # "admin" or "examiner"
+    secure_key: Optional[str] = None
+
 class AdminCreateSchema(UserBaseSchema):
     full_name: str
+    secure_key: Optional[str] = None
 
 class ExaminerCreateSchema(UserBaseSchema):
     full_name: str
+    secure_key: Optional[str] = None
 
 class StudentEnrollSchema(UserBaseSchema):
     full_name: str
