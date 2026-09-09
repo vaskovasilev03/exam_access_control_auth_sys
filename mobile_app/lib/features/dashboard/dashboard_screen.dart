@@ -7,6 +7,8 @@ import '../auth/change_password_sheet.dart';
 import '../auth/login_screen.dart';
 import '../liveness/liveness_screen.dart';
 import 'models/student_models.dart';
+import 'admin_students_view.dart';
+import 'admin_exams_view.dart';
 
 class DashboardScreen extends StatefulWidget {
   final AuthRepository? authRepository;
@@ -18,7 +20,7 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  int _selectedTabIndex = 0; // 0: Student Profile, 1: Exam's Window
+  int _selectedTabIndex = 0; // 0: Student Profile / Students, 1: Exam's Window
   late final PageController _pageController;
 
   bool _isLoading = true; // Първоначално зареждане
@@ -29,6 +31,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<ExamItemModel> _exams = [];
   bool _isLoadingExams = false;
   String? _examsErrorMessage;
+
+  // Административен режим: списък със студенти и избран студент за симулация
+  List<StudentSummaryModel> _adminStudents = [];
+  bool _isLoadingStudents = false;
+  String? _studentsErrorMessage;
+  StudentSummaryModel? _selectedStudent;
 
   @override
   void initState() {
@@ -65,9 +73,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _isLoading = false;
       });
 
-      // Ако студентът е одобрен с биометрия, зареждаме и изпитите
-      if (profile.hasAccessToExams) {
+      if (profile.isSuperadmin) {
+        // За администратор: зареждаме студентите за първия таб и ВСИЧКИ изпити за втория
+        _loadAdminStudents();
         _loadExams();
+      } else {
+        // За редовен студент: зареждаме изпитите само при биометричен достъп
+        if (profile.hasAccessToExams) {
+          _loadExams();
+        } else {
+          setState(() {
+            _exams = [];
+            _isLoadingExams = false;
+          });
+        }
       }
     } catch (e) {
       if (!mounted) return;
@@ -78,7 +97,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  Future<void> _loadExams() async {
+  Future<void> _loadAdminStudents() async {
+    if (widget.authRepository == null) return;
+    setState(() {
+      _isLoadingStudents = true;
+      _studentsErrorMessage = null;
+    });
+
+    try {
+      final students = await widget.authRepository!.getImpersonationList();
+      if (!mounted) return;
+      setState(() {
+        _adminStudents = students;
+        _isLoadingStudents = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _studentsErrorMessage = e.toString().replaceAll('Exception: ', '');
+        _isLoadingStudents = false;
+      });
+    }
+  }
+
+  Future<void> _loadExams({String? impersonateId}) async {
     if (widget.authRepository == null) return;
     setState(() {
       _isLoadingExams = true;
@@ -86,7 +128,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
 
     try {
-      final exams = await widget.authRepository!.getMyExams();
+      final exams = await widget.authRepository!.getMyExams(
+        impersonateId: impersonateId ?? _selectedStudent?.id,
+      );
       if (!mounted) return;
       setState(() {
         _exams = exams;
@@ -117,12 +161,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _profile = profile;
       });
 
-      if (profile.hasAccessToExams) {
-        final exams = await widget.authRepository!.getMyExams();
-        if (mounted) {
+      if (profile.isSuperadmin) {
+        await Future.wait([
+          _loadAdminStudents(),
+          _loadExams(impersonateId: _selectedStudent?.id),
+        ]);
+      } else {
+        if (profile.hasAccessToExams) {
+          final exams = await widget.authRepository!.getMyExams();
+          if (mounted) {
+            setState(() {
+              _exams = exams;
+              _examsErrorMessage = null;
+            });
+          }
+        } else {
           setState(() {
-            _exams = exams;
-            _examsErrorMessage = null;
+            _exams = [];
+            _isLoadingExams = false;
           });
         }
       }
@@ -151,8 +207,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
     );
-    if (index == 1 && _profile != null && _profile!.hasAccessToExams && _exams.isEmpty && !_isLoadingExams) {
-      _loadExams();
+    if (index == 1 && _profile != null) {
+      if (_profile!.isSuperadmin) {
+        if (_exams.isEmpty && !_isLoadingExams) {
+          _loadExams(impersonateId: _selectedStudent?.id);
+        }
+      } else if (_profile!.hasAccessToExams && _exams.isEmpty && !_isLoadingExams) {
+        _loadExams();
+      }
     }
   }
 
@@ -205,6 +267,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
         },
       ),
     );
+  }
+
+  void _onStudentSelected(StudentSummaryModel? student) {
+    setState(() {
+      _selectedStudent = student;
+    });
+    _loadExams(impersonateId: student?.id);
+    if (student != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Избран студент за преглед на изпити: ${student.fullName} (${student.studentIdNumber})'),
+          backgroundColor: Colors.amber.shade800,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Премахнат филтър по студент. Показват се всички изпити.'),
+          backgroundColor: UiThemeTokens.primary,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   Future<void> _handleLogout() async {
@@ -316,7 +402,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             color: UiThemeTokens.primary,
                             backgroundColor: Colors.transparent,
                           ),
-                        if (_profile != null && !_profile!.isApproved)
+                        if (_profile != null && !_profile!.isSuperadmin && !_profile!.isApproved)
                           _buildPersistentAlertBanner(),
                         Expanded(
                           child: PageView(
@@ -375,8 +461,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildTopHeader() {
+    final isSuper = _profile?.isSuperadmin == true;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
       decoration: const BoxDecoration(
         color: UiThemeTokens.card,
         border: Border(bottom: BorderSide(color: UiThemeTokens.border)),
@@ -384,31 +472,71 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            children: [
-              const Text('🎓', style: TextStyle(fontSize: 24)),
-              const SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Exam Gate',
-                    style: UiThemeTokens.getSansFont(
-                      fontSize: 17,
-                      fontWeight: FontWeight.bold,
-                      color: UiThemeTokens.primary,
-                    ),
+          Expanded(
+            child: Row(
+              children: [
+                Text(isSuper ? '👑' : '🎓', style: const TextStyle(fontSize: 24)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              'Exam Gate',
+                              overflow: TextOverflow.ellipsis,
+                              style: UiThemeTokens.getSansFont(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                                color: UiThemeTokens.primary,
+                              ),
+                            ),
+                          ),
+                          if (isSuper) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.shade700.withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: Colors.amber.shade700, width: 0.8),
+                              ),
+                              child: Text(
+                                'SUPERADMIN',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.amber.shade700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      if (_profile != null)
+                        Text(
+                          isSuper
+                              ? (_profile!.email.isNotEmpty ? _profile!.email : 'Административен профил')
+                              : 'Фак. № ${_profile!.studentIdNumber}',
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                          style: UiThemeTokens.getSansFont(
+                            fontSize: 12,
+                            color: UiThemeTokens.mutedForeground,
+                          ),
+                        ),
+                    ],
                   ),
-                  if (_profile != null)
-                    Text(
-                      'Фак. № ${_profile!.studentIdNumber}',
-                      style: UiThemeTokens.getSansFont(fontSize: 11, color: UiThemeTokens.mutedForeground),
-                    ),
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
+          const SizedBox(width: 8),
           Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               IconButton(
                 icon: _isRefreshing
@@ -490,7 +618,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               padding: const EdgeInsets.symmetric(vertical: 12.0),
                               child: Center(
                                 child: Text(
-                                  'Студентски Профил',
+                                  _profile?.isSuperadmin == true ? 'Студенти' : 'Студентски Профил',
                                   style: UiThemeTokens.getSansFont(
                                     fontSize: 13,
                                     fontWeight: FontWeight.bold,
@@ -516,7 +644,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Text(
-                                      'Изпитен Прозорец',
+                                      _profile?.isSuperadmin == true ? 'Всички Изпити' : 'Изпитен Прозорец',
                                       style: UiThemeTokens.getSansFont(
                                         fontSize: 13,
                                         fontWeight: FontWeight.bold,
@@ -527,7 +655,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                         ),
                                       ),
                                     ),
-                                    if (_profile != null && !_profile!.hasAccessToExams) ...[
+                                    if (_profile != null && !_profile!.isSuperadmin && !_profile!.hasAccessToExams) ...[
                                       const SizedBox(width: 4),
                                       Icon(
                                         Icons.lock_outline,
@@ -644,6 +772,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildStudentProfileTab() {
     if (_profile == null) return const SizedBox.shrink();
 
+    // За Superadmin: показваме директно интерактивния панел със студенти и филтри
+    if (_profile!.isSuperadmin) {
+      return AdminStudentsView(
+        students: _adminStudents,
+        isLoading: _isLoadingStudents,
+        errorMessage: _studentsErrorMessage,
+        selectedStudent: _selectedStudent,
+        onStudentSelected: _onStudentSelected,
+        onRefresh: _loadAdminStudents,
+      );
+    }
+
+    // За редовен студент: показваме стандартните профилни карти
     return RefreshIndicator(
       onRefresh: _refreshAll,
       color: UiThemeTokens.primary,
@@ -936,6 +1077,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildSecurityOptionsCard() {
+    final isImp = _profile?.isImpersonating == true;
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(20.0),
@@ -947,18 +1090,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
               style: UiThemeTokens.getSansFont(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 14),
-            OutlinedButton.icon(
-              onPressed: _openChangePasswordSheet,
-              icon: const Icon(Icons.lock_reset, size: 18),
-              label: const Text('Смяна на парола'),
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 48),
-                side: const BorderSide(color: UiThemeTokens.border),
-                shape: RoundedRectangleBorder(borderRadius: UiThemeTokens.borderRadius),
-                textStyle: UiThemeTokens.getSansFont(fontSize: 14, fontWeight: FontWeight.bold),
+            if (isImp) ...[
+              Container(
+                padding: const EdgeInsets.all(12.0),
+                decoration: BoxDecoration(
+                  color: UiThemeTokens.input,
+                  borderRadius: UiThemeTokens.borderRadius,
+                  border: Border.all(color: UiThemeTokens.border),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.lock_outline, size: 18, color: UiThemeTokens.mutedForeground),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Смяната на парола е заключена по време на симулация, за да се защитят данните на реалния студент.',
+                        style: UiThemeTokens.getSansFont(fontSize: 12, color: UiThemeTokens.mutedForeground),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 10),
+              const SizedBox(height: 12),
+            ] else ...[
+              OutlinedButton.icon(
+                onPressed: _openChangePasswordSheet,
+                icon: const Icon(Icons.lock_reset, size: 18),
+                label: const Text('Смяна на парола'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 48),
+                  side: const BorderSide(color: UiThemeTokens.border),
+                  shape: RoundedRectangleBorder(borderRadius: UiThemeTokens.borderRadius),
+                  textStyle: UiThemeTokens.getSansFont(fontSize: 14, fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
             OutlinedButton.icon(
               onPressed: _handleLogout,
               icon: const Icon(Icons.logout, size: 18, color: UiThemeTokens.destructive),
@@ -978,6 +1145,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildExamsWindowTab() {
+    // За Superadmin: изпитният прозорец е винаги достъпен (никога не се замъглява/gated)
+    // и показва изчерпателния панел AdminExamsView с пълна филтрация
+    if (_profile?.isSuperadmin == true) {
+      return AdminExamsView(
+        exams: _exams,
+        isLoading: _isLoadingExams,
+        errorMessage: _examsErrorMessage,
+        selectedStudent: _selectedStudent,
+        onClearSelectedStudent: () => _onStudentSelected(null),
+        onRefresh: () => _loadExams(impersonateId: _selectedStudent?.id),
+      );
+    }
+
     final hasAccess = _profile != null && _profile!.hasAccessToExams;
 
     if (!hasAccess) {

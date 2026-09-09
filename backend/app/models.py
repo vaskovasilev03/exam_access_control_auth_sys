@@ -1,6 +1,6 @@
 import uuid
 import enum
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, text, Enum
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, text, Enum, Index, event
 from sqlalchemy.dialects.postgresql import UUID, ARRAY
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
@@ -12,6 +12,14 @@ Base = declarative_base()
 class Admin(Base):
     """ Таблица за администраторите (служители в канцелария, разработчици) """
     __tablename__ = "admins"
+    __table_args__ = (
+        Index(
+            "uq_single_superadmin",
+            "is_superadmin",
+            unique=True,
+            postgresql_where=text("is_superadmin = true")
+        ),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     full_name = Column(String, nullable=False)
@@ -22,6 +30,28 @@ class Admin(Base):
     is_verified = Column(Boolean, nullable=False, default=False)
     is_superadmin = Column(Boolean, default=False) # За софтуерни разработчици/главни администратори
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+@event.listens_for(Admin, "before_insert")
+def validate_single_superadmin_insert(mapper, connection, target):
+    if target.is_superadmin:
+        existing = connection.execute(
+            text("SELECT id FROM admins WHERE is_superadmin = true")
+        ).first()
+        if existing:
+            raise ValueError("A superadmin record already exists. Only one superadmin record is allowed in the database.")
+
+
+@event.listens_for(Admin, "before_update")
+def validate_single_superadmin_update(mapper, connection, target):
+    if target.is_superadmin:
+        existing = connection.execute(
+            text("SELECT id FROM admins WHERE is_superadmin = true AND id != :id"),
+            {"id": str(target.id)}
+        ).first()
+        if existing:
+            raise ValueError("A superadmin record already exists. Only one superadmin record is allowed in the database.")
+
 
 
 class Student(Base):

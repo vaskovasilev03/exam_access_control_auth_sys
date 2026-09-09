@@ -144,3 +144,17 @@ class StudentProfileSchema(BaseModel):
     status: str
     has_face_embedding: bool
     rejection_reason: Optional[str] = None
+    is_superadmin: Optional[bool] = False
+    is_impersonating: Optional[bool] = False
+
+class StudentSummarySchema(BaseModel):
+    id: str
+    full_name: str
+    student_id_number: str
+    faculty: str
+    specialty: str
+    course: int
+    stream: int
+    group: int
+    status: str
+    has_face_embedding: bool

@@ -70,9 +70,12 @@ class AuthRepository {
     }
   }
 
-  Future<StudentProfileModel> getStudentProfile() async {
+  Future<StudentProfileModel> getStudentProfile({String? impersonateId}) async {
     try {
-      final response = await _apiClient.dio.get('/students/profile');
+      final response = await _apiClient.dio.get(
+        '/students/profile',
+        queryParameters: impersonateId != null ? {'impersonate_id': impersonateId} : null,
+      );
       return StudentProfileModel.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       final errorMsg = e.response?.data['detail'] ?? 'Грешка при зареждане на профила';
@@ -80,13 +83,27 @@ class AuthRepository {
     }
   }
 
-  Future<List<ExamItemModel>> getMyExams() async {
+  Future<List<ExamItemModel>> getMyExams({String? impersonateId}) async {
     try {
-      final response = await _apiClient.dio.get('/students/my-registrations');
+      final response = await _apiClient.dio.get(
+        '/students/my-registrations',
+        queryParameters: impersonateId != null ? {'impersonate_id': impersonateId} : null,
+      );
       final list = response.data as List<dynamic>;
       return list.map((item) => ExamItemModel.fromJson(item as Map<String, dynamic>)).toList();
     } on DioException catch (e) {
       final errorMsg = e.response?.data['detail'] ?? 'Грешка при зареждане на изпитния график';
+      throw Exception(errorMsg);
+    }
+  }
+
+  Future<List<StudentSummaryModel>> getImpersonationList() async {
+    try {
+      final response = await _apiClient.dio.get('/students/impersonate/list');
+      final list = response.data as List<dynamic>;
+      return list.map((item) => StudentSummaryModel.fromJson(item as Map<String, dynamic>)).toList();
+    } on DioException catch (e) {
+      final errorMsg = e.response?.data['detail'] ?? 'Грешка при зареждане на списъка със студенти';
       throw Exception(errorMsg);
     }
   }

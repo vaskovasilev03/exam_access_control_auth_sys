@@ -2,12 +2,14 @@ import os
 import jwt
 import bcrypt
 from datetime import datetime, timedelta
+from dotenv import load_dotenv
 from fastapi import HTTPException, Security, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
+load_dotenv()
+
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
-print(f"SECRET_KEY: {SECRET_KEY}")  # Debugging line to check if SECRET_KEY is loaded correctly
 
 security_agent = HTTPBearer()
 
@@ -31,10 +33,26 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Security(securi
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token.")
 
+def is_superadmin_user(user: dict) -> bool:
+    """ Проверява дали потребителят притежава права на главен администратор (Superadmin) """
+    return user.get("is_superadmin") is True or user.get("role") == "superadmin"
+
 def require_admin(current_user: dict = Depends(get_current_user)):
-    """ Защитна стена: Допуска само потребители с роля 'admin' """
-    if current_user.get("role") != "admin":
+    """ Защитна стена: Допуска потребители с роля 'admin' или права на Superadmin """
+    if current_user.get("role") not in ("admin", "superadmin") and not is_superadmin_user(current_user):
         raise HTTPException(status_code=403, detail="Permission denied. Admins only.")
+    return current_user
+
+def require_examiner(current_user: dict = Depends(get_current_user)):
+    """ Защитна стена: Допуска потребители с роля 'examiner' или права на Superadmin """
+    if current_user.get("role") not in ("examiner", "superadmin") and not is_superadmin_user(current_user):
+        raise HTTPException(status_code=403, detail="Permission denied. Examiners only.")
+    return current_user
+
+def require_student(current_user: dict = Depends(get_current_user)):
+    """ Защитна стена: Допуска потребители с роля 'student' или права на Superadmin """
+    if current_user.get("role") not in ("student", "superadmin") and not is_superadmin_user(current_user):
+        raise HTTPException(status_code=403, detail="Permission denied. Students only.")
     return current_user
 
 def get_password_hash(password: str) -> str:

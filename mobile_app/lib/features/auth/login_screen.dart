@@ -157,9 +157,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 28),
                     TextField(
                       controller: _facNumController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Факултетен номер'),
+                      keyboardType: TextInputType.text,
+                      decoration: const InputDecoration(
+                        labelText: 'Факултетен номер / Имейл',
+                      ),
                     ),
+
                     const SizedBox(height: 14),
                     TextField(
                       controller: _passwordController,

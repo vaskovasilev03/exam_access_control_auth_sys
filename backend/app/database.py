@@ -1,7 +1,10 @@
 import os
+from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from .models import Base
+
+load_dotenv()
 
 # This pulls from the .env variables we set up earlier
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -17,6 +20,12 @@ def init_db():
     
     # 2. Create all tables defined in models.py
     Base.metadata.create_all(bind=engine)
+
+    # 3. Ensure the single superadmin partial unique index exists
+    with engine.connect() as conn:
+        conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_single_superadmin ON admins (is_superadmin) WHERE is_superadmin = true"))
+        conn.commit()
+
 
 def get_db():
     db = SessionLocal()

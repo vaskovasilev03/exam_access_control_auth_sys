@@ -11,6 +11,8 @@ class StudentProfileModel {
   final String status;
   final bool hasFaceEmbedding;
   final String? rejectionReason;
+  final bool isSuperadmin;
+  final bool isImpersonating;
 
   const StudentProfileModel({
     required this.id,
@@ -25,6 +27,8 @@ class StudentProfileModel {
     required this.status,
     required this.hasFaceEmbedding,
     this.rejectionReason,
+    this.isSuperadmin = false,
+    this.isImpersonating = false,
   });
 
   factory StudentProfileModel.fromJson(Map<String, dynamic> json) {
@@ -41,6 +45,8 @@ class StudentProfileModel {
       status: json['status'] as String? ?? 'PENDING',
       hasFaceEmbedding: json['has_face_embedding'] as bool? ?? false,
       rejectionReason: json['rejection_reason'] as String?,
+      isSuperadmin: json['is_superadmin'] as bool? ?? false,
+      isImpersonating: json['is_impersonating'] as bool? ?? false,
     );
   }
 
@@ -59,6 +65,11 @@ class ExamItemModel {
   final String roomNumber;
   final DateTime? dateTime;
   final String? sessionType;
+  final String? faculty;
+  final String? specialty;
+  final int? course;
+  final String? stream;
+  final String? group;
 
   const ExamItemModel({
     required this.registrationId,
@@ -68,6 +79,11 @@ class ExamItemModel {
     required this.roomNumber,
     this.dateTime,
     this.sessionType,
+    this.faculty,
+    this.specialty,
+    this.course,
+    this.stream,
+    this.group,
   });
 
   factory ExamItemModel.fromJson(Map<String, dynamic> json) {
@@ -83,6 +99,11 @@ class ExamItemModel {
       roomNumber: json['room_number'] as String? ?? '',
       dateTime: dt,
       sessionType: json['session_type'] as String?,
+      faculty: json['faculty'] as String?,
+      specialty: json['specialty'] as String?,
+      course: json['course'] as int?,
+      stream: json['stream']?.toString(),
+      group: json['group']?.toString(),
     );
   }
 
@@ -96,5 +117,50 @@ class ExamItemModel {
     final minute = local.minute.toString().padLeft(2, '0');
     return '$day.$month.$year г. в $hour:$minute ч.';
   }
+}
+
+class StudentSummaryModel {
+  final String id;
+  final String fullName;
+  final String studentIdNumber;
+  final String faculty;
+  final String specialty;
+  final int course;
+  final int stream;
+  final int group;
+  final String status;
+  final bool hasFaceEmbedding;
+
+  const StudentSummaryModel({
+    required this.id,
+    required this.fullName,
+    required this.studentIdNumber,
+    required this.faculty,
+    required this.specialty,
+    required this.course,
+    required this.stream,
+    required this.group,
+    required this.status,
+    required this.hasFaceEmbedding,
+  });
+
+  factory StudentSummaryModel.fromJson(Map<String, dynamic> json) {
+    return StudentSummaryModel(
+      id: json['id'] as String? ?? '',
+      fullName: json['full_name'] as String? ?? '',
+      studentIdNumber: json['student_id_number'] as String? ?? '',
+      faculty: json['faculty'] as String? ?? '',
+      specialty: json['specialty'] as String? ?? '',
+      course: json['course'] as int? ?? 1,
+      stream: json['stream'] as int? ?? 1,
+      group: json['group'] as int? ?? 1,
+      status: json['status'] as String? ?? 'PENDING',
+      hasFaceEmbedding: json['has_face_embedding'] as bool? ?? false,
+    );
+  }
+
+  bool get isApproved => status.toUpperCase() == 'APPROVED';
+  bool get isPendingApproval => status.toUpperCase() == 'PENDING_APPROVAL';
+  bool get isRejected => status.toUpperCase() == 'REJECTED';
 }
 

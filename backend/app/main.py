@@ -17,7 +17,9 @@ from fastapi import FastAPI, Depends, Response, File, UploadFile, HTTPException,
 from fastapi.responses import StreamingResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from datetime import datetime, timedelta
+
 from pydantic import ValidationError
 from typing import Optional
 from zoneinfo import ZoneInfo
@@ -27,9 +29,15 @@ from .models import Student, Exam, Admin, ExamRegistration, AccessLog, Examiner,
 from .schemas import (
     AdminCreateSchema, ExaminerCreateSchema, StudentEnrollSchema,
     ExamUploadValidationSchema, StudentLoginSchema, StudentLoginResponseSchema,
-    ChangePasswordSchema, CameraRegisterSchema, StudentProfileSchema
+    ChangePasswordSchema, CameraRegisterSchema, StudentProfileSchema,
+    StudentSummarySchema
 )
-from .auth import create_access_token, get_current_user, require_admin, verify_password, get_password_hash, SECRET_KEY, ALGORITHM
+from .auth import (
+    create_access_token, get_current_user, require_admin, require_examiner,
+    require_student, is_superadmin_user, verify_password, get_password_hash,
+    SECRET_KEY, ALGORITHM
+)
+from .seed import seed_superadmin
 from .stream_esp32 import generate_from_memory, fetch_frames_from_esp32, ACTIVE_CAMERAS, CAMERA_TASKS, AI_ROOM_STATES, CAMERA_HEALTH
 from .storage import init_storage, upload_photo_to_cloud, get_photo_from_cloud, BUCKET_NAME
 from .mailer import send_welcome_email, send_allocation_email
@@ -166,6 +174,7 @@ def _photo_url_for_student(student: Student) -> Optional[str]:
 def on_startup():
     init_db()
     init_storage()
+    seed_superadmin()
 
 @app.get("/")
 def read_root():
@@ -503,10 +512,11 @@ def get_admin_dashboard_page(request: fastapi.Request, response: Response):
 
     try:
         payload = jwt.decode(admin_token, SECRET_KEY, algorithms=[ALGORITHM])
-        if payload.get("role") != "admin":
+        if payload.get("role") not in ("admin", "superadmin") and not is_superadmin_user(payload):
             return RedirectResponse(url="/admins/login-view", status_code=302)
     except Exception:
         return RedirectResponse(url="/admins/login-view", status_code=302)
+
 
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return templates.TemplateResponse(
@@ -592,10 +602,11 @@ def get_student_photo(student_id: str, token: str = Query(...), db: Session = De
 
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        if payload.get("role") != "admin":
+        if payload.get("role") not in ("admin", "superadmin") and not is_superadmin_user(payload):
             raise HTTPException(status_code=403, detail="Достъпът е отказан. Изискват се админ права.")
     except Exception:
         raise HTTPException(status_code=401, detail="Невалиден или изтекъл администраторски токен.")
+
 
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student or not student.photo_path:
@@ -772,7 +783,8 @@ def admin_login(
     db: Session = Depends(get_db)
 ):
     # Търсим изрично в таблицата за администратори
-    admin = db.query(Admin).filter(Admin.email == email).first()
+    clean_email = email.strip().lower()
+    admin = db.query(Admin).filter(func.lower(Admin.email) == clean_email).first()
     if not admin:
         raise HTTPException(status_code=400, detail="Invalid email or password.")
     
@@ -783,8 +795,12 @@ def admin_login(
     if not bcrypt.checkpw(password_bytes, admin.hashed_password.encode('utf-8')):
         raise HTTPException(status_code=400, detail="Invalid email or password.")
     
-    # Издаваме токен с роля admin
-    access_token = create_access_token(data={"sub": admin.id, "role": "admin"})
+    # Издаваме токен с роля admin и статус superadmin
+    access_token = create_access_token(data={
+        "sub": str(admin.id),
+        "role": "admin",
+        "is_superadmin": bool(admin.is_superadmin)
+    })
     response.set_cookie(
         key="admin_token",
         value=access_token,
@@ -794,22 +810,34 @@ def admin_login(
         secure=False,
         path="/"
     )
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "is_superadmin": bool(admin.is_superadmin)
+    }
 
 @app.post("/examiners/login")
 def examiner_login(email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
     """ Ендпоинт за автентикация на квестори и издаване на JWT токен """
-    examiner = db.query(Examiner).filter(Examiner.email == email.strip()).first()
-    if not examiner:
-        raise HTTPException(status_code=400, detail="Invalid email or password.")
+    clean_email = email.strip().lower()
+    examiner = db.query(Examiner).filter(func.lower(Examiner.email) == clean_email).first()
     
-    # Проверка на паролата чрез Bcrypt от auth.py
-    if not verify_password(password, examiner.hashed_password):
-        raise HTTPException(status_code=400, detail="Invalid email or password.")
+    if examiner:
+        if not examiner.is_verified:
+            raise HTTPException(status_code=403, detail="Вашият квесторски акаунт очаква потвърждение от администратор.")
+        if not verify_password(password, examiner.hashed_password):
+            raise HTTPException(status_code=400, detail="Invalid email or password.")
 
-    # Издаваме токен със sub (ID) и роля examiner
-    access_token = create_access_token(data={"sub": str(examiner.id), "role": "examiner"})
-    return {"access_token": access_token, "token_type": "bearer", "full_name": examiner.full_name}
+        access_token = create_access_token(data={"sub": str(examiner.id), "role": "examiner", "is_superadmin": False})
+        return {"access_token": access_token, "token_type": "bearer", "full_name": examiner.full_name, "is_superadmin": False}
+
+    # Fallback за Superadmin акаунт (Omni-Role достъп)
+    admin = db.query(Admin).filter(func.lower(Admin.email) == clean_email, Admin.is_superadmin == True).first()
+    if admin and verify_password(password, admin.hashed_password):
+        access_token = create_access_token(data={"sub": str(admin.id), "role": "examiner", "is_superadmin": True})
+        return {"access_token": access_token, "token_type": "bearer", "full_name": f"{admin.full_name} (Superadmin)", "is_superadmin": True}
+
+    raise HTTPException(status_code=400, detail="Invalid email or password.")
 
 @app.get("/examiners/login-view", response_class=HTMLResponse)
 def get_examiner_login_page(request: fastapi.Request):
@@ -836,11 +864,38 @@ async def student_login(
 ):
     """
     Ендпоинт за вход на студенти в мобилното приложение.
-    Ако влиза за първи път, връща статус 'force_password_change'.
+    Поддържа вход и за Superadmin акаунт за лесно тестване.
     """
-    # 1. Търсене на студента по Факултетен номер
-    student = db.query(Student).filter(Student.student_id_number == payload.student_id_number.strip()).first()
+    input_id = payload.student_id_number.strip()
+    student = db.query(Student).filter(Student.student_id_number == input_id).first()
+    
     if not student:
+        # Проверка дали се логва Superadmin акаунт през мобилното приложение
+        superadmin = db.query(Admin).filter(
+            Admin.is_superadmin == True,
+            func.lower(Admin.email) == input_id.lower()
+        ).first()
+        if not superadmin and input_id.lower() in ["superadmin", "0", "000000000"]:
+            superadmin = db.query(Admin).filter(Admin.is_superadmin == True).first()
+
+        if superadmin and verify_password(payload.password, superadmin.hashed_password):
+            token_data = {
+                "sub": str(superadmin.id),
+                "student_id_number": "000000000",
+                "role": "student",
+                "is_superadmin": True,
+                "must_change": False,
+                "student_status": "APPROVED",
+            }
+            token = create_access_token(data=token_data)
+            return {
+                "status": "success",
+                "message": "Успешен вход в системата (Superadmin).",
+                "access_token": token,
+                "student_status": "APPROVED",
+                "has_face_embedding": True,
+                "must_change_password": False,
+            }
         raise HTTPException(status_code=401, detail="Invalid student ID number or password.")
 
     # 2. Проверка дали акаунтът е заключен (Чакащ имейл) 
@@ -861,6 +916,7 @@ async def student_login(
         "sub": str(student.id),
         "student_id_number": student.student_id_number,
         "role": "student",
+        "is_superadmin": False,
         "must_change": student.must_change_password,
         "student_status": student.status,
     }
@@ -887,6 +943,7 @@ async def student_login(
         "must_change_password": False,
     }
 
+
 @app.post("/students/change-password")
 async def change_student_password(
     payload: ChangePasswordSchema,
@@ -897,14 +954,44 @@ async def change_student_password(
     Ендпоинт за първоначална или последваща смяна на студентската парола.
     След успешна смяна, флагът must_change_password се залага на False.
     """
-    # 1. Стриктна софтуерна защита: Допускаме само потребители с роля 'student'
-    if current_user.get("role") != "student":
+    # 1. Стриктна софтуерна защита: Допускаме студенти или Superadmin
+    if current_user.get("role") not in ("student", "superadmin") and not is_superadmin_user(current_user):
         raise HTTPException(status_code=403, detail="Достъпът е отказан. Ендпоинтът е само за студенти.")
 
-    # 2. Извличане на студента от базата чрез ID-то ('sub') от JWT токена
     student_id = current_user.get("sub")
     student = db.query(Student).filter(Student.id == student_id).first()
     
+    # Обработка за Superadmin без отделен физически Student запис
+    if not student and is_superadmin_user(current_user):
+        admin = db.query(Admin).filter(Admin.id == student_id, Admin.is_superadmin == True).first()
+        if not admin:
+            admin = db.query(Admin).filter(Admin.is_superadmin == True).first()
+        if not admin:
+            raise HTTPException(status_code=404, detail="Superadmin профилът не е намерен в системата.")
+
+        if payload.old_password and not verify_password(payload.old_password, admin.hashed_password):
+            raise HTTPException(status_code=400, detail="Грешна текуща парола.")
+        if payload.old_password == payload.new_password:
+            raise HTTPException(status_code=400, detail="Новата парола трябва да бъде различна от текущата.")
+
+        admin.hashed_password = get_password_hash(payload.new_password)
+        db.commit()
+
+        new_token = create_access_token(data={
+            "sub": str(admin.id),
+            "student_id_number": "000000000",
+            "role": "student",
+            "is_superadmin": True,
+            "must_change": False,
+            "student_status": "APPROVED",
+        })
+
+        return {
+            "status": "success",
+            "message": "Паролата беше обновена успешно.",
+            "access_token": new_token
+        }
+
     if not student:
         raise HTTPException(status_code=404, detail="Студентът не е намерен в системата.")
 
@@ -933,6 +1020,7 @@ async def change_student_password(
         "sub": str(student.id),
         "student_id_number": student.student_id_number,
         "role": "student",
+        "is_superadmin": False,
         "must_change": False,
         "student_status": student.status,
     })
@@ -943,22 +1031,123 @@ async def change_student_password(
         "access_token": new_token
     }
 
+@app.get("/students/impersonate/list", response_model=list[StudentSummarySchema])
+def get_students_impersonation_list(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Връща списък на реални студенти в системата за симулация/имперсониране от Superadmin.
+    Достъпно САМО за Superadmin.
+    """
+    if not is_superadmin_user(current_user):
+        raise HTTPException(status_code=403, detail="Достъпът е разрешен само за Superadmin.")
+
+    students = db.query(Student).order_by(
+        Student.faculty.asc(),
+        Student.course.asc(),
+        Student.stream.asc(),
+        Student.group.asc(),
+        Student.student_id_number.asc()
+    ).all()
+
+    return [
+        {
+            "id": str(s.id),
+            "full_name": s.full_name,
+            "student_id_number": s.student_id_number,
+            "faculty": s.faculty or "",
+            "specialty": s.specialty or "",
+            "course": s.course or 1,
+            "stream": s.stream or 1,
+            "group": s.group or 1,
+            "status": s.status or "PENDING",
+            "has_face_embedding": s.face_embedding is not None,
+        }
+        for s in students
+    ]
+
+
 @app.get("/students/profile", response_model=StudentProfileSchema)
 @app.get("/students/me", response_model=StudentProfileSchema)
 def get_student_profile(
+    impersonate_id: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
     """
     Извлича профила и текущия статус на валидация на студента.
     При статус REJECTED извлича причината за отхвърляне от admin_logs.
+    При вход на Superadmin връща валидиран студентски профил или профил на имперсониран студент.
     """
-    if current_user.get("role") != "student":
+    if current_user.get("role") not in ("student", "superadmin") and not is_superadmin_user(current_user):
         raise HTTPException(status_code=403, detail="Достъпът е разрешен само за студенти.")
+
+    # Проверка за имперсониране от Superadmin
+    if impersonate_id:
+        if not is_superadmin_user(current_user):
+            raise HTTPException(status_code=403, detail="Само Superadmin може да преглежда чужди студентски профили.")
+        target_student = db.query(Student).filter(Student.id == impersonate_id).first()
+        if not target_student:
+            raise HTTPException(status_code=404, detail="Студентът за симулация не е намерен.")
+
+        rejection_reason = None
+        if target_student.status == "REJECTED":
+            reject_log = (
+                db.query(AdminLog)
+                .filter(
+                    AdminLog.action_type == "STUDENT_REJECT",
+                    AdminLog.details.like(f"%{target_student.student_id_number}%")
+                )
+                .order_by(AdminLog.created_at.desc())
+                .first()
+            )
+            if reject_log and reject_log.details:
+                if "Причина: " in reject_log.details:
+                    rejection_reason = reject_log.details.split("Причина: ", 1)[1].strip()
+                else:
+                    rejection_reason = reject_log.details.strip()
+
+        return {
+            "id": str(target_student.id),
+            "full_name": target_student.full_name,
+            "student_id_number": target_student.student_id_number,
+            "email": target_student.email,
+            "faculty": target_student.faculty,
+            "specialty": target_student.specialty,
+            "course": target_student.course,
+            "stream": target_student.stream,
+            "group": target_student.group,
+            "status": target_student.status or "PENDING",
+            "has_face_embedding": target_student.face_embedding is not None,
+            "rejection_reason": rejection_reason,
+            "is_superadmin": True,
+            "is_impersonating": True,
+        }
 
     student_id = current_user.get("sub")
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
+        if is_superadmin_user(current_user):
+            admin = db.query(Admin).filter(Admin.id == student_id, Admin.is_superadmin == True).first()
+            if not admin:
+                admin = db.query(Admin).filter(Admin.is_superadmin == True).first()
+            return {
+                "id": str(admin.id if admin else student_id),
+                "full_name": f"{admin.full_name if admin else 'Super Administrator'} (Superadmin)",
+                "student_id_number": "000000000",
+                "email": admin.email if admin else "superadmin@tu-sofia.bg",
+                "faculty": "ФКСТ",
+                "specialty": "КСИ",
+                "course": 4,
+                "stream": 1,
+                "group": 1,
+                "status": "APPROVED",
+                "has_face_embedding": True,
+                "rejection_reason": None,
+                "is_superadmin": True,
+                "is_impersonating": False,
+            }
         raise HTTPException(status_code=404, detail="Студентът не е намерен в системата.")
 
     rejection_reason = None
@@ -991,6 +1180,8 @@ def get_student_profile(
         "status": student.status or "PENDING",
         "has_face_embedding": student.face_embedding is not None,
         "rejection_reason": rejection_reason,
+        "is_superadmin": is_superadmin_user(current_user),
+        "is_impersonating": False,
     }
 
 @app.post("/admins/execute-allocation")
@@ -1177,10 +1368,11 @@ async def stream_exam_room(room_number: str, background_tasks: BackgroundTasks, 
     """
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        if payload.get("role") not in ["examiner", "superadmin"]:
+        if payload.get("role") not in ["examiner", "superadmin"] and not is_superadmin_user(payload):
             raise HTTPException(status_code=403, detail="Достъпът е отказан.")
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid or expired token.")
+
 
     if room_number not in ACTIVE_CAMERAS:
         raise HTTPException(
@@ -1231,7 +1423,7 @@ def force_register_student_to_exam(
     current_user: dict = Depends(get_current_user) # Защита през хедъра на Fetch API
 ):
     """ Академичен модул: Принудително записване на студент за изпит в текущата зала """
-    if current_user.get("role") != "examiner":
+    if current_user.get("role") not in ("examiner", "superadmin") and not is_superadmin_user(current_user):
         raise HTTPException(status_code=403, detail="Операцията е разрешена само за квестори.")
 
     # 1. Търсим студента
@@ -1285,8 +1477,8 @@ async def student_submit_for_verification(
 
     if status != "LIVENESS_PASSED":
         raise HTTPException(status_code=400, detail="Liveness check failed. Cannot proceed with verification.")
-    # 1. Защита на достъпа
-    if current_user.get("role") != "student":
+    # 1. Защита на достъпа: студенти или Superadmin
+    if current_user.get("role") not in ("student", "superadmin") and not is_superadmin_user(current_user):
         raise HTTPException(status_code=403, detail="Access denied.")
 
     if file.content_type not in ALLOWED_EXTENSIONS:
@@ -1299,7 +1491,27 @@ async def student_submit_for_verification(
     student = db.query(Student).filter(Student.id == student_id).first()
     
     if not student:
+        if is_superadmin_user(current_user):
+            contents = await file.read()
+            photo_url = upload_photo_to_cloud(
+                file_data=contents,
+                object_name=f"superadmin_{int(time.time())}{os.path.splitext(file.filename)[1]}",
+                content_type=file.content_type
+            )
+            admin_uuid = None
+            try:
+                admin_uuid = uuid.UUID(student_id) if student_id else None
+            except Exception:
+                pass
+            db.add(AdminLog(
+                admin_id=admin_uuid,
+                action_type="SUPERADMIN_LIVENESS_VERIFIED",
+                details=f"Superadmin submitted liveness photo: {photo_url}"
+            ))
+            db.commit()
+            return {"status": "already_approved", "message": "Superadmin profile is permanently verified."}
         raise HTTPException(status_code=404, detail="Student not found.")
+
         
     if student.status == "APPROVED":
         return {"status": "already_approved", "message": "Profile is already approved and verified."}
@@ -1482,10 +1694,11 @@ async def get_exam_room_biometric_status(room_number: str, token: str = Query(..
     """
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        if payload.get("role") not in ["examiner", "superadmin"]:
+        if payload.get("role") not in ["examiner", "superadmin"] and not is_superadmin_user(payload):
             raise HTTPException(status_code=403, detail="Достъпът е отказан.")
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid or expired token.")
+
 
     if room_number not in AI_ROOM_STATES:
         return {
@@ -1506,34 +1719,70 @@ async def get_exam_room_biometric_status(room_number: str, token: str = Query(..
 
 @app.get("/students/my-registrations")
 def get_my_exam_registrations(
+    impersonate_id: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
     """
-    1. Извлича всички текущи изпитни регистрации за логнатия студент.
+    1. Извлича всички текущи изпитни регистрации за логнатия студент или имперсонирания студент.
+    За Superadmin (когато не е избран конкретен студент) връща наличните планирани изпити за лесно тестване на мобилния интерфейс.
     """
-    if current_user.get("role") != "student":
+    if current_user.get("role") not in ("student", "superadmin") and not is_superadmin_user(current_user):
         raise HTTPException(status_code=403, detail="Достъпът е разрешен само за студенти.")
 
-    student_id = current_user.get("sub")
+    if impersonate_id:
+        if not is_superadmin_user(current_user):
+            raise HTTPException(status_code=403, detail="Само Superadmin може да преглежда изпити на друг студент.")
+        student_id = impersonate_id
+    else:
+        student_id = current_user.get("sub")
     
     # Правим JOIN между ExamRegistration и Exam, за да изкараме пълните детайли
     registrations = db.query(ExamRegistration).join(Exam).filter(
         ExamRegistration.student_id == student_id
     ).order_by(Exam.date_time.asc()).all()
 
-    return [
-        {
-            "registration_id": str(reg.id),
-            "exam_id": str(reg.exam.id),
-            "subject": reg.exam.subject,
-            "lecturer": reg.exam.lecturer,
-            "room_number": reg.exam.room_number,
-            "date_time": reg.exam.date_time.isoformat() if reg.exam.date_time else None,
-            "session_type": reg.exam.session_type.value if reg.exam.session_type else None
-        }
-        for reg in registrations
-    ]
+    if registrations:
+        return [
+            {
+                "registration_id": str(reg.id),
+                "exam_id": str(reg.exam.id),
+                "subject": reg.exam.subject,
+                "lecturer": reg.exam.lecturer,
+                "room_number": reg.exam.room_number,
+                "date_time": reg.exam.date_time.isoformat() if reg.exam.date_time else None,
+                "session_type": reg.exam.session_type.value if reg.exam.session_type else None,
+                "faculty": reg.exam.faculty or "",
+                "specialty": reg.exam.specialty or "",
+                "course": reg.exam.course or 1,
+                "stream": str(reg.exam.stream or ""),
+                "group": str(reg.exam.group or ""),
+            }
+            for reg in registrations
+        ]
+
+    # За Superadmin в глобален режим (без избран студент) връщаме ВСИЧКИ планирани изпити от системата
+    if is_superadmin_user(current_user) and not impersonate_id:
+        exams = db.query(Exam).order_by(Exam.date_time.asc()).all()
+        return [
+            {
+                "registration_id": f"admin-{exam.id}",
+                "exam_id": str(exam.id),
+                "subject": exam.subject,
+                "lecturer": exam.lecturer or "Не е указан",
+                "room_number": exam.room_number,
+                "date_time": exam.date_time.isoformat() if exam.date_time else None,
+                "session_type": exam.session_type.value if exam.session_type else None,
+                "faculty": exam.faculty or "",
+                "specialty": exam.specialty or "",
+                "course": exam.course or 1,
+                "stream": str(exam.stream or ""),
+                "group": str(exam.group or ""),
+            }
+            for exam in exams
+        ]
+
+    return []
 
 @app.get("/students/upcoming-resits")
 def get_upcoming_resits_and_liquidations(
@@ -1543,7 +1792,7 @@ def get_upcoming_resits_and_liquidations(
     """
     2. Извлича наличните поправителни и ликвидационни изпити в прозорец от 20 дни напред.
     """
-    if current_user.get("role") != "student":
+    if current_user.get("role") not in ("student", "superadmin") and not is_superadmin_user(current_user):
         raise HTTPException(status_code=403, detail="Достъпът е забранен.")
 
     now = datetime.now(timezone)
@@ -1582,15 +1831,28 @@ async def request_exam_insertion(
     3. Подаване на заявка за служебно записване на изпит.
     Ако курсът на изпита се разминава с курса на студента, системата изисква снимка на протокол.
     """
-    if current_user.get("role") != "student":
+    if current_user.get("role") not in ("student", "superadmin") and not is_superadmin_user(current_user):
         raise HTTPException(status_code=403, detail="Достъпът е забранен.")
 
     student_id = current_user.get("sub")
     student = db.query(Student).filter(Student.id == student_id).first()
     exam = db.query(Exam).filter(Exam.id == exam_id).first()
 
-    if not student or not exam:
-        raise HTTPException(status_code=404, detail="Студентът или изпитът не бяха намерени.")
+    if not exam:
+        raise HTTPException(status_code=404, detail="Изпитът не беше намерен.")
+
+    if not student:
+        if is_superadmin_user(current_user):
+            admin = db.query(Admin).filter(Admin.id == student_id, Admin.is_superadmin == True).first()
+            admin_uuid = admin.id if admin else None
+            db.add(AdminLog(
+                admin_id=admin_uuid,
+                action_type="SUPERADMIN_EXAM_INSERT",
+                details=f"Superadmin requested exam insert for {exam.subject} in room {exam.room_number}."
+            ))
+            db.commit()
+            return {"status": "success", "message": "Успешно записване за изпита (Superadmin)."}
+        raise HTTPException(status_code=404, detail="Студентът не беше намерен.")
 
     # Проверка дали вече е регистриран за този изпит
     already_registered = db.query(ExamRegistration).filter(
@@ -1664,7 +1926,10 @@ def delete_student_account(
     4. Изтриване на студентския акаунт от мобилното приложение.
     Поради CASCADE релациите в базата данни, автоматично се трият и изпитните му регистрации.
     """
-    if current_user.get("role") != "student":
+    if is_superadmin_user(current_user):
+        raise HTTPException(status_code=400, detail="Superadmin account cannot be deleted via mobile student app.")
+
+    if current_user.get("role") not in ("student", "superadmin") and not is_superadmin_user(current_user):
         raise HTTPException(status_code=403, detail="Достъпът е забранен.")
 
     student_id = current_user.get("sub")
