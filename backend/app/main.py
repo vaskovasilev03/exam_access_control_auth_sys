@@ -23,6 +23,7 @@ from datetime import datetime, timedelta
 from pydantic import ValidationError
 from typing import Optional
 from zoneinfo import ZoneInfo
+from collections import defaultdict
 
 from .database import init_db, get_db
 from .models import Student, Exam, Admin, ExamRegistration, AccessLog, Examiner, AdminLog, SessionType, SecureKey
@@ -79,7 +80,29 @@ def _student_payload(student: Student) -> dict:
     }
 
 
-def _exam_payload(exam: Exam) -> dict:
+def _exam_payload(exam: Exam, db: Optional[Session] = None) -> dict:
+    allocated_count = 0
+    eligible_count = 0
+    approved_count = 0
+
+    if db:
+        allocated_count = db.query(ExamRegistration).filter(ExamRegistration.exam_id == exam.id).count()
+        if exam.group:
+            allowed_groups = [int(g.strip()) for g in str(exam.group).split(",") if g.strip().isdigit()]
+            if allowed_groups:
+                students_query = db.query(Student.id, Student.status).filter(
+                    Student.faculty == exam.faculty,
+                    Student.specialty == exam.specialty,
+                    Student.course == exam.course,
+                    Student.stream == exam.stream,
+                    Student.group.in_(allowed_groups)
+                ).all()
+                eligible_count = len(students_query)
+                approved_count = sum(1 for s in students_query if s.status == "APPROVED")
+    else:
+        if exam.registrations is not None:
+            allocated_count = len(exam.registrations)
+
     return {
         "id": str(exam.id),
         "session_type": exam.session_type.value if exam.session_type else None,
@@ -92,6 +115,10 @@ def _exam_payload(exam: Exam) -> dict:
         "course": exam.course,
         "stream": exam.stream,
         "group": exam.group,
+        "allocated_count": allocated_count,
+        "eligible_count": eligible_count,
+        "approved_count": approved_count,
+        "pending_bio_count": max(0, eligible_count - approved_count),
     }
 
 
@@ -165,6 +192,37 @@ def _resolve_log_exams(db: Session, log: AdminLog) -> list[Exam]:
     if not exam_ids:
         return []
     return db.query(Exam).filter(Exam.id.in_(exam_ids)).order_by(Exam.date_time.asc()).all()
+
+
+def _resolve_log_registrations(db: Session, log: AdminLog) -> list[dict]:
+    parsed_details = _parse_admin_log_details(log.details)
+    exam_ids = parsed_details.get("exam_ids", [])
+    if not exam_ids:
+        return []
+
+    registrations = db.query(ExamRegistration).filter(
+        ExamRegistration.exam_id.in_(exam_ids)
+    ).join(Student, ExamRegistration.student_id == Student.id
+    ).join(Exam, ExamRegistration.exam_id == Exam.id
+    ).order_by(Exam.date_time.asc(), Student.student_id_number.asc()).all()
+
+    return [
+        {
+            "id": str(reg.id),
+            "student_id": str(reg.student_id),
+            "student_name": reg.student.full_name if reg.student else "Неизвестен",
+            "student_fac_num": reg.student.student_id_number if reg.student else "-",
+            "student_email": reg.student.email if reg.student else "",
+            "student_specialty": reg.student.specialty if reg.student else "-",
+            "student_group": reg.student.group if reg.student else "-",
+            "exam_id": str(reg.exam_id),
+            "exam_subject": reg.exam.subject if reg.exam else "Неизвестен",
+            "session_type": reg.exam.session_type.value if (reg.exam and reg.exam.session_type) else None,
+            "room_number": reg.exam.room_number if reg.exam else "-",
+            "date_time": reg.exam.date_time.isoformat() if (reg.exam and reg.exam.date_time) else None,
+        }
+        for reg in registrations
+    ]
 
 
 def _photo_url_for_student(student: Student) -> Optional[str]:
@@ -679,15 +737,16 @@ def get_admin_dashboard_data(db: Session = Depends(get_db), current_admin: dict 
         "exam_import_logs": [
             {
                 **_admin_log_payload(log),
-                "exams": [_exam_payload(exam) for exam in _resolve_log_exams(db, log)],
+                "exams": [_exam_payload(exam, db) for exam in _resolve_log_exams(db, log)],
             }
             for log in exam_import_logs
         ],
         "allocation_logs": [
             {
                 **_admin_log_payload(log),
-                "exams": [_exam_payload(exam) for exam in _resolve_log_exams(db, log)],
+                "exams": [_exam_payload(exam, db) for exam in _resolve_log_exams(db, log)],
                 "students": [_student_payload(student) for student in _resolve_log_students(db, log)],
+                "registrations": _resolve_log_registrations(db, log),
             }
             for log in allocation_logs
         ],
@@ -708,7 +767,7 @@ def get_admin_dashboard_data(db: Session = Depends(get_db), current_admin: dict 
             }
             for examiner in examiners
         ],
-        "exams": [_exam_payload(exam) for exam in exams],
+        "exams": [_exam_payload(exam, db) for exam in exams],
     }
 
 
@@ -834,6 +893,7 @@ async def upload_exams(
                 exams_created += 1
 
         # 4. Запис в лога при промени
+        log_id = None
         if exams_created > 0 or exams_updated > 0:
             new_log = AdminLog(
                 admin_id=admin.id,
@@ -842,14 +902,18 @@ async def upload_exams(
                 notification_sent=True
             )
             db.add(new_log)
-
-        db.commit()
+            db.commit()
+            db.refresh(new_log)
+            log_id = str(new_log.id)
+        else:
+            db.commit()
         
         return {
             "status": "success",
-            "message": "Обработката на Excel файла приключи успешно.",
+            "message": f"Обработката на Excel файла приключи успешно. Създадени: {exams_created}, Обновени: {exams_updated}",
             "created": exams_created,
-            "updated": exams_updated
+            "updated": exams_updated,
+            "admin_log_id": log_id
         }
     
     except HTTPException as http_ex:
@@ -1517,6 +1581,107 @@ def get_student_profile(
         "is_impersonating": False,
     }
 
+@app.get("/admins/allocation-preview")
+def preview_student_allocation(
+    exam_id: Optional[str] = Query(default=None),
+    exam_ids: Optional[str] = Query(default=None),
+    db: Session = Depends(get_db),
+    current_admin: dict = Depends(require_admin)
+):
+    """
+    Преглед на очаквания резултат от разпределението преди неговото реално изпълнение.
+    Анализира кои одобрени студенти ще получат регистрации, кои ще бъдат пропуснати
+    поради липса на биометрично одобрение (PENDING), и връща списък за предварителен преглед.
+    """
+    admin = db.query(Admin).filter(Admin.id == current_admin['sub']).first()
+    if not admin or not admin.is_verified:
+        raise HTTPException(status_code=403, detail="Your admin account is pending verification. Cannot preview allocation.")
+
+    if exam_id:
+        all_exams = db.query(Exam).filter(Exam.id == exam_id).all()
+        if not all_exams:
+            raise HTTPException(status_code=404, detail="Exam not found for the provided ID.")
+    elif exam_ids:
+        raw_ids = [x.strip() for x in exam_ids.split(",") if x.strip()]
+        all_exams = db.query(Exam).filter(Exam.id.in_(raw_ids)).all()
+    else:
+        all_exams = db.query(Exam).filter(Exam.session_type.in_([SessionType.SUMMER, SessionType.WINTER])).all()
+
+    # Извличаме студентите и ги индексираме за светкавичен анализ в паметта
+    students = db.query(Student).all()
+    student_index = defaultdict(list)
+    for s in students:
+        key = (
+            str(s.faculty or "").strip().upper(),
+            str(s.specialty or "").strip().upper(),
+            int(s.course) if s.course is not None else 0,
+            str(s.stream or "").strip(),
+            int(s.group) if s.group is not None else 0
+        )
+        student_index[key].append(s)
+
+    exam_ids_set = {e.id for e in all_exams}
+    existing_pairs = set(
+        db.query(ExamRegistration.exam_id, ExamRegistration.student_id)
+        .filter(ExamRegistration.exam_id.in_(exam_ids_set))
+        .all()
+    ) if exam_ids_set else set()
+
+    ready_registrations_count = 0
+    unique_ready_students = set()
+    affected_exam_ids = set()
+    skipped_pending_bio_students = set()
+    skipped_pending_bio_registrations = 0
+    preview_items = []
+
+    for exam in all_exams:
+        allowed_groups = [int(g.strip()) for g in (exam.group or "").split(",") if g.strip().isdigit()]
+        for g in allowed_groups:
+            key = (
+                str(exam.faculty or "").strip().upper(),
+                str(exam.specialty or "").strip().upper(),
+                int(exam.course) if exam.course is not None else 0,
+                str(exam.stream or "").strip(),
+                g
+            )
+            candidates = student_index.get(key, [])
+            for st in candidates:
+                if (exam.id, st.id) in existing_pairs:
+                    continue
+                if st.status == "APPROVED":
+                    ready_registrations_count += 1
+                    unique_ready_students.add(st.id)
+                    affected_exam_ids.add(exam.id)
+                    if len(preview_items) < 100:
+                        preview_items.append({
+                            "student_name": st.full_name,
+                            "student_fac_num": st.student_id_number,
+                            "student_specialty": st.specialty,
+                            "student_course": st.course,
+                            "student_group": st.group,
+                            "exam_id": str(exam.id),
+                            "exam_subject": exam.subject,
+                            "session_type": exam.session_type.value if exam.session_type else None,
+                            "room_number": exam.room_number,
+                            "date_time": exam.date_time.isoformat() if exam.date_time else None,
+                        })
+                else:
+                    skipped_pending_bio_students.add(st.id)
+                    skipped_pending_bio_registrations += 1
+
+    return {
+        "status": "success",
+        "ready_registrations_count": ready_registrations_count,
+        "unique_students_count": len(unique_ready_students),
+        "affected_exams_count": len(affected_exam_ids),
+        "total_exams_evaluated": len(all_exams),
+        "skipped_pending_bio_count": len(skipped_pending_bio_students),
+        "skipped_pending_bio_registrations": skipped_pending_bio_registrations,
+        "can_allocate": ready_registrations_count > 0,
+        "preview_items": preview_items,
+    }
+
+
 @app.post("/admins/execute-allocation")
 def execute_student_allocation(
     payload: dict | None = Body(default=None),
@@ -1526,62 +1691,86 @@ def execute_student_allocation(
     """
     Задействане на разпределението. 
     Обхожда всички изпити, разделя групите по запетайка и вкарва съответните студенти в exam_registrations.
+    Ако няма нови регистрации, НЕ генерира празен лог в базата и връща статус noop.
     """
 
     admin = db.query(Admin).filter(Admin.id == current_admin['sub']).first()
-    if not admin.is_verified:
+    if not admin or not admin.is_verified:
         raise HTTPException(status_code=403, detail="Your admin account is pending verification. Cannot execute allocation.")
 
     exam_id = None
+    exam_ids = None
     if isinstance(payload, dict):
         exam_id = payload.get("exam_id")
+        exam_ids = payload.get("exam_ids")
 
     if exam_id:
         all_exams = db.query(Exam).filter(Exam.id == exam_id).all()
         if not all_exams:
             raise HTTPException(status_code=404, detail="Exam not found for the provided ID.")
+    elif exam_ids and isinstance(exam_ids, list):
+        all_exams = db.query(Exam).filter(Exam.id.in_(exam_ids)).all()
     else:
         all_exams = db.query(Exam).filter(Exam.session_type.in_([SessionType.SUMMER, SessionType.WINTER])).all()
 
+    # Индексираме одобрените студенти за бързо разпределение
+    approved_students = db.query(Student).filter(Student.status == "APPROVED").all()
+    student_index = defaultdict(list)
+    for s in approved_students:
+        key = (
+            str(s.faculty or "").strip().upper(),
+            str(s.specialty or "").strip().upper(),
+            int(s.course) if s.course is not None else 0,
+            str(s.stream or "").strip(),
+            int(s.group) if s.group is not None else 0
+        )
+        student_index[key].append(s)
+
+    exam_ids_set = {e.id for e in all_exams}
+    existing_pairs = set(
+        db.query(ExamRegistration.exam_id, ExamRegistration.student_id)
+        .filter(ExamRegistration.exam_id.in_(exam_ids_set))
+        .all()
+    ) if exam_ids_set else set()
+
     total_registrations_created = 0
     processed_exam_ids = []
-    
+
     for exam in all_exams:
-        processed_exam_ids.append(str(exam.id))
-        # Разделяме групите от стринга "37, 38" -> ['37', '38']
-        allowed_groups = [int(g.strip()) for g in exam.group.split(",") if g.strip().isdigit()]
-        
-        # Намираме студентите от по факултета, специалността, курса, потока и групите, които са одобрени
-        matching_students = db.query(Student).filter(
-            Student.status == "APPROVED",
-            Student.faculty == exam.faculty,
-            Student.specialty == exam.specialty,
-            Student.course == exam.course,
-            Student.stream == exam.stream,
-            Student.group.in_(allowed_groups)
-        ).all()
-        
-        for student in matching_students:
-            # Проверяваме дали вече няма съществуващ запис, за да не дублираме
-            exists = db.query(ExamRegistration).filter(
-                ExamRegistration.student_id == student.id,
-                ExamRegistration.exam_id == exam.id
-            ).first()
-            
-            if not exists:
-                new_reg = ExamRegistration(
-                    student_id=student.id,
-                    exam_id=exam.id
-                )
-                db.add(new_reg)
-                total_registrations_created += 1
+        allowed_groups = [int(g.strip()) for g in (exam.group or "").split(",") if g.strip().isdigit()]
+        exam_has_new_reg = False
+        for g in allowed_groups:
+            key = (
+                str(exam.faculty or "").strip().upper(),
+                str(exam.specialty or "").strip().upper(),
+                int(exam.course) if exam.course is not None else 0,
+                str(exam.stream or "").strip(),
+                g
+            )
+            candidates = student_index.get(key, [])
+            for st in candidates:
+                if (exam.id, st.id) not in existing_pairs:
+                    new_reg = ExamRegistration(
+                        student_id=st.id,
+                        exam_id=exam.id
+                    )
+                    db.add(new_reg)
+                    existing_pairs.add((exam.id, st.id))
+                    total_registrations_created += 1
+                    exam_has_new_reg = True
+        if exam_has_new_reg or (not exam_ids and not exam_id):
+            processed_exam_ids.append(str(exam.id))
 
     if total_registrations_created == 0:
-        action_type = "ALLOCATION_EXECUTION_NO_NEW"
-        updated_details = "Няма нови регистрации за изпити. Всички студенти вече са разпределени."
-    else:
-        action_type = "ALLOCATION_EXECUTION"
-        updated_details = f"Успешно разпределение: Брой на новите регистрации: {total_registrations_created}."
+        return {
+            "status": "noop",
+            "message": "Няма нови регистрации за изпити. Всички отговарящи студенти са вече разпределени или чакат биометрично одобрение.",
+            "new_registrations_created": 0,
+            "admin_log_id": None
+        }
+
+    action_type = "ALLOCATION_EXECUTION"
+    updated_details = f"Успешно разпределение: Брой на новите регистрации: {total_registrations_created}."
 
     new_log = AdminLog(
         admin_id=admin.id,
@@ -1590,17 +1779,19 @@ def execute_student_allocation(
             "summary": updated_details,
             "exam_ids": processed_exam_ids,
             "total_registrations_created": total_registrations_created,
-            "mode": "single" if exam_id else "bulk",
+            "mode": "single" if exam_id else ("batch" if exam_ids else "bulk"),
         }, ensure_ascii=False),
         notification_sent=False
     )
     db.add(new_log)
-                
     db.commit()
+    db.refresh(new_log)
+
     return {
         "status": "success",
-        "message": f"Allocation executed successfully by admin ID {current_admin['sub']}.",
-        "new_registrations_created": total_registrations_created
+        "message": f"Успешно разпределение: Брой на новите регистрации: {total_registrations_created}.",
+        "new_registrations_created": total_registrations_created,
+        "admin_log_id": str(new_log.id)
     }
 
 

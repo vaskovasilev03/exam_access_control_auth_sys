@@ -725,97 +725,359 @@
             <!-- 3. PANEL: EXAMS                                 -->
             <!-- =============================================== -->
             <div id="panel-exams" class="panel space-y-6">
-                <div class="grid grid-cols-1 xl:grid-cols-[400px_1fr] gap-6">
-                    <section class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 sm:p-6 shadow-xs space-y-4">
-                        <div class="border-b border-[var(--border)] pb-3">
-                            <h2 class="text-base font-bold text-[var(--text-main)]">Excel Изпитен График</h2>
-                            <p class="text-xs text-[var(--text-muted)] mt-0.5">Качете файл с семестриални изпитни дати, часове и зали.</p>
-                        </div>
-                        <form id="examsForm" class="space-y-4">
-                            <div class="border-2 border-dashed border-[var(--border)] rounded-[var(--radius)] p-6 text-center bg-[var(--bg-body)] hover:border-blue-500 transition relative flex flex-col items-center justify-center min-h-[180px]">
-                                <span class="text-3xl mb-2">📊</span>
-                                <label class="block cursor-pointer">
-                                    <span class="text-blue-600 dark:text-blue-400 font-bold text-xs hover:underline">Изберете файл с графици</span>
-                                    <input type="file" id="examFile" accept=".xlsx,.xls" class="hidden">
-                                </label>
-                                <p id="examFileName" class="text-[11px] text-[var(--text-muted)] mt-2">Само файлове .xlsx или .xls</p>
+                <!-- TOP ROW: IMPORT DROPZONE & BATCHES HUB -->
+                <div class="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-6 items-stretch">
+                    
+                    <!-- CARD 1: EXCEL EXAMS IMPORT -->
+                    <section class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 sm:p-6 shadow-xs flex flex-col justify-between space-y-4">
+                        <div>
+                            <div class="border-b border-[var(--border)] pb-3 flex items-center justify-between mb-4">
+                                <div class="flex items-center gap-2.5">
+                                    <div class="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold shrink-0">
+                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h2 class="text-sm font-bold text-[var(--text-main)]">Excel Изпитен График</h2>
+                                        <p class="text-[11px] text-[var(--text-muted)]">Качване на семестриални изпити и зали</p>
+                                    </div>
+                                </div>
                             </div>
-                            <div id="examStatus" class="hidden text-xs p-3 rounded-[var(--radius)] border"></div>
-                            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-[var(--radius)] text-xs shadow-md shadow-blue-500/20 transition cursor-pointer">Импортирай Изпитен График</button>
-                        </form>
+
+                            <form id="examsForm" class="space-y-4">
+                                <!-- DRAG & DROP ZONE -->
+                                <div>
+                                    <label class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)] block mb-1">Excel Файл (.xlsx, .xls)</label>
+                                    <div id="examDropzone" class="border-2 border-dashed border-[var(--border)] rounded-[var(--radius)] p-4 text-center bg-[var(--bg-body)] hover:border-purple-500 transition relative flex flex-col items-center justify-center cursor-pointer group">
+                                        <input type="file" id="examFile" accept=".xlsx,.xls" class="hidden">
+                                        
+                                        <!-- IDLE STATE -->
+                                        <div id="examDropzoneIdle" class="flex flex-col items-center py-1">
+                                            <div class="w-9 h-9 rounded-full bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center mb-1.5 group-hover:scale-110 transition">
+                                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                                </svg>
+                                            </div>
+                                            <p class="text-xs font-semibold text-[var(--text-main)]">Плъзнете Excel файл тук или <span class="text-purple-600 dark:text-purple-400 underline">изберете</span></p>
+                                            <p class="text-[10px] text-[var(--text-muted)] mt-0.5">Формати: .xlsx, .xls (до 10MB)</p>
+                                        </div>
+
+                                        <!-- FILE PREVIEW STATE (HIDDEN INITIALLY) -->
+                                        <div id="examFilePreview" class="hidden w-full flex items-center justify-between p-2.5 rounded-[var(--radius)] bg-[var(--bg-card)] border border-[var(--border)] text-left">
+                                            <div class="flex items-center gap-2.5 min-w-0">
+                                                <div class="w-8 h-8 rounded bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold text-xs shrink-0">XLS</div>
+                                                <div class="min-w-0">
+                                                    <p id="examFileName" class="text-xs font-bold text-[var(--text-main)] truncate max-w-[200px]"></p>
+                                                    <p id="examFileSize" class="text-[10px] text-[var(--text-muted)]"></p>
+                                                </div>
+                                            </div>
+                                            <button type="button" id="examFileClearBtn" class="p-1.5 rounded hover:bg-[var(--border-subtle)] text-[var(--text-muted)] hover:text-rose-500 transition cursor-pointer" title="Премахни файл">
+                                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div id="examStatus" class="hidden text-xs p-3 rounded-[var(--radius)] border"></div>
+
+                                <button type="submit" id="examSubmitBtn" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 rounded-[var(--radius)] text-xs shadow-md shadow-purple-500/20 transition cursor-pointer flex items-center justify-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                    </svg>
+                                    <span id="examSubmitText">Импортирай Изпитен График</span>
+                                </button>
+                            </form>
+                        </div>
                     </section>
 
-                    <section class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 sm:p-6 shadow-xs flex flex-col justify-between min-h-[500px]">
+                    <!-- CARD 2: EXAM BATCH HISTORY MASTER LIST -->
+                    <section class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 sm:p-6 shadow-xs flex flex-col justify-between">
                         <div>
-                            <div class="border-b border-[var(--border)] pb-3 mb-4">
-                                <span class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)]">Избран лог</span>
-                                <h3 id="examLogTitle" class="text-base font-bold text-[var(--text-main)]">Изберете изпитен лог отдолу</h3>
+                            <div class="flex items-center justify-between border-b border-[var(--border)] pb-3 mb-3">
+                                <div class="flex items-center gap-2">
+                                    <h3 class="text-sm font-bold text-[var(--text-main)]">Изпитни партиди</h3>
+                                    <span id="examsLogCount" class="text-xs px-2 py-0.5 rounded-full bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 font-bold">0</span>
+                                </div>
+                                <span class="text-[11px] text-[var(--text-muted)]">Изберете партида за преглед</span>
                             </div>
-                            <p id="examBatchSummary" class="text-xs text-[var(--text-muted)] mb-3"></p>
-                            <div class="overflow-x-auto border border-[var(--border)] rounded-[var(--radius)]">
-                                <table class="min-w-full text-xs">
-                                    <thead class="bg-[var(--bg-body)] text-left text-[var(--text-muted)] font-bold">
-                                        <tr>
-                                            <th class="px-3 py-2.5">Дисциплина</th>
-                                            <th class="px-3 py-2.5">Зала</th>
-                                            <th class="px-3 py-2.5">Дата и час</th>
-                                            <th class="px-3 py-2.5">Курс</th>
-                                            <th class="px-3 py-2.5">Група</th>
-                                            <th class="px-3 py-2.5">Действие</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="examBatchTableBody" class="divide-y divide-[var(--border)]"></tbody>
-                                </table>
+                            <!-- Batch Search Box -->
+                            <div class="relative mb-3">
+                                <input type="text" id="examBatchSearchInput" placeholder="Търси партида по дата, текст..." class="w-full bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)] pl-8 pr-3 py-1.5 text-xs text-[var(--text-main)] placeholder-[var(--text-muted)] focus:ring-1 focus:ring-purple-500 outline-none transition">
+                                <svg class="w-3.5 h-3.5 text-[var(--text-muted)] absolute left-2.5 top-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
                             </div>
+                            <!-- Scrollable batch items container -->
+                            <div id="examImportLogList" class="max-h-[160px] overflow-y-auto space-y-2 pr-1"></div>
                         </div>
                     </section>
                 </div>
 
-                <aside class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 shadow-xs">
-                    <div class="flex items-center justify-between border-b border-[var(--border)] pb-3 mb-3">
-                        <h3 class="text-sm font-bold text-[var(--text-main)]">Изпитни импорти</h3>
-                        <span id="examsLogCount" class="text-xs px-2.5 py-0.5 rounded-full bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 font-bold">0</span>
+                <!-- BOTTOM ROW: FULL-WIDTH INTERACTIVE EXAM SCHEDULE DIRECTORY -->
+                <section class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 sm:p-6 shadow-xs flex flex-col justify-between min-h-[620px]">
+                    <div>
+                        <!-- BATCH HEADER & ACTIONS -->
+                        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] pb-4 mb-4">
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2 mb-0.5">
+                                    <span class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)]">Текущ график</span>
+                                    <span id="examBatchStatusBadge" class="hidden inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold"></span>
+                                </div>
+                                <h3 id="examLogTitle" class="text-base font-bold text-[var(--text-main)] truncate">Изберете изпитен лог от горния панел</h3>
+                                <p id="examBatchSummary" class="text-xs text-[var(--text-muted)] mt-0.5"></p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button id="examBatchAllocateBtn" class="px-3.5 py-2 rounded-[var(--radius)] bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition shadow-sm cursor-pointer flex items-center gap-1.5 hidden">
+                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                    </svg>
+                                    <span>Разпредели този график</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- FILTER TOOLBAR -->
+                        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                            <div class="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
+                                <!-- Search input -->
+                                <div class="relative flex-1 min-w-[220px] max-w-sm">
+                                    <input type="text" id="examSearchInput" placeholder="Търси по предмет, зала, специалност..." class="w-full bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)] pl-8 pr-3 py-1.5 text-xs text-[var(--text-main)] placeholder-[var(--text-muted)] focus:ring-1 focus:ring-purple-500 outline-none transition">
+                                    <svg class="w-3.5 h-3.5 text-[var(--text-muted)] absolute left-2.5 top-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                    </svg>
+                                </div>
+
+                                <!-- Session Type Filter Dropdown -->
+                                <div class="relative">
+                                    <select id="examSessionFilter" class="bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)] px-3 py-1.5 text-xs text-[var(--text-main)] focus:ring-1 focus:ring-purple-500 outline-none cursor-pointer">
+                                        <option value="">Всички сесии</option>
+                                        <option value="лятна">Редовна лятна</option>
+                                        <option value="зимна">Редовна зимна</option>
+                                        <option value="поправителна">Поправителна</option>
+                                        <option value="ликвидационна">Ликвидационна</option>
+                                    </select>
+                                </div>
+
+                                <!-- Status Filter Dropdown -->
+                                <div class="relative">
+                                    <select id="examStatusFilter" class="bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)] px-3 py-1.5 text-xs text-[var(--text-main)] focus:ring-1 focus:ring-purple-500 outline-none cursor-pointer">
+                                        <option value="">Всички статуси</option>
+                                        <option value="ready">Само готови за разпределение (+)</option>
+                                        <option value="pending_bio">Само с чакащи биометрия</option>
+                                        <option value="allocated">Само напълно разпределени</option>
+                                        <option value="no_students">Само без студенти в системата</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="text-xs text-[var(--text-muted)] flex items-center gap-1.5">
+                                <span id="examFilteredCount" class="font-bold text-[var(--text-main)]">0</span>
+                                <span>намерени изпита</span>
+                            </div>
+                        </div>
+
+                        <!-- TABLE -->
+                        <div class="overflow-x-auto border border-[var(--border)] rounded-[var(--radius)]">
+                            <table class="min-w-full text-xs" id="examBatchTable">
+                                <thead class="bg-[var(--bg-body)] text-left text-[var(--text-muted)] font-bold">
+                                    <tr>
+                                        <th class="px-4 py-3 w-36">Сесия</th>
+                                        <th class="px-4 py-3 min-w-[220px]">Дисциплина & Преподавател</th>
+                                        <th class="px-4 py-3 w-36">Зала & Факултет</th>
+                                        <th class="px-4 py-3 min-w-[280px]">Спец. / Курс / Поток / Група</th>
+                                        <th class="px-4 py-3 w-44">Дата и час</th>
+                                        <th class="px-4 py-3 w-72 text-right">Разпределение & Действие</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="examBatchTableBody" class="divide-y divide-[var(--border)]">
+                                    <tr>
+                                        <td colspan="6" class="px-4 py-8 text-center text-xs text-[var(--text-muted)]">
+                                            Изберете партида от горния панел, за да прегледате изпитния график.
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                    <div id="examImportLogList" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3"></div>
-                </aside>
+
+                    <!-- PAGINATION FOOTER -->
+                    <div class="flex flex-wrap items-center justify-between gap-3 pt-4 mt-4 border-t border-[var(--border)] text-xs text-[var(--text-muted)]">
+                        <div class="flex items-center gap-2">
+                            <span>Показвай по:</span>
+                            <select id="examRowsPerPage" class="bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)] px-2 py-1 text-xs text-[var(--text-main)] outline-none cursor-pointer">
+                                <option value="10" selected>10</option>
+                                <option value="20">20</option>
+                                <option value="50">50</option>
+                            </select>
+                            <span>на страница</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span id="examPaginationInfo" class="font-medium">Стр. 1 от 1</span>
+                            <div class="flex items-center gap-1">
+                                <button id="examPrevPageBtn" class="px-2.5 py-1 rounded border border-[var(--border)] hover:bg-[var(--border-subtle)] disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer">Предишна</button>
+                                <button id="examNextPageBtn" class="px-2.5 py-1 rounded border border-[var(--border)] hover:bg-[var(--border-subtle)] disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer">Следваща</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
             </div>
 
             <!-- =============================================== -->
             <!-- 4. PANEL: ALLOCATION                            -->
             <!-- =============================================== -->
             <div id="panel-allocation" class="panel space-y-6">
-                <div class="grid grid-cols-1 xl:grid-cols-[380px_1fr] gap-6">
-                    <aside class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 shadow-xs max-h-[75vh] overflow-y-auto">
-                        <div class="flex items-center justify-between border-b border-[var(--border)] pb-3 mb-3">
-                            <h3 class="text-sm font-bold text-[var(--text-main)]">История на разпределенията</h3>
-                            <span id="allocationLogCount" class="text-xs px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold">0</span>
+                <!-- TOP ACTION HUB BANNER -->
+                <section class="bg-gradient-to-r from-emerald-500/10 via-blue-500/5 to-transparent border border-emerald-500/20 rounded-[var(--radius)] p-5 sm:p-6 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                    <div class="space-y-1.5">
+                        <div class="flex items-center gap-2">
+                            <div class="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold shrink-0">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                </svg>
+                            </div>
+                            <h2 class="text-base font-bold text-[var(--text-main)]">Интелигентно Разпределение на Студенти</h2>
                         </div>
-                        <div id="allocationLogList" class="space-y-2.5"></div>
+                        <p class="text-xs text-[var(--text-muted)] max-w-xl">Автоматично регистрира одобрените студенти (<code class="text-emerald-600 font-mono text-[11px]">APPROVED</code>) към техните семестриални изпитни зали според специалност, курс, поток и група.</p>
+                        
+                        <!-- LIVE STATUS KPI PILLS -->
+                        <div class="flex flex-wrap items-center gap-2 pt-1.5 text-xs">
+                            <span id="allocHubReadyBadge" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800/60 text-[var(--text-muted)] border border-[var(--border)] font-semibold transition">
+                                <span class="w-1.5 h-1.5 rounded-full bg-slate-400" id="allocHubReadyDot"></span>
+                                <span><strong id="allocHubReadyCount">0</strong> готови за разпределение</span>
+                            </span>
+                            <span id="allocHubPendingBioBadge" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-semibold">
+                                <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                <span><strong id="allocHubPendingBioCount">0</strong> чакат биометрия</span>
+                            </span>
+                            <span id="allocHubExamsBadge" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 font-medium">
+                                <svg class="w-3 h-3 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                <span><strong id="allocHubExamsCount">0</strong> семестриални изпита</span>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2.5">
+                        <button id="previewAllocationBtn" class="bg-[var(--bg-card)] hover:bg-[var(--bg-body)] border border-[var(--border)] text-[var(--text-main)] text-xs font-bold py-2.5 px-3.5 rounded-[var(--radius)] shadow-xs transition cursor-pointer flex items-center gap-2">
+                            <svg class="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                            <span>Преглед преди разпределение</span>
+                        </button>
+                        <button id="globalAllocationBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2.5 px-4 rounded-[var(--radius)] shadow-md shadow-emerald-500/20 transition cursor-pointer flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                            <span id="globalAllocationText">Глобално разпределение</span>
+                        </button>
+                    </div>
+                </section>
+
+                <!-- MASTER-DETAIL GRID -->
+                <div class="grid grid-cols-1 xl:grid-cols-[380px_1fr] gap-6 items-start">
+                    <!-- LEFT COLUMN: ALLOCATION EXECUTION HISTORY STACK -->
+                    <aside class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 shadow-xs flex flex-col">
+                        <div class="flex items-center justify-between border-b border-[var(--border)] pb-3 mb-3">
+                            <div class="flex items-center gap-2">
+                                <h3 class="text-sm font-bold text-[var(--text-main)]">История на разпределенията</h3>
+                                <span id="allocationLogCount" class="text-xs px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold">0</span>
+                            </div>
+                        </div>
+
+                        <!-- Execution Search Box -->
+                        <div class="relative mb-3">
+                            <input type="text" id="allocationSearchInput" placeholder="Търси изпълнение по дата, резюме..." class="w-full bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)] pl-8 pr-3 py-1.5 text-xs text-[var(--text-main)] placeholder-[var(--text-muted)] focus:ring-1 focus:ring-emerald-500 outline-none transition">
+                            <svg class="w-3.5 h-3.5 text-[var(--text-muted)] absolute left-2.5 top-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                        </div>
+
+                        <div id="allocationLogList" class="max-h-[560px] overflow-y-auto space-y-2 pr-1"></div>
                     </aside>
 
-                    <section class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 sm:p-6 shadow-xs flex flex-col justify-between min-h-[500px]">
+                    <!-- RIGHT COLUMN: ALLOCATED REGISTRATIONS DIRECTORY -->
+                    <section class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 sm:p-6 shadow-xs flex flex-col justify-between min-h-[620px]">
                         <div>
-                            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] pb-3 mb-4">
-                                <div>
-                                    <span class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)]">Избрано изпълнение</span>
-                                    <h3 id="allocationLogTitle" class="text-base font-bold text-[var(--text-main)]">Изберете allocation лог отляво</h3>
+                            <!-- EXECUTION HEADER & EMAIL DISPATCH -->
+                            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] pb-4 mb-4">
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-2 mb-0.5">
+                                        <span class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)]">Избрано изпълнение</span>
+                                        <span id="allocationLogBadge" class="hidden inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold"></span>
+                                    </div>
+                                    <h3 id="allocationLogTitle" class="text-base font-bold text-[var(--text-main)] truncate">Изберете allocation лог отляво</h3>
+                                    <p id="allocationSummary" class="text-xs text-[var(--text-muted)] mt-0.5"></p>
                                 </div>
-                                <button id="allocationSendBtn" class="px-3 py-1.5 rounded-[var(--radius)] bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-sm">Изпрати изпитни имейли</button>
+                                <div class="flex items-center gap-2">
+                                    <button id="allocationSendBtn" class="px-4 py-2 rounded-[var(--radius)] bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-sm cursor-pointer flex items-center gap-2">
+                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                        </svg>
+                                        <span id="allocationSendBtnText">Изпрати изпитни имейли</span>
+                                    </button>
+                                </div>
                             </div>
-                            <div id="allocationSummary" class="text-xs text-[var(--text-muted)] mb-3"></div>
+
+                            <!-- FILTER TOOLBAR -->
+                            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                                <div class="relative flex-1 min-w-[240px] max-w-sm">
+                                    <input type="text" id="allocationStudentSearchInput" placeholder="Търси студент, фак. номер, зала, предмет..." class="w-full bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)] pl-8 pr-3 py-1.5 text-xs text-[var(--text-main)] placeholder-[var(--text-muted)] focus:ring-1 focus:ring-emerald-500 outline-none transition">
+                                    <svg class="w-3.5 h-3.5 text-[var(--text-muted)] absolute left-2.5 top-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                    </svg>
+                                </div>
+
+                                <div class="text-xs text-[var(--text-muted)] flex items-center gap-1.5">
+                                    <span id="allocationFilteredCount" class="font-bold text-[var(--text-main)]">0</span>
+                                    <span>разпределени студенти</span>
+                                </div>
+                            </div>
+
+                            <!-- TABLE -->
                             <div class="overflow-x-auto border border-[var(--border)] rounded-[var(--radius)]">
-                                <table class="min-w-full text-xs">
+                                <table class="min-w-full text-xs" id="allocationStudentsTable">
                                     <thead class="bg-[var(--bg-body)] text-left text-[var(--text-muted)] font-bold">
                                         <tr>
                                             <th class="px-3 py-2.5">Студент</th>
                                             <th class="px-3 py-2.5">Фак. №</th>
-                                            <th class="px-3 py-2.5">Дисциплина</th>
+                                            <th class="px-3 py-2.5">Спец. / Група</th>
+                                            <th class="px-3 py-2.5">Изпитна дисциплина</th>
+                                            <th class="px-3 py-2.5">Сесия</th>
                                             <th class="px-3 py-2.5">Зала</th>
                                             <th class="px-3 py-2.5">Дата и час</th>
                                         </tr>
                                     </thead>
-                                    <tbody id="allocationStudentsBody" class="divide-y divide-[var(--border)]"></tbody>
+                                    <tbody id="allocationStudentsBody" class="divide-y divide-[var(--border)]">
+                                        <tr>
+                                            <td colspan="7" class="px-3 py-8 text-center text-xs text-[var(--text-muted)]">
+                                                Изберете изпълнение отляво, за да видите разпределените студенти.
+                                            </td>
+                                        </tr>
+                                    </tbody>
                                 </table>
+                            </div>
+                        </div>
+
+                        <!-- PAGINATION FOOTER -->
+                        <div class="flex flex-wrap items-center justify-between gap-3 pt-4 mt-4 border-t border-[var(--border)] text-xs text-[var(--text-muted)]">
+                            <div class="flex items-center gap-2">
+                                <span>Показвай по:</span>
+                                <select id="allocationRowsPerPage" class="bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)] px-2 py-1 text-xs text-[var(--text-main)] outline-none cursor-pointer">
+                                    <option value="10" selected>10</option>
+                                    <option value="20">20</option>
+                                    <option value="50">50</option>
+                                </select>
+                                <span>на страница</span>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span id="allocationPaginationInfo" class="font-medium">Стр. 1 от 1</span>
+                                <div class="flex items-center gap-1">
+                                    <button id="allocationPrevPageBtn" class="px-2.5 py-1 rounded border border-[var(--border)] hover:bg-[var(--border-subtle)] disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer">Предишна</button>
+                                    <button id="allocationNextPageBtn" class="px-2.5 py-1 rounded border border-[var(--border)] hover:bg-[var(--border-subtle)] disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer">Следваща</button>
+                                </div>
                             </div>
                         </div>
                     </section>
@@ -1120,6 +1382,95 @@
     </div>
 
     <!-- =============================================== -->
+    <!-- ALLOCATION PREVIEW MODAL DIALOG                 -->
+    <!-- =============================================== -->
+    <div id="allocationPreviewModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 transition-opacity">
+        <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] max-w-4xl w-full p-5 sm:p-6 shadow-2xl space-y-4 flex flex-col max-h-[90vh]">
+            <!-- MODAL HEADER -->
+            <div class="flex items-start justify-between gap-4 border-b border-[var(--border)] pb-3">
+                <div class="space-y-1">
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold shrink-0">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                        </div>
+                        <h3 class="text-base font-bold text-[var(--text-main)]">Преглед преди разпределение на студенти</h3>
+                    </div>
+                    <p class="text-xs text-[var(--text-muted)]">Анализ на съответствията между одобрените студенти и изпитите преди физическото записване в базата данни.</p>
+                </div>
+                <button id="closeAllocationPreviewBtn" class="text-[var(--text-muted)] hover:text-[var(--text-main)] p-1 rounded-md transition cursor-pointer" title="Затвори">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <!-- MODAL KPI SUMMARY STATS -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div class="p-3 rounded-[var(--radius)] border border-emerald-500/20 bg-emerald-500/5 flex flex-col">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Готови регистрации</span>
+                    <span id="previewModalReadyCount" class="text-xl font-black text-emerald-600 dark:text-emerald-400 mt-0.5">0</span>
+                    <span class="text-[10px] text-[var(--text-muted)]">нови записа</span>
+                </div>
+                <div class="p-3 rounded-[var(--radius)] border border-blue-500/20 bg-blue-500/5 flex flex-col">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Одобрени студенти</span>
+                    <span id="previewModalApprovedStudents" class="text-xl font-black text-blue-600 dark:text-blue-400 mt-0.5">0</span>
+                    <span class="text-[10px] text-[var(--text-muted)]">с биометрия</span>
+                </div>
+                <div class="p-3 rounded-[var(--radius)] border border-amber-500/20 bg-amber-500/5 flex flex-col">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Чакащи биометрия</span>
+                    <span id="previewModalPendingBioStudents" class="text-xl font-black text-amber-600 dark:text-amber-400 mt-0.5">0</span>
+                    <span class="text-[10px] text-[var(--text-muted)]">статус PENDING</span>
+                </div>
+                <div class="p-3 rounded-[var(--radius)] border border-purple-500/20 bg-purple-500/5 flex flex-col">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">Засегнати изпити</span>
+                    <span id="previewModalExamsCount" class="text-xl font-black text-purple-600 dark:text-purple-400 mt-0.5">0</span>
+                    <span class="text-[10px] text-[var(--text-muted)]">зали с нови студенти</span>
+                </div>
+            </div>
+
+            <!-- MODAL INFO / WARNING BANNER -->
+            <div id="previewModalBanner" class="p-3.5 rounded-[var(--radius)] border text-xs"></div>
+
+            <!-- PREVIEW ITEMS TABLE CONTAINER -->
+            <div class="flex-1 overflow-y-auto border border-[var(--border)] rounded-[var(--radius)] min-h-[200px] max-h-[320px]">
+                <table class="min-w-full text-xs" id="previewTable">
+                    <thead class="bg-[var(--bg-body)] text-left text-[var(--text-muted)] font-bold sticky top-0 z-10 border-b border-[var(--border)]">
+                        <tr>
+                            <th class="px-3 py-2.5">Студент</th>
+                            <th class="px-3 py-2.5">Фак. №</th>
+                            <th class="px-3 py-2.5">Спец. / Курс / Група</th>
+                            <th class="px-3 py-2.5">Дисциплина</th>
+                            <th class="px-3 py-2.5">Зала</th>
+                            <th class="px-3 py-2.5">Дата и час</th>
+                        </tr>
+                    </thead>
+                    <tbody id="previewTableBody" class="divide-y divide-[var(--border)]">
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- MODAL FOOTER ACTIONS -->
+            <div class="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border)] pt-3">
+                <div class="text-[11px] text-[var(--text-muted)]" id="previewFooterNote"></div>
+                <div class="flex items-center gap-2">
+                    <button id="cancelAllocationPreviewBtn" class="px-4 py-2 border border-[var(--border)] rounded-[var(--radius)] text-xs font-semibold hover:bg-[var(--border-subtle)] transition cursor-pointer">
+                        Затвори
+                    </button>
+                    <button id="confirmAllocationExecutionBtn" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-[var(--radius)] text-xs font-bold transition cursor-pointer flex items-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span id="confirmAllocationExecutionText">Потвърди и разпредели</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- =============================================== -->
     <!-- JAVASCRIPT STATE & LOGIC                        -->
     <!-- =============================================== -->
     <script>
@@ -1235,6 +1586,18 @@
             studentPageSize: 20,
             batchSearch: '',
             selectedFile: null,
+            // Feature 3: Exam Schedules & Allocation state
+            examBatchSearch: '',
+            examSearch: '',
+            examSessionFilter: '',
+            examStatusFilter: '',
+            examPage: 1,
+            examPageSize: 10,
+            selectedExamFile: null,
+            allocationSearch: '',
+            allocationStudentSearch: '',
+            allocationPage: 1,
+            allocationPageSize: 10,
         };
 
         function formatBytes(bytes, decimals = 1) {
@@ -1362,6 +1725,9 @@
             if (tabName === 'verifications') {
                 setStatus('Верификации и Secure Key');
                 loadVerificationsData();
+            } else if (tabName === 'allocation') {
+                setStatus('База данни: Свързана');
+                updateAllocationPreviewKPIs();
             } else if (tabName !== 'approval') {
                 setStatus('База данни: Свързана');
                 const btn = document.getElementById('startApprovalBtn');
@@ -1684,6 +2050,7 @@
             renderSelectedStudentLog();
             renderExamImportLogs();
             renderAllocationLogs();
+            updateAllocationPreviewKPIs();
             renderPendingStudents();
             renderExaminers();
             setStatus('База данни: Свързана');
@@ -2055,135 +2422,549 @@
             }
         }
 
+        // ===============================================
+        // 3. EXAMS & ALLOCATION RENDERERS (FEATURE 3)
+        // ===============================================
+        function getSessionBadgeHtml(sessionType) {
+            if (!sessionType) return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">-</span>';
+            const s = String(sessionType).toLowerCase();
+            if (s.includes('лятна') || s.includes('summer')) {
+                return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-500/20"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Редовна лятна</span>';
+            }
+            if (s.includes('зимна') || s.includes('winter')) {
+                return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-400 border border-sky-500/20"><span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span>Редовна зимна</span>';
+            }
+            if (s.includes('поправителна') || s.includes('resit')) {
+                return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 border border-amber-500/20"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>Поправителна</span>';
+            }
+            if (s.includes('ликвидационна') || s.includes('liquidation')) {
+                return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400 border border-rose-500/20"><span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>Ликвидационна</span>';
+            }
+            return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">${escapeHtml(sessionType)}</span>`;
+        }
+
         function renderExamImportLogs() {
             const list = document.getElementById('examImportLogList');
-            const logs = state.data?.exam_import_logs || [];
+            if (!list) return;
+
+            const allLogs = state.data?.exam_import_logs || [];
+            const countElem = document.getElementById('examsLogCount');
+            if (countElem) countElem.textContent = allLogs.length;
+
+            const query = (state.examBatchSearch || '').trim().toLowerCase();
+            const logs = query
+                ? allLogs.filter(log => {
+                    const text = `${log.parsed_details?.message || ''} ${log.details || ''} ${log.created_at || ''}`.toLowerCase();
+                    return text.includes(query);
+                })
+                : allLogs;
+
             if (!logs.length) {
-                list.innerHTML = '<div class="text-xs text-[var(--text-muted)] col-span-full">Няма изпитни импорти.</div>';
+                list.innerHTML = `<div class="text-xs text-[var(--text-muted)] text-center py-6 border border-dashed border-[var(--border)] rounded-[var(--radius)]">${allLogs.length ? 'Няма намерени изпитни партиди.' : 'Няма записани изпитни импорти.'}</div>`;
                 return;
             }
 
-            list.innerHTML = logs.map((log, index) => `
-                <button class="w-full text-left border rounded-[var(--radius)] p-3 ${state.selectedExamLog?.id === log.id ? 'border-purple-500 bg-purple-50/20 dark:bg-purple-500/10' : 'border-[var(--border)] bg-[var(--bg-card)]'} hover:border-purple-400 transition" data-index="${index}" data-kind="exam">
-                    <div class="flex items-start justify-between gap-2">
-                        <div class="min-w-0">
-                            <p class="font-bold text-xs truncate">${escapeHtml(log.parsed_details?.message || log.details || 'Лог на импорта на изпити')}</p>
-                            <p class="text-[10px] text-[var(--text-muted)] mt-1">${escapeHtml(formatDateTime(log.created_at))}</p>
-                        </div>
-                        ${statusBadgeHtml(log.notification_sent)}
-                    </div>
-                </button>
-            `).join('');
+            list.innerHTML = logs.map((log) => {
+                const isSelected = state.selectedExamLog?.id === log.id;
+                const exams = log.exams || [];
+                const sessions = Array.from(new Set(exams.map(e => e.session_type).filter(Boolean)));
+                const sessionsText = sessions.length ? sessions.join(', ') : 'изпити';
 
-            list.querySelectorAll('button[data-kind="exam"]').forEach((button) => {
-                button.addEventListener('click', () => {
-                    state.selectedExamLog = logs[Number(button.dataset.index)];
-                    renderSelectedExamLog();
-                    renderExamImportLogs();
+                return `
+                    <div class="exam-batch-card w-full text-left border rounded-[var(--radius)] p-3 transition cursor-pointer ${isSelected ? 'border-purple-500 bg-purple-50/20 dark:bg-purple-500/10 ring-1 ring-purple-500/30' : 'border-[var(--border)] bg-[var(--bg-card)] hover:border-purple-400/60'}" data-log-id="${log.id}">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="min-w-0 flex-1">
+                                <p class="font-bold text-xs text-[var(--text-main)] truncate">${escapeHtml(log.parsed_details?.message || log.details || 'Изпитна партида')}</p>
+                                <p class="text-[11px] text-[var(--text-muted)] mt-0.5">${exams.length} изпита • <span class="capitalize">${escapeHtml(sessionsText)}</span></p>
+                                <p class="text-[10px] text-[var(--text-muted)] mt-1 flex items-center gap-1">
+                                    <svg class="w-3 h-3 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                    ${escapeHtml(formatDateTime(log.created_at))}
+                                </p>
+                            </div>
+                            <div class="shrink-0">
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">${exams.length} изп.</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            list.querySelectorAll('.exam-batch-card').forEach((card) => {
+                card.addEventListener('click', () => {
+                    const logId = card.dataset.logId;
+                    const log = allLogs.find(l => l.id == logId);
+                    if (log) {
+                        selectExamBatchLog(log);
+                    }
                 });
             });
 
-            if (!state.selectedExamLog && logs.length) {
-                state.selectedExamLog = logs[0];
-                renderSelectedExamLog();
+            if (state.selectedExamLog) {
+                const refreshed = allLogs.find(l => l.id == state.selectedExamLog.id);
+                if (refreshed) {
+                    state.selectedExamLog = refreshed;
+                } else if (allLogs.length) {
+                    selectExamBatchLog(allLogs[0]);
+                } else {
+                    state.selectedExamLog = null;
+                }
+            } else if (allLogs.length) {
+                selectExamBatchLog(allLogs[0]);
             }
+        }
+
+        function selectExamBatchLog(log) {
+            state.selectedExamLog = log;
+            state.examPage = 1;
+            renderSelectedExamLog();
+            renderExamImportLogs();
         }
 
         function renderSelectedExamLog() {
             const log = state.selectedExamLog;
-            document.getElementById('examLogTitle').textContent = log ? (log.parsed_details?.summary || 'Лог на импорта на изпити') : 'Изберете изпитен лог отдолу';
-            document.getElementById('examBatchSummary').textContent = log ? `${log.exams?.length || 0} изпита в тази партида` : '';
-
+            const titleElem = document.getElementById('examLogTitle');
+            const summaryElem = document.getElementById('examBatchSummary');
+            const badgeElem = document.getElementById('examBatchStatusBadge');
             const body = document.getElementById('examBatchTableBody');
-            const exams = log?.exams || [];
-            if (!exams.length) {
-                body.innerHTML = '<tr><td colspan="6" class="px-3 py-4 text-center text-xs text-[var(--text-muted)]">Няма налични изпити за този batch.</td></tr>';
+            const batchAllocateBtn = document.getElementById('examBatchAllocateBtn');
+
+            if (!log) {
+                if (titleElem) titleElem.textContent = 'Изберете изпитен лог от горния панел';
+                if (summaryElem) summaryElem.textContent = '';
+                if (badgeElem) badgeElem.classList.add('hidden');
+                if (batchAllocateBtn) batchAllocateBtn.classList.add('hidden');
+                if (body) body.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-xs text-[var(--text-muted)]">Няма избран изпитен лог.</td></tr>';
                 return;
             }
 
-            body.innerHTML = exams.map((exam) => `
-                <tr class="hover:bg-[var(--border-subtle)] transition">
-                    <td class="px-3 py-2 font-semibold text-[var(--text-main)]">${escapeHtml(exam.subject)}</td>
-                    <td class="px-3 py-2 font-mono font-bold text-blue-600">${escapeHtml(exam.room_number)}</td>
-                    <td class="px-3 py-2 text-[var(--text-muted)]">${escapeHtml(formatDateTime(exam.date_time))}</td>
-                    <td class="px-3 py-2">${escapeHtml(exam.course)}</td>
-                    <td class="px-3 py-2">${escapeHtml(exam.group)}</td>
-                    <td class="px-3 py-2">
-                        <button class="px-2.5 py-1 rounded-[var(--radius)] bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold run-allocation-row transition cursor-pointer" data-exam-id="${exam.id}">Разпредели</button>
-                    </td>
-                </tr>
-            `).join('');
+            const allExams = log.exams || [];
+            if (titleElem) {
+                titleElem.textContent = log.parsed_details?.message || log.details || 'Изпитна партида';
+            }
+            if (summaryElem) {
+                summaryElem.textContent = `Импортиран на ${formatDateTime(log.created_at)} • Общо ${allExams.length} изпита в този файл`;
+            }
+            if (badgeElem) {
+                badgeElem.classList.remove('hidden');
+                badgeElem.className = 'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20';
+                badgeElem.textContent = `${allExams.length} изпита`;
+            }
+
+            // Calculate total allocatable and approved across this batch
+            let totalEligible = 0;
+            let totalApproved = 0;
+            let totalAllocated = 0;
+            let totalReady = 0;
+
+            allExams.forEach(exam => {
+                const el = exam.eligible_count || 0;
+                const ap = exam.approved_count || 0;
+                const al = exam.allocated_count || 0;
+                totalEligible += el;
+                totalApproved += ap;
+                totalAllocated += al;
+                if (ap > al) totalReady += (ap - al);
+            });
+
+            if (batchAllocateBtn) {
+                batchAllocateBtn.classList.remove('hidden');
+                if (totalReady > 0) {
+                    batchAllocateBtn.disabled = false;
+                    batchAllocateBtn.className = 'px-3.5 py-2 rounded-[var(--radius)] bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition shadow-sm cursor-pointer flex items-center gap-1.5';
+                    batchAllocateBtn.title = `Разпредели готовите ${totalReady} студенти с биометрия в този график`;
+                    batchAllocateBtn.innerHTML = `
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                        </svg>
+                        <span>Разпредели този график (${totalReady} готови)</span>
+                    `;
+                } else {
+                    batchAllocateBtn.disabled = true;
+                    batchAllocateBtn.className = 'px-3.5 py-2 rounded-[var(--radius)] bg-[var(--bg-body)] border border-[var(--border)] text-[var(--text-muted)] opacity-50 text-xs font-bold transition shadow-none cursor-not-allowed flex items-center gap-1.5';
+                    batchAllocateBtn.title = totalEligible > 0 ? 'Няма студенти с преминато и одобрено биометрично сканиране за разпределение' : 'Няма записани студенти в базата данни за този график';
+                    batchAllocateBtn.innerHTML = `
+                        <svg class="w-3.5 h-3.5 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                        <span>Разпредели този график (0 готови)</span>
+                    `;
+                }
+            }
+
+            // Client-side filtering
+            const query = (state.examSearch || '').trim().toLowerCase();
+            const sessionFilter = (state.examSessionFilter || '').trim().toLowerCase();
+            const statusFilter = (state.examStatusFilter || '').trim().toLowerCase();
+
+            const filtered = allExams.filter(exam => {
+                const matchesSession = !sessionFilter || (exam.session_type && exam.session_type.toLowerCase().includes(sessionFilter));
+                if (!matchesSession) return false;
+
+                const allocated = exam.allocated_count || 0;
+                const eligible = exam.eligible_count || 0;
+                const approved = exam.approved_count || 0;
+
+                if (statusFilter === 'ready' && !(approved > allocated)) return false;
+                if (statusFilter === 'pending_bio' && !(eligible > 0 && approved === 0)) return false;
+                if (statusFilter === 'allocated' && !(eligible > 0 && allocated >= eligible)) return false;
+                if (statusFilter === 'no_students' && !(eligible === 0)) return false;
+
+                if (!query) return true;
+                const text = `${exam.subject || ''} ${exam.lecturer || ''} ${exam.room_number || ''} ${exam.faculty || ''} ${exam.specialty || ''} ${exam.group || ''}`.toLowerCase();
+                return text.includes(query);
+            });
+
+            const countElem = document.getElementById('examFilteredCount');
+            if (countElem) countElem.textContent = filtered.length;
+
+            // Pagination calculations
+            const pageSize = Number(state.examPageSize) || 10;
+            const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+            if (state.examPage > totalPages) state.examPage = totalPages;
+            if (state.examPage < 1) state.examPage = 1;
+
+            const startIndex = (state.examPage - 1) * pageSize;
+            const pageSlice = filtered.slice(startIndex, startIndex + pageSize);
+
+            const pageInfoElem = document.getElementById('examPaginationInfo');
+            if (pageInfoElem) pageInfoElem.textContent = `Стр. ${state.examPage} от ${totalPages}`;
+
+            const prevBtn = document.getElementById('examPrevPageBtn');
+            const nextBtn = document.getElementById('examNextPageBtn');
+            if (prevBtn) prevBtn.disabled = state.examPage <= 1;
+            if (nextBtn) nextBtn.disabled = state.examPage >= totalPages;
+
+            if (!allExams.length) {
+                body.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-xs text-[var(--text-muted)]">Няма налични изпити за тази партида.</td></tr>';
+                return;
+            }
+
+            if (!pageSlice.length) {
+                body.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-xs text-[var(--text-muted)]">Няма намерени изпити по зададените филтри.</td></tr>';
+                return;
+            }
+
+            body.innerHTML = pageSlice.map((exam) => {
+                const allocated = exam.allocated_count || 0;
+                const eligible = exam.eligible_count || 0;
+                const approved = exam.approved_count || 0;
+                const pendingBio = exam.pending_bio_count || 0;
+
+                let ratioBadge = '';
+                let btnLabel = 'Разпредели';
+                let btnDisabled = false;
+                let btnClass = 'bg-purple-600 hover:bg-purple-700 text-white shadow-sm shadow-purple-500/20 cursor-pointer';
+                let btnTitle = 'Разпредели изпита';
+
+                if (eligible === 0) {
+                    ratioBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 dark:bg-gray-800 text-[var(--text-muted)] border border-[var(--border)]" title="Няма импортирани студенти в базата данни за тази специалност, поток и група">Няма студенти</span>`;
+                    btnLabel = 'Разпредели';
+                    btnDisabled = true;
+                    btnClass = 'opacity-40 cursor-not-allowed bg-[var(--bg-body)] border border-[var(--border)] text-[var(--text-muted)]';
+                    btnTitle = 'Няма записани студенти за този поток/група';
+                } else if (approved === 0) {
+                    ratioBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20" title="${pendingBio} студента очакват биометрично сканиране">${allocated}/${eligible} (${pendingBio} чакат биом.)</span>`;
+                    btnLabel = 'Разпредели';
+                    btnDisabled = true;
+                    btnClass = 'opacity-40 cursor-not-allowed bg-[var(--bg-body)] border border-[var(--border)] text-[var(--text-muted)]';
+                    btnTitle = 'Няма одобрени студенти с биометрия за разпределение';
+                } else if (approved > allocated) {
+                    const diff = approved - allocated;
+                    const pct = Math.round((allocated / eligible) * 100);
+                    ratioBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20" title="${diff} нови одобрени студенти са готови за разпределение">${allocated}/${eligible} (+${diff} готови)</span>`;
+                    btnLabel = `Разпредели (+${diff})`;
+                    btnDisabled = false;
+                    btnClass = 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-500/20 cursor-pointer';
+                    btnTitle = 'Разпредели новите одобрени студенти';
+                } else if (allocated >= eligible) {
+                    ratioBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20" title="Всички студенти са разпределени"><span>${allocated}/${eligible}</span> <svg class="w-3 h-3 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg></span>`;
+                    btnLabel = 'Разпределен';
+                    btnDisabled = true;
+                    btnClass = 'opacity-50 cursor-not-allowed bg-[var(--bg-body)] border border-[var(--border)] text-[var(--text-muted)]';
+                    btnTitle = 'Всички студенти вече са разпределени';
+                } else {
+                    ratioBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20" title="${pendingBio} студента очакват биометрия">${allocated}/${eligible} (${pendingBio} чакат биом.)</span>`;
+                    btnLabel = 'Разпредели';
+                    btnDisabled = true;
+                    btnClass = 'opacity-40 cursor-not-allowed bg-[var(--bg-body)] border border-[var(--border)] text-[var(--text-muted)]';
+                    btnTitle = 'Няма нови сканирани студенти за разпределение';
+                }
+
+                return `
+                    <tr class="hover:bg-[var(--border-subtle)] transition">
+                        <td class="px-4 py-3.5 w-36">${getSessionBadgeHtml(exam.session_type)}</td>
+                        <td class="px-4 py-3.5 min-w-[220px]">
+                            <p class="font-bold text-[var(--text-main)] text-xs">${escapeHtml(exam.subject)}</p>
+                            <p class="text-[11px] text-[var(--text-muted)] mt-0.5 flex items-center gap-1">
+                                <svg class="w-3 h-3 text-[var(--text-muted)] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                                <span class="truncate">${escapeHtml(exam.lecturer || 'Няма посочен преподавател')}</span>
+                            </p>
+                        </td>
+                        <td class="px-4 py-3.5 w-36">
+                            <div class="flex items-center gap-1.5">
+                                <span class="font-mono font-bold text-xs px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">Зала ${escapeHtml(exam.room_number)}</span>
+                                <span class="text-[10px] font-semibold text-[var(--text-muted)]">${escapeHtml(exam.faculty)}</span>
+                            </div>
+                        </td>
+                        <td class="px-4 py-3.5 min-w-[280px]">
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                <span class="px-2 py-0.5 rounded font-bold text-[11px] bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">${escapeHtml(exam.specialty)}</span>
+                                <span class="text-[11px] font-medium text-[var(--text-muted)]">Курс ${exam.course} • Поток ${exam.stream}</span>
+                            </div>
+                            <div class="text-[11px] text-[var(--text-muted)] font-mono mt-1 flex items-center gap-1">
+                                <span class="font-semibold text-[var(--text-main)] shrink-0">Групи:</span>
+                                <span class="truncate max-w-[340px]" title="Групи: ${escapeHtml(exam.group)}">${escapeHtml(exam.group)}</span>
+                            </div>
+                        </td>
+                        <td class="px-4 py-3.5 w-44">
+                            <span class="text-xs text-[var(--text-muted)] flex items-center gap-1.5 font-medium">
+                                <svg class="w-3.5 h-3.5 text-purple-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                <span>${escapeHtml(formatDateTime(exam.date_time))}</span>
+                            </span>
+                        </td>
+                        <td class="px-4 py-3.5 w-72 text-right">
+                            <div class="flex items-center justify-end gap-2.5">
+                                ${ratioBadge}
+                                <button class="px-3 py-1 rounded-[var(--radius)] text-xs font-bold transition run-allocation-row ${btnClass}" data-exam-id="${exam.id}" ${btnDisabled ? 'disabled' : ''} title="${btnTitle}">
+                                    ${btnLabel}
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
 
             body.querySelectorAll('.run-allocation-row').forEach((button) => {
                 button.addEventListener('click', async () => {
-                    const response = await authFetch('/admins/execute-allocation', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ exam_id: button.dataset.examId }),
-                    });
-                    const data = await response.json();
-                    alert(data.message || data.detail || 'Allocation executed');
-                    await loadDashboardData();
-                    switchTab('allocation');
+                    if (button.disabled) return;
+                    const originalText = button.textContent;
+                    button.disabled = true;
+                    button.textContent = '🔄 Разпределяне...';
+                    try {
+                        const response = await authFetch('/admins/execute-allocation', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ exam_id: button.dataset.examId }),
+                        });
+                        const data = await response.json();
+                        if (response.ok) {
+                            showToast('Разпределението приключи', data.message || `Създадени ${data.new_registrations_created} нови регистрации.`, 'success');
+                            await loadDashboardData();
+                            switchTab('allocation');
+                        } else {
+                            showToast('Грешка при разпределение', data.detail || 'Възникна проблем при разпределението.', 'error');
+                            button.disabled = false;
+                            button.textContent = originalText;
+                        }
+                    } catch (err) {
+                        showToast('Мрежова грешка', 'Липсва връзка със сървъра.', 'error');
+                        button.disabled = false;
+                        button.textContent = originalText;
+                    }
                 });
             });
         }
 
         function renderAllocationLogs() {
             const list = document.getElementById('allocationLogList');
-            const logs = state.data?.allocation_logs || [];
+            if (!list) return;
+
+            const allLogs = state.data?.allocation_logs || [];
+            const countElem = document.getElementById('allocationLogCount');
+            if (countElem) countElem.textContent = allLogs.length;
+
+            const query = (state.allocationSearch || '').trim().toLowerCase();
+            const logs = query
+                ? allLogs.filter(log => {
+                    const text = `${log.parsed_details?.summary || ''} ${log.details || ''} ${log.created_at || ''}`.toLowerCase();
+                    return text.includes(query);
+                })
+                : allLogs;
+
             if (!logs.length) {
-                list.innerHTML = '<div class="text-xs text-[var(--text-muted)]">Няма allocation изпълнения.</div>';
+                list.innerHTML = `<div class="text-xs text-[var(--text-muted)] text-center py-6 border border-dashed border-[var(--border)] rounded-[var(--radius)]">${allLogs.length ? 'Няма намерени разпределения.' : 'Няма история на разпределенията.'}</div>`;
                 return;
             }
 
-            list.innerHTML = logs.map((log, index) => `
-                <button class="w-full text-left border rounded-[var(--radius)] p-3 ${state.selectedAllocationLog?.id === log.id ? 'border-emerald-500 bg-emerald-50/20 dark:bg-emerald-500/10' : 'border-[var(--border)] bg-[var(--bg-card)]'} hover:border-emerald-400 transition" data-index="${index}" data-kind="allocation">
-                    <div class="flex items-start justify-between gap-2">
-                        <div class="min-w-0">
-                            <p class="font-bold text-xs truncate">${escapeHtml(log.parsed_details?.summary || 'Allocation execution')}</p>
-                            <p class="text-[10px] text-[var(--text-muted)] mt-1">${escapeHtml(formatDateTime(log.created_at))}</p>
-                        </div>
-                        ${statusBadgeHtml(log.notification_sent)}
-                    </div>
-                </button>
-            `).join('');
+            list.innerHTML = logs.map((log) => {
+                const isSelected = state.selectedAllocationLog?.id === log.id;
+                const registrations = log.registrations || log.students || [];
+                const isNoNew = log.action_type === 'ALLOCATION_EXECUTION_NO_NEW';
+                const mode = log.parsed_details?.mode === 'single' ? 'Единичен' : 'Глобален';
 
-            list.querySelectorAll('button[data-kind="allocation"]').forEach((button) => {
-                button.addEventListener('click', () => {
-                    state.selectedAllocationLog = logs[Number(button.dataset.index)];
-                    renderSelectedAllocationLog();
-                    renderAllocationLogs();
+                return `
+                    <div class="allocation-card w-full text-left border rounded-[var(--radius)] p-3 transition cursor-pointer ${isSelected ? 'border-emerald-500 bg-emerald-50/20 dark:bg-emerald-500/10 ring-1 ring-emerald-500/30' : 'border-[var(--border)] bg-[var(--bg-card)] hover:border-emerald-400/60'}" data-log-id="${log.id}">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold ${mode === 'Глобален' ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400' : 'bg-purple-50 text-purple-600 dark:bg-purple-500/10 dark:text-purple-400'}">${mode}</span>
+                                    <p class="font-bold text-xs text-[var(--text-main)] truncate">${escapeHtml(log.parsed_details?.summary || 'Изпълнение на разпределение')}</p>
+                                </div>
+                                <p class="text-[11px] text-[var(--text-muted)] mt-1">${registrations.length} регистрирани студенти</p>
+                                <p class="text-[10px] text-[var(--text-muted)] mt-1 flex items-center gap-1">
+                                    <svg class="w-3 h-3 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                    ${escapeHtml(formatDateTime(log.created_at))}
+                                </p>
+                            </div>
+                            <div class="shrink-0">
+                                ${statusBadgeHtml(log.notification_sent)}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            list.querySelectorAll('.allocation-card').forEach((card) => {
+                card.addEventListener('click', () => {
+                    const logId = card.dataset.logId;
+                    const log = allLogs.find(l => l.id == logId);
+                    if (log) {
+                        selectAllocationLog(log);
+                    }
                 });
             });
 
-            if (!state.selectedAllocationLog && logs.length) {
-                state.selectedAllocationLog = logs[0];
-                renderSelectedAllocationLog();
+            if (state.selectedAllocationLog) {
+                const refreshed = allLogs.find(l => l.id == state.selectedAllocationLog.id);
+                if (refreshed) {
+                    state.selectedAllocationLog = refreshed;
+                } else if (allLogs.length) {
+                    selectAllocationLog(allLogs[0]);
+                } else {
+                    state.selectedAllocationLog = null;
+                }
+            } else if (allLogs.length) {
+                selectAllocationLog(allLogs[0]);
             }
+        }
+
+        function selectAllocationLog(log) {
+            state.selectedAllocationLog = log;
+            state.allocationPage = 1;
+            renderSelectedAllocationLog();
+            renderAllocationLogs();
         }
 
         function renderSelectedAllocationLog() {
             const log = state.selectedAllocationLog;
-            document.getElementById('allocationLogTitle').textContent = log ? (log.parsed_details?.summary || 'Allocation execution') : 'Изберете allocation лог отляво';
-            document.getElementById('allocationSummary').textContent = log ? `${log.students?.length || 0} студенти, ${log.exams?.length || 0} изпита` : '';
-
+            const titleElem = document.getElementById('allocationLogTitle');
+            const summaryElem = document.getElementById('allocationSummary');
+            const badgeElem = document.getElementById('allocationLogBadge');
             const body = document.getElementById('allocationStudentsBody');
-            const students = log?.students || [];
-            if (!students.length) {
-                body.innerHTML = '<tr><td colspan="5" class="px-3 py-4 text-center text-xs text-[var(--text-muted)]">Няма регистрирани студенти за този execution.</td></tr>';
+            const sendBtn = document.getElementById('allocationSendBtn');
+            const sendBtnText = document.getElementById('allocationSendBtnText');
+
+            if (!log) {
+                if (titleElem) titleElem.textContent = 'Изберете allocation лог отляво';
+                if (summaryElem) summaryElem.textContent = '';
+                if (badgeElem) badgeElem.classList.add('hidden');
+                if (body) body.innerHTML = '<tr><td colspan="7" class="px-3 py-8 text-center text-xs text-[var(--text-muted)]">Няма избрано изпълнение.</td></tr>';
+                if (sendBtn) sendBtn.disabled = true;
                 return;
             }
 
-            body.innerHTML = students.map((student) => `
-                <tr class="hover:bg-[var(--border-subtle)] transition">
-                    <td class="px-3 py-2 font-semibold text-[var(--text-main)]">${escapeHtml(student.full_name)}</td>
-                    <td class="px-3 py-2 font-mono text-[var(--text-muted)]">${escapeHtml(student.student_id_number)}</td>
-                    <td class="px-3 py-2">${escapeHtml(student.exam_subject || '-')}</td>
-                    <td class="px-3 py-2 font-mono font-bold text-blue-600">${escapeHtml(student.room_number || '-')}</td>
-                    <td class="px-3 py-2 text-[var(--text-muted)]">${escapeHtml(formatDateTime(student.date_time))}</td>
-                </tr>
-            `).join('');
+            // registrations array (enriched backend) or fallback to students
+            const allRegistrations = log.registrations && log.registrations.length
+                ? log.registrations
+                : (log.students || []).map(s => ({
+                    student_id: s.id,
+                    student_name: s.full_name,
+                    student_fac_num: s.student_id_number,
+                    student_email: s.email,
+                    student_specialty: s.specialty,
+                    student_group: s.group,
+                    exam_subject: s.exam_subject || (log.exams?.[0]?.subject) || '-',
+                    session_type: log.exams?.[0]?.session_type || null,
+                    room_number: s.room_number || (log.exams?.[0]?.room_number) || '-',
+                    date_time: s.date_time || (log.exams?.[0]?.date_time) || null,
+                }));
+
+            if (titleElem) {
+                titleElem.textContent = log.parsed_details?.summary || 'Изпълнение на разпределение';
+            }
+            if (summaryElem) {
+                summaryElem.textContent = `Изпълнено на ${formatDateTime(log.created_at)} • ${allRegistrations.length} разпределени студенти • ${log.exams?.length || 0} изпита`;
+            }
+            if (badgeElem) {
+                badgeElem.classList.remove('hidden');
+                badgeElem.className = log.notification_sent
+                    ? 'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                    : 'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400';
+                badgeElem.textContent = log.notification_sent ? 'Имейлите са изпратени' : 'Чакат изпращане';
+            }
+
+            if (sendBtn) {
+                sendBtn.disabled = allRegistrations.length === 0;
+            }
+            if (sendBtnText) {
+                sendBtnText.textContent = log.notification_sent ? 'Изпрати отново изпитни имейли' : `Изпрати изпитни имейли (${allRegistrations.length})`;
+            }
+
+            // In-memory instant client-side filtering
+            const query = (state.allocationStudentSearch || '').trim().toLowerCase();
+            const filtered = query
+                ? allRegistrations.filter(r => {
+                    const text = `${r.student_name || ''} ${r.student_fac_num || ''} ${r.student_email || ''} ${r.exam_subject || ''} ${r.room_number || ''} ${r.student_specialty || ''}`.toLowerCase();
+                    return text.includes(query);
+                })
+                : allRegistrations;
+
+            const countElem = document.getElementById('allocationFilteredCount');
+            if (countElem) countElem.textContent = filtered.length;
+
+            // Pagination calculations
+            const pageSize = Number(state.allocationRowsPerPage?.value || state.allocationPageSize) || 10;
+            const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+            if (state.allocationPage > totalPages) state.allocationPage = totalPages;
+            if (state.allocationPage < 1) state.allocationPage = 1;
+
+            const startIndex = (state.allocationPage - 1) * pageSize;
+            const pageSlice = filtered.slice(startIndex, startIndex + pageSize);
+
+            const pageInfoElem = document.getElementById('allocationPaginationInfo');
+            if (pageInfoElem) pageInfoElem.textContent = `Стр. ${state.allocationPage} от ${totalPages}`;
+
+            const prevBtn = document.getElementById('allocationPrevPageBtn');
+            const nextBtn = document.getElementById('allocationNextPageBtn');
+            if (prevBtn) prevBtn.disabled = state.allocationPage <= 1;
+            if (nextBtn) nextBtn.disabled = state.allocationPage >= totalPages;
+
+            if (!allRegistrations.length) {
+                body.innerHTML = '<tr><td colspan="7" class="px-3 py-8 text-center text-xs text-[var(--text-muted)]">Няма регистрирани студенти за това разпределение.</td></tr>';
+                return;
+            }
+
+            if (!pageSlice.length) {
+                body.innerHTML = '<tr><td colspan="7" class="px-3 py-8 text-center text-xs text-[var(--text-muted)]">Няма намерени студенти по зададените критерии за търсене.</td></tr>';
+                return;
+            }
+
+            body.innerHTML = pageSlice.map((reg) => {
+                const initials = (reg.student_name || 'С').split(' ').map(n => n[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
+                return `
+                    <tr class="hover:bg-[var(--border-subtle)] transition">
+                        <td class="px-3 py-2.5">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-7 h-7 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-[10px] flex items-center justify-center shrink-0 border border-emerald-500/20">
+                                    ${escapeHtml(initials)}
+                                </div>
+                                <div class="min-w-0">
+                                    <p class="font-semibold text-xs text-[var(--text-main)] truncate">${escapeHtml(reg.student_name)}</p>
+                                    <p class="text-[10px] text-[var(--text-muted)] truncate">${escapeHtml(reg.student_email || '')}</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-3 py-2.5 font-mono text-xs font-semibold text-[var(--text-muted)]">${escapeHtml(reg.student_fac_num)}</td>
+                        <td class="px-3 py-2.5 text-xs text-[var(--text-muted)]">${escapeHtml(reg.student_specialty || '-')} • гр. ${escapeHtml(reg.student_group || '-')}</td>
+                        <td class="px-3 py-2.5 font-semibold text-xs text-[var(--text-main)]">${escapeHtml(reg.exam_subject || '-')}</td>
+                        <td class="px-3 py-2.5">${getSessionBadgeHtml(reg.session_type)}</td>
+                        <td class="px-3 py-2.5">
+                            <span class="font-mono font-bold text-xs px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">Зала ${escapeHtml(reg.room_number || '-')}</span>
+                        </td>
+                        <td class="px-3 py-2.5 text-xs text-[var(--text-muted)]">${escapeHtml(formatDateTime(reg.date_time))}</td>
+                    </tr>
+                `;
+            }).join('');
         }
 
         function renderPendingStudents() {
@@ -2561,18 +3342,591 @@
         }
         initStudentManagementEvents();
 
-        document.getElementById('allocationSendBtn')?.addEventListener('click', async () => {
-            const log = state.selectedAllocationLog;
-            if (!log) return;
-            const response = await authFetch(`/admins/notifications/send/${log.id}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({}),
+        function initExamManagementEvents() {
+            // Dropzone & File Upload
+            const dropzone = document.getElementById('examDropzone');
+            const fileInput = document.getElementById('examFile');
+            const idleView = document.getElementById('examDropzoneIdle');
+            const previewView = document.getElementById('examFilePreview');
+            const fileNameElem = document.getElementById('examFileName');
+            const fileSizeElem = document.getElementById('examFileSize');
+            const fileClearBtn = document.getElementById('examFileClearBtn');
+
+            function handleExamFileSelect(file) {
+                if (!file) return;
+                const name = file.name.toLowerCase();
+                if (!name.endsWith('.xlsx') && !name.endsWith('.xls')) {
+                    showToast('Невалиден формат', 'Моля, качете валиден Excel файл (.xlsx или .xls)', 'warning');
+                    return;
+                }
+                state.selectedExamFile = file;
+                fileNameElem.textContent = file.name;
+                fileSizeElem.textContent = formatBytes(file.size);
+                idleView.classList.add('hidden');
+                previewView.classList.remove('hidden');
+            }
+
+            if (dropzone && fileInput) {
+                dropzone.addEventListener('click', (e) => {
+                    if (e.target.closest('#examFileClearBtn')) return;
+                    fileInput.click();
+                });
+
+                fileInput.addEventListener('change', (e) => {
+                    if (e.target.files && e.target.files[0]) {
+                        handleExamFileSelect(e.target.files[0]);
+                    }
+                });
+
+                ['dragenter', 'dragover'].forEach(eventName => {
+                    dropzone.addEventListener(eventName, (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        dropzone.classList.add('border-purple-500', 'bg-purple-50/30', 'dark:bg-purple-500/5');
+                    });
+                });
+
+                ['dragleave', 'drop'].forEach(eventName => {
+                    dropzone.addEventListener(eventName, (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        dropzone.classList.remove('border-purple-500', 'bg-purple-50/30', 'dark:bg-purple-500/5');
+                    });
+                });
+
+                dropzone.addEventListener('drop', (e) => {
+                    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+                        handleExamFileSelect(e.dataTransfer.files[0]);
+                    }
+                });
+
+                fileClearBtn?.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    state.selectedExamFile = null;
+                    fileInput.value = '';
+                    previewView.classList.add('hidden');
+                    idleView.classList.remove('hidden');
+                });
+            }
+
+            // Batch Search Filter
+            document.getElementById('examBatchSearchInput')?.addEventListener('input', (e) => {
+                state.examBatchSearch = e.target.value;
+                renderExamImportLogs();
             });
-            const data = await response.json();
-            alert(data.message || data.detail || 'Done');
-            await loadDashboardData();
-        });
+
+            // Table Search Filter
+            document.getElementById('examSearchInput')?.addEventListener('input', (e) => {
+                state.examSearch = e.target.value;
+                state.examPage = 1;
+                renderSelectedExamLog();
+            });
+
+            // Session Filter
+            document.getElementById('examSessionFilter')?.addEventListener('change', (e) => {
+                state.examSessionFilter = e.target.value;
+                state.examPage = 1;
+                renderSelectedExamLog();
+            });
+
+            // Status Filter
+            document.getElementById('examStatusFilter')?.addEventListener('change', (e) => {
+                state.examStatusFilter = e.target.value;
+                state.examPage = 1;
+                renderSelectedExamLog();
+            });
+
+            // Rows per page
+            document.getElementById('examRowsPerPage')?.addEventListener('change', (e) => {
+                state.examPageSize = Number(e.target.value);
+                state.examPage = 1;
+                renderSelectedExamLog();
+            });
+
+            // Pagination Prev/Next
+            document.getElementById('examPrevPageBtn')?.addEventListener('click', () => {
+                if (state.examPage > 1) {
+                    state.examPage -= 1;
+                    renderSelectedExamLog();
+                }
+            });
+            document.getElementById('examNextPageBtn')?.addEventListener('click', () => {
+                state.examPage += 1;
+                renderSelectedExamLog();
+            });
+
+            // Batch Allocate Button with Animated Purple Progress Bar
+            document.getElementById('examBatchAllocateBtn')?.addEventListener('click', async () => {
+                const log = state.selectedExamLog;
+                if (!log || !log.exams || !log.exams.length) return;
+                const btn = document.getElementById('examBatchAllocateBtn');
+                if (!btn || btn.disabled) return;
+
+                // Check if any students are ready
+                const hasReadyStudents = log.exams.some(exam => (exam.approved_count || 0) > (exam.allocated_count || 0));
+                if (!hasReadyStudents) {
+                    showToast('Няма готови студенти', 'Няма студенти с преминато и одобрено биометрично сканиране за разпределение в този график.', 'warning');
+                    return;
+                }
+
+                btn.disabled = true;
+                const originalHtml = btn.innerHTML;
+                const originalClass = btn.className;
+
+                // Transform into progress bar container
+                btn.className = 'relative px-4 py-2 rounded-[var(--radius)] border border-purple-500/40 bg-[var(--bg-body)] overflow-hidden shadow-inner flex items-center justify-center min-w-[280px] h-10 select-none cursor-wait';
+                btn.innerHTML = `
+                    <div id="batchProgressBar" class="absolute inset-y-0 left-0 bg-gradient-to-r from-purple-600 via-fuchsia-600 to-purple-600 transition-all duration-300 ease-out" style="width: 0%;"></div>
+                    <div class="relative z-10 w-full flex items-center justify-center gap-2 text-xs font-bold text-white drop-shadow">
+                        <svg class="w-3.5 h-3.5 animate-spin text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        <span>Разпределяне... <span id="batchProgressPct">0%</span></span>
+                    </div>
+                `;
+
+                const progressBar = document.getElementById('batchProgressBar');
+                const progressPct = document.getElementById('batchProgressPct');
+
+                try {
+                    const allExamIds = log.exams.map(e => e.id);
+                    // Determine chunks: minimum 5 chunks so progress is visually smooth, maximum 150 exams per chunk
+                    const numChunks = Math.min(allExamIds.length, Math.max(5, Math.ceil(allExamIds.length / 150)));
+                    const chunkSize = Math.ceil(allExamIds.length / numChunks);
+                    const chunks = [];
+                    for (let i = 0; i < allExamIds.length; i += chunkSize) {
+                        chunks.push(allExamIds.slice(i, i + chunkSize));
+                    }
+
+                    let totalCreated = 0;
+                    for (let i = 0; i < chunks.length; i++) {
+                        const chunk = chunks[i];
+                        const res = await authFetch('/admins/execute-allocation', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ exam_ids: chunk }),
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                            totalCreated += (data.new_registrations_created || 0);
+                        }
+                        const currentPct = Math.round(((i + 1) / chunks.length) * 100);
+                        if (progressBar) progressBar.style.width = `${currentPct}%`;
+                        if (progressPct) progressPct.textContent = `${currentPct}%`;
+                        await new Promise(r => setTimeout(r, 60));
+                    }
+
+                    // Complete visual state
+                    if (progressBar) progressBar.style.width = '100%';
+                    btn.innerHTML = `
+                        <div class="absolute inset-y-0 left-0 bg-gradient-to-r from-emerald-600 to-purple-600 w-full"></div>
+                        <div class="relative z-10 w-full flex items-center justify-center gap-1.5 text-xs font-bold text-white drop-shadow">
+                            <svg class="w-4 h-4 text-emerald-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                            <span>Готово! Разпределени ${totalCreated} (100%)</span>
+                        </div>
+                    `;
+
+                    await new Promise(r => setTimeout(r, 1200));
+                    showToast('Разпределение на графика', `Успешно приключи! Създадени са ${totalCreated} нови регистрации.`, 'success');
+                    await loadDashboardData();
+                    switchTab('allocation');
+                } catch (err) {
+                    showToast('Грешка', 'Възникна проблем при разпределението на партидата.', 'error');
+                    btn.disabled = false;
+                    btn.className = originalClass;
+                    btn.innerHTML = originalHtml;
+                }
+            });
+
+            // Form Submit
+            document.getElementById('examsForm')?.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const file = state.selectedExamFile || (fileInput?.files && fileInput.files[0]);
+                if (!file) {
+                    showToast('Липсва файл', 'Моля, изберете или плъзнете Excel файл с изпитен график.', 'warning');
+                    return;
+                }
+
+                const submitBtn = document.getElementById('examSubmitBtn');
+                const submitText = document.getElementById('examSubmitText');
+                const statusDiv = document.getElementById('examStatus');
+
+                submitBtn.disabled = true;
+                const originalText = submitText.textContent;
+                submitText.textContent = 'Обработка на графика...';
+
+                const formData = new FormData();
+                formData.append('file', file);
+
+                try {
+                    const response = await authFetch('/admins/upload/exams', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        showToast('Успешен импорт', data.message || `Създадени: ${data.created}, Обновени: ${data.updated}`, 'success');
+                        statusDiv.className = 'text-xs p-3 rounded-[var(--radius)] border bg-emerald-50 text-emerald-700 font-bold text-center';
+                        statusDiv.textContent = `✅ Успех! Създадени изпити: ${data.created}, Обновени: ${data.updated}`;
+                        statusDiv.classList.remove('hidden');
+
+                        // Reset file
+                        state.selectedExamFile = null;
+                        fileInput.value = '';
+                        previewView.classList.add('hidden');
+                        idleView.classList.remove('hidden');
+
+                        await loadDashboardData();
+                        if (data.admin_log_id) {
+                            const newLog = state.data?.exam_import_logs?.find(l => l.id === data.admin_log_id);
+                            if (newLog) selectExamBatchLog(newLog);
+                        }
+                    } else {
+                        showToast('Грешка при импорт', data.detail || 'Възникна проблем при импорта на изпити.', 'error');
+                        statusDiv.className = 'text-xs p-3 rounded-[var(--radius)] border bg-red-50 text-red-700 font-semibold text-center';
+                        statusDiv.textContent = `❌ Грешка: ${data.detail || 'Проблем при обработка на графика.'}`;
+                        statusDiv.classList.remove('hidden');
+                    }
+                } catch (err) {
+                    showToast('Мрежова грешка', 'Липсва връзка със сървъра.', 'error');
+                } finally {
+                    submitBtn.disabled = false;
+                    submitText.textContent = originalText;
+                }
+            });
+        }
+
+        function initAllocationManagementEvents() {
+            // Execution search
+            document.getElementById('allocationSearchInput')?.addEventListener('input', (e) => {
+                state.allocationSearch = e.target.value;
+                renderAllocationLogs();
+            });
+
+            // Student in allocation search
+            document.getElementById('allocationStudentSearchInput')?.addEventListener('input', (e) => {
+                state.allocationStudentSearch = e.target.value;
+                state.allocationPage = 1;
+                renderSelectedAllocationLog();
+            });
+
+            // Rows per page
+            document.getElementById('allocationRowsPerPage')?.addEventListener('change', (e) => {
+                state.allocationPageSize = Number(e.target.value);
+                state.allocationPage = 1;
+                renderSelectedAllocationLog();
+            });
+
+            // Pagination Prev/Next
+            document.getElementById('allocationPrevPageBtn')?.addEventListener('click', () => {
+                if (state.allocationPage > 1) {
+                    state.allocationPage -= 1;
+                    renderSelectedAllocationLog();
+                }
+            });
+            document.getElementById('allocationNextPageBtn')?.addEventListener('click', () => {
+                state.allocationPage += 1;
+                renderSelectedAllocationLog();
+            });
+
+            // ===============================================
+            // ALLOCATION PREVIEW & EXECUTION MODAL LOGIC
+            // ===============================================
+            async function fetchAllocationPreview(examId = null, examIds = null) {
+                try {
+                    let url = '/admins/allocation-preview';
+                    const params = new URLSearchParams();
+                    if (examId) params.append('exam_id', examId);
+                    if (examIds && examIds.length) params.append('exam_ids', examIds.join(','));
+                    const qs = params.toString();
+                    if (qs) url += `?${qs}`;
+
+                    const response = await authFetch(url);
+                    if (response.ok) {
+                        return await response.json();
+                    }
+                } catch (err) {
+                    console.error('Error fetching allocation preview:', err);
+                }
+                return null;
+            }
+
+            async function updateAllocationPreviewKPIs() {
+                const data = await fetchAllocationPreview();
+                if (!data) return;
+
+                const readyCount = data.ready_registrations_count || 0;
+                const pendingBio = data.skipped_pending_bio_count || 0;
+                const totalExams = data.total_exams_evaluated || 0;
+
+                const readyCountElem = document.getElementById('allocHubReadyCount');
+                const pendingBioElem = document.getElementById('allocHubPendingBioCount');
+                const examsCountElem = document.getElementById('allocHubExamsCount');
+                const readyBadge = document.getElementById('allocHubReadyBadge');
+                const readyDot = document.getElementById('allocHubReadyDot');
+                const globalAllocText = document.getElementById('globalAllocationText');
+
+                if (readyCountElem) readyCountElem.textContent = readyCount;
+                if (pendingBioElem) pendingBioElem.textContent = pendingBio;
+                if (examsCountElem) examsCountElem.textContent = totalExams.toLocaleString('bg-BG');
+
+                if (readyBadge && readyDot) {
+                    if (readyCount > 0) {
+                        readyBadge.className = "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-semibold transition";
+                        readyDot.className = "w-1.5 h-1.5 rounded-full bg-emerald-500";
+                    } else {
+                        readyBadge.className = "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800/60 text-[var(--text-muted)] border border-[var(--border)] font-semibold transition";
+                        readyDot.className = "w-1.5 h-1.5 rounded-full bg-slate-400";
+                    }
+                }
+
+                if (globalAllocText) {
+                    if (readyCount > 0) {
+                        globalAllocText.textContent = `Глобално разпределение (+${readyCount} готови)`;
+                    } else {
+                        globalAllocText.textContent = `Глобално разпределение (0 готови)`;
+                    }
+                }
+            }
+
+            window.updateAllocationPreviewKPIs = updateAllocationPreviewKPIs;
+
+            function openAllocationPreviewModal(previewData) {
+                const modal = document.getElementById('allocationPreviewModal');
+                if (!modal || !previewData) return;
+
+                const readyCount = previewData.ready_registrations_count || 0;
+                const uniqueStudents = previewData.unique_students_count || 0;
+                const pendingBio = previewData.skipped_pending_bio_count || 0;
+                const affectedExams = previewData.affected_exams_count || 0;
+                const items = previewData.preview_items || [];
+
+                // Update summary stats
+                const readyElem = document.getElementById('previewModalReadyCount');
+                const approvedElem = document.getElementById('previewModalApprovedStudents');
+                const pendingElem = document.getElementById('previewModalPendingBioStudents');
+                const examsElem = document.getElementById('previewModalExamsCount');
+
+                if (readyElem) readyElem.textContent = readyCount;
+                if (approvedElem) approvedElem.textContent = uniqueStudents;
+                if (pendingElem) pendingElem.textContent = pendingBio;
+                if (examsElem) examsElem.textContent = affectedExams;
+
+                // Update informational banner
+                const banner = document.getElementById('previewModalBanner');
+                if (banner) {
+                    if (readyCount === 0) {
+                        banner.className = "flex items-start gap-2.5 text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800/60 p-3.5 rounded-[var(--radius)] text-xs";
+                        banner.innerHTML = `
+                            <svg class="w-5 h-5 shrink-0 text-amber-500 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                            <div>
+                                <p class="font-bold text-sm">Няма студенти, готови за ново разпределение!</p>
+                                <p class="text-xs mt-1 leading-relaxed">
+                                    Всички отговарящи студенти са вече разпределени за техните изпити, или намерените <strong>${pendingBio} студенти</strong> са все още със статус <code class="font-mono text-[11px] bg-amber-200/50 dark:bg-amber-900/50 px-1 py-0.5 rounded">PENDING</code> (чакащи лицево заснемане и потвърждение от квестор).
+                                </p>
+                                <p class="text-[11px] mt-1.5 opacity-90">
+                                    💡 За да се появят нови студенти тук, те трябва първо да преминат през лицева верификация и статусът им да стане <code class="font-mono text-[10px] bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 px-1 py-0.5 rounded">APPROVED</code>.
+                                </p>
+                            </div>
+                        `;
+                    } else {
+                        banner.className = "flex items-start gap-2.5 text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800/60 p-3.5 rounded-[var(--radius)] text-xs";
+                        banner.innerHTML = `
+                            <svg class="w-5 h-5 shrink-0 text-emerald-500 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            <div>
+                                <p class="font-bold text-sm">Готови за създаване на ${readyCount} нови студентски регистрации!</p>
+                                <p class="text-xs mt-1 leading-relaxed">
+                                    Ще бъдат разпределени <strong>${uniqueStudents} одобрени студенти</strong> към техните семестриални изпити в <strong>${affectedExams} зали</strong>.
+                                    ${pendingBio > 0 ? `<br><span class="text-[11px] text-amber-700 dark:text-amber-300 font-medium">⚠️ Забележка: Други ${pendingBio} студенти ще бъдат пропуснати, тъй като нямат одобрена биометрия.</span>` : ''}
+                                </p>
+                            </div>
+                        `;
+                    }
+                }
+
+                // Update preview table
+                const tableBody = document.getElementById('previewTableBody');
+                if (tableBody) {
+                    if (items.length === 0) {
+                        tableBody.innerHTML = `
+                            <tr>
+                                <td colspan="6" class="px-4 py-8 text-center text-xs text-[var(--text-muted)]">
+                                    <div class="flex flex-col items-center justify-center gap-2">
+                                        <svg class="w-8 h-8 text-slate-300 dark:text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                                        <p class="font-medium">Няма нови записи за добавяне в този момент.</p>
+                                        <p class="text-[11px] max-w-sm">Всички студенти са вече разпределени или чакат биометрично заснемане.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
+                    } else {
+                        tableBody.innerHTML = items.map(item => `
+                            <tr class="hover:bg-[var(--bg-body)] transition">
+                                <td class="px-3 py-2.5 font-bold text-[var(--text-main)]">${escapeHtml(item.student_name || '-')}</td>
+                                <td class="px-3 py-2.5 font-mono text-[11px] text-[var(--text-muted)]">${escapeHtml(item.student_fac_num || '-')}</td>
+                                <td class="px-3 py-2.5">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400">
+                                        ${escapeHtml(item.student_specialty || '')} • К${item.student_course || '-'} • Гр.${item.student_group || '-'}
+                                    </span>
+                                </td>
+                                <td class="px-3 py-2.5 font-medium text-[var(--text-main)]">${escapeHtml(item.exam_subject || '-')}</td>
+                                <td class="px-3 py-2.5 font-mono text-emerald-600 dark:text-emerald-400 font-bold">${escapeHtml(item.room_number || '-')}</td>
+                                <td class="px-3 py-2.5 text-[11px] text-[var(--text-muted)]">${escapeHtml(formatDateTime(item.date_time))}</td>
+                            </tr>
+                        `).join('');
+                    }
+                }
+
+                // Update confirm button & footer notes
+                const confirmBtn = document.getElementById('confirmAllocationExecutionBtn');
+                const confirmText = document.getElementById('confirmAllocationExecutionText');
+                const footerNote = document.getElementById('previewFooterNote');
+
+                if (confirmBtn) {
+                    if (readyCount === 0) {
+                        confirmBtn.disabled = true;
+                        if (confirmText) confirmText.textContent = 'Няма нови за разпределение (0)';
+                        if (footerNote) footerNote.innerHTML = '<span class="text-amber-600 dark:text-amber-400 font-medium">Бутонът е деактивиран, за да не се създава празно разпределение.</span>';
+                    } else {
+                        confirmBtn.disabled = false;
+                        if (confirmText) confirmText.textContent = `Потвърди и разпредели (${readyCount} нови)`;
+                        if (footerNote) footerNote.innerHTML = '<span class="text-[var(--text-muted)]">При потвърждение записите ще бъдат добавени в базата данни.</span>';
+                    }
+                }
+
+                modal.classList.remove('hidden');
+            }
+
+            function closeAllocationPreviewModal() {
+                const modal = document.getElementById('allocationPreviewModal');
+                if (modal) modal.classList.add('hidden');
+            }
+
+            // Preview Allocation Button Click
+            document.getElementById('previewAllocationBtn')?.addEventListener('click', async () => {
+                const btn = document.getElementById('previewAllocationBtn');
+                btn.disabled = true;
+                const originalHtml = btn.innerHTML;
+                btn.innerHTML = `
+                    <svg class="animate-spin w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    <span>Зареждане...</span>
+                `;
+                try {
+                    const data = await fetchAllocationPreview();
+                    if (data) {
+                        openAllocationPreviewModal(data);
+                    } else {
+                        showToast('Грешка', 'Неуспешно зареждане на прегледа.', 'error');
+                    }
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = originalHtml;
+                }
+            });
+
+            // Global Allocation Button Click (now opens preview first so admin sees impact!)
+            document.getElementById('globalAllocationBtn')?.addEventListener('click', async () => {
+                const btn = document.getElementById('globalAllocationBtn');
+                btn.disabled = true;
+                const textElem = document.getElementById('globalAllocationText');
+                const originalText = textElem ? textElem.textContent : '';
+                if (textElem) textElem.textContent = 'Анализиране на студентите...';
+
+                try {
+                    const data = await fetchAllocationPreview();
+                    if (data) {
+                        openAllocationPreviewModal(data);
+                    } else {
+                        showToast('Грешка', 'Неуспешно извличане на предварителен преглед.', 'error');
+                    }
+                } finally {
+                    btn.disabled = false;
+                    if (textElem) textElem.textContent = originalText;
+                }
+            });
+
+            // Modal Close Buttons
+            document.getElementById('closeAllocationPreviewBtn')?.addEventListener('click', closeAllocationPreviewModal);
+            document.getElementById('cancelAllocationPreviewBtn')?.addEventListener('click', closeAllocationPreviewModal);
+
+            // Modal Confirm Execution Button
+            document.getElementById('confirmAllocationExecutionBtn')?.addEventListener('click', async () => {
+                const btn = document.getElementById('confirmAllocationExecutionBtn');
+                const textElem = document.getElementById('confirmAllocationExecutionText');
+                const originalText = textElem ? textElem.textContent : '';
+
+                if (btn) btn.disabled = true;
+                if (textElem) textElem.textContent = 'Изпълнение на разпределение...';
+
+                try {
+                    const response = await authFetch('/admins/execute-allocation', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({}),
+                    });
+                    const data = await response.json();
+                    if (response.ok) {
+                        if (data.status === 'noop' || data.new_registrations_created === 0) {
+                            showToast('Разпределение', data.message || 'Няма нови регистрации за създаване.', 'info');
+                        } else {
+                            showToast('Глобално разпределение', data.message || `Създадени ${data.new_registrations_created} нови регистрации.`, 'success');
+                        }
+                        closeAllocationPreviewModal();
+                        await loadDashboardData();
+                        await updateAllocationPreviewKPIs();
+                        if (data.admin_log_id) {
+                            const newLog = state.data?.allocation_logs?.find(l => l.id === data.admin_log_id);
+                            if (newLog) selectAllocationLog(newLog);
+                        }
+                    } else {
+                        showToast('Грешка при разпределение', data.detail || 'Възникна проблем при разпределението.', 'error');
+                    }
+                } catch (err) {
+                    showToast('Мрежова грешка', 'Липсва връзка със сървъра.', 'error');
+                } finally {
+                    if (btn) btn.disabled = false;
+                    if (textElem) textElem.textContent = originalText;
+                }
+            });
+
+            // Send notification emails button
+            document.getElementById('allocationSendBtn')?.addEventListener('click', async () => {
+                const log = state.selectedAllocationLog;
+                if (!log) {
+                    showToast('Няма избран лог', 'Моля, изберете изпълнение на разпределение отляво.', 'warning');
+                    return;
+                }
+
+                const btn = document.getElementById('allocationSendBtn');
+                const textElem = document.getElementById('allocationSendBtnText');
+                const originalText = textElem ? textElem.textContent : '';
+
+                if (btn) btn.disabled = true;
+                if (textElem) textElem.textContent = 'Изпращане на изпитни имейли...';
+
+                try {
+                    const response = await authFetch(`/admins/notifications/send/${log.id}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({}),
+                    });
+                    const data = await response.json();
+                    if (response.ok) {
+                        showToast('Успешно изпратени имейли', data.message || `Изпратени са изпитни известия до студентите.`, 'success');
+                        await loadDashboardData();
+                    } else {
+                        showToast('Грешка при изпращане', data.detail || 'Възникна проблем при изпращането на имейли.', 'error');
+                    }
+                } catch (err) {
+                    showToast('Мрежова грешка', 'Липсва връзка със сървъра.', 'error');
+                } finally {
+                    if (btn) btn.disabled = false;
+                    if (textElem) textElem.textContent = originalText;
+                }
+            });
+        }
+
+        initExamManagementEvents();
+        initAllocationManagementEvents();
 
         document.getElementById('startApprovalBtn')?.addEventListener('click', () => {
             const btn = document.getElementById('startApprovalBtn');
@@ -2689,53 +4043,7 @@
         });
 
 
-        document.getElementById('examFile')?.addEventListener('change', (e) => {
-            const file = e.target.files && e.target.files[0];
-            const nameElem = document.getElementById('examFileName');
-            if (nameElem) {
-                nameElem.textContent = file ? `Избран: ${file.name}` : 'Само файлове .xlsx или .xls';
-            }
-        });
 
-        document.getElementById('examsForm')?.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const fileInput = document.getElementById("examFile");
-            const file = fileInput?.files && fileInput.files[0];
-            if (!file) {
-                showToast('Липсва файл', 'Моля, изберете Excel файл с изпитен график.', 'warning');
-                return;
-            }
-
-            const statusDiv = document.getElementById('examStatus');
-            statusDiv.className = 'text-xs p-3 rounded-[var(--radius)] border bg-blue-50 text-blue-700 font-semibold text-center';
-            statusDiv.textContent = '🔄 Анализиране на изпитния график...';
-            statusDiv.classList.remove('hidden');
-
-            const formData = new FormData();
-            formData.append("file", file);
-
-            try {
-                const response = await authFetch('/admins/upload/exams', {
-                    method: 'POST',
-                    body: formData
-                });
-                const data = await response.json();
-
-                if (response.ok) {
-                    statusDiv.className = 'text-xs p-3 rounded-[var(--radius)] border bg-emerald-50 text-emerald-700 font-bold text-center';
-                    statusDiv.textContent = `✅ Успех! Създадени изпити: ${data.created}, Обновени: ${data.updated}`;
-                    document.getElementById('examsForm').reset();
-                    document.getElementById('examFileName').textContent = 'Само файлове .xlsx или .xls';
-                    await loadDashboardData();
-                } else {
-                    statusDiv.className = 'text-xs p-3 rounded-[var(--radius)] border bg-red-50 text-red-700 font-semibold text-center';
-                    statusDiv.textContent = `❌ Грешка: ${data.detail || 'Проблем при обработка на графика.'}`;
-                }
-            } catch (err) {
-                statusDiv.className = 'text-xs p-3 rounded-[var(--radius)] border bg-red-50 text-red-700 font-semibold text-center';
-                statusDiv.textContent = '❌ Критична грешка: Липсва отговор от сървъра.';
-            }
-        });
 
         // ===============================================
         // 7. SUPERADMIN: SECURE KEY & VERIFICATIONS
