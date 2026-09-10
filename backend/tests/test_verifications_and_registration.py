@@ -29,7 +29,6 @@ class VerificationsAndRegistrationTestCase(unittest.TestCase):
             db.query(Admin).filter(Admin.is_superadmin == False).delete()
             db.query(Examiner).delete()
             db.query(SecureKey).delete()
-            db.query(Student).filter(Student.student_id_number != "000000000").delete()
             db.commit()
         except Exception:
             db.rollback()
@@ -66,7 +65,6 @@ class VerificationsAndRegistrationTestCase(unittest.TestCase):
             self.db.query(Admin).filter(Admin.is_superadmin == False).delete()
             self.db.query(Examiner).delete()
             self.db.query(SecureKey).delete()
-            self.db.query(Student).filter(Student.student_id_number != "000000000").delete()
             # Ensure superadmin password is reset to default SuperAdmin123!
             superadmin = self.db.query(Admin).filter(Admin.is_superadmin == True).first()
             if superadmin:

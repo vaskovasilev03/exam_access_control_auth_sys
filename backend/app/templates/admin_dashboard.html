@@ -577,7 +577,7 @@
                                 <div>
                                     <label class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)] block mb-1">Excel Файл (.xlsx, .xls)</label>
                                     <div id="studDropzone" class="border-2 border-dashed border-[var(--border)] rounded-[var(--radius)] p-4 text-center bg-[var(--bg-body)] hover:border-blue-500 transition relative flex flex-col items-center justify-center cursor-pointer group">
-                                        <input type="file" id="studFile" accept=".xlsx,.xls" required class="hidden">
+                                        <input type="file" id="studFile" accept=".xlsx,.xls" class="hidden">
                                         
                                         <!-- IDLE STATE -->
                                         <div id="studDropzoneIdle" class="flex flex-col items-center py-2">
@@ -736,7 +736,7 @@
                                 <span class="text-3xl mb-2">📊</span>
                                 <label class="block cursor-pointer">
                                     <span class="text-blue-600 dark:text-blue-400 font-bold text-xs hover:underline">Изберете файл с графици</span>
-                                    <input type="file" id="examFile" accept=".xlsx,.xls" required class="hidden">
+                                    <input type="file" id="examFile" accept=".xlsx,.xls" class="hidden">
                                 </label>
                                 <p id="examFileName" class="text-[11px] text-[var(--text-muted)] mt-2">Само файлове .xlsx или .xls</p>
                             </div>
@@ -1916,8 +1916,8 @@
                 body.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-xs text-[var(--text-muted)]">Няма намерени студенти по зададените критерии за търсене.</td></tr>';
             } else {
                 body.innerHTML = pageSlice.map((student) => {
-                    const isSelected = state.selectedStudentIds.has(student.id);
                     const isSent = Boolean(student.is_active || student.email_sent);
+                    const isSelected = !isSent && state.selectedStudentIds.has(student.id);
                     const initials = (student.full_name || 'С').split(' ').map(n => n[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
 
                     let statusBadge = '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400">PENDING</span>';
@@ -1932,9 +1932,9 @@
                         : '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400">⏳ Чакащ</span>';
 
                     return `
-                        <tr class="hover:bg-[var(--border-subtle)] transition cursor-pointer student-row ${isSelected ? 'bg-blue-50/20 dark:bg-blue-500/5' : ''}" data-student-id="${student.id}">
+                        <tr class="${isSent ? 'opacity-60 bg-[var(--bg-body)]/40 cursor-default' : (isSelected ? 'bg-blue-50/20 dark:bg-blue-500/5 cursor-pointer hover:bg-[var(--border-subtle)]' : 'cursor-pointer hover:bg-[var(--border-subtle)]')} transition student-row" data-student-id="${student.id}" data-disabled="${isSent}">
                             <td class="px-3 py-2.5 text-center" onclick="event.stopPropagation()">
-                                <input type="checkbox" class="student-row-checkbox rounded border-[var(--border)] cursor-pointer" value="${student.id}" ${isSelected ? 'checked' : ''}>
+                                <input type="checkbox" class="student-row-checkbox rounded border-[var(--border)] ${isSent ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}" value="${student.id}" ${isSelected ? 'checked' : ''} ${isSent ? 'disabled title="Имейлът вече е изпратен / акаунтът е активен"' : ''}>
                             </td>
                             <td class="px-3 py-2.5">
                                 <div class="flex items-center gap-2.5">
@@ -1955,9 +1955,10 @@
                 }).join('');
             }
 
-            // Attach row click listeners for row toggling
+            // Attach row click listeners for row toggling (skip disabled sent rows)
             body.querySelectorAll('.student-row').forEach(row => {
                 row.addEventListener('click', () => {
+                    if (row.dataset.disabled === 'true') return;
                     const studentId = row.dataset.studentId;
                     if (state.selectedStudentIds.has(studentId)) {
                         state.selectedStudentIds.delete(studentId);
@@ -1970,6 +1971,7 @@
 
             body.querySelectorAll('.student-row-checkbox').forEach(cb => {
                 cb.addEventListener('change', (e) => {
+                    if (cb.disabled) return;
                     const studentId = cb.value;
                     if (e.target.checked) {
                         state.selectedStudentIds.add(studentId);
@@ -2016,31 +2018,40 @@
                 }
             }
 
-            // Sync select-all checkbox
+            // Sync select-all checkbox (syncs only with selectable pending students)
             const selectAllCb = document.getElementById('studentSelectAllCheckbox');
             if (selectAllCb) {
-                if (pageSlice.length > 0) {
-                    const allSliceSelected = pageSlice.every(s => state.selectedStudentIds.has(s.id));
-                    const someSliceSelected = pageSlice.some(s => state.selectedStudentIds.has(s.id));
+                const pendingSlice = pageSlice.filter(s => !s.is_active && !s.email_sent);
+                if (pendingSlice.length > 0) {
+                    const allSliceSelected = pendingSlice.every(s => state.selectedStudentIds.has(s.id));
+                    const someSliceSelected = pendingSlice.some(s => state.selectedStudentIds.has(s.id));
+                    selectAllCb.disabled = false;
                     selectAllCb.checked = allSliceSelected;
                     selectAllCb.indeterminate = !allSliceSelected && someSliceSelected;
                 } else {
+                    selectAllCb.disabled = true;
                     selectAllCb.checked = false;
                     selectAllCb.indeterminate = false;
                 }
             }
 
-            updateStudentSelectionUi(state.selectedStudentIds.size, allStudents.length);
+            const pendingCount = allStudents.filter(s => !s.is_active && !s.email_sent).length;
+            updateStudentSelectionUi(state.selectedStudentIds.size, allStudents.length, pendingCount);
         }
 
-        function updateStudentSelectionUi(selectedCount, totalCount) {
+        function updateStudentSelectionUi(selectedCount, totalCount, pendingCount) {
             const summaryElem = document.getElementById('studentSelectionSummary');
             if (summaryElem) {
-                summaryElem.textContent = `Избрани ${selectedCount} от ${totalCount} студента`;
+                const pCount = pendingCount !== undefined ? pendingCount : totalCount;
+                summaryElem.textContent = `Избрани ${selectedCount} от ${pCount} чакащи студента (общо ${totalCount})`;
             }
+            const sendBtn = document.getElementById('studentSendBtn');
             const sendBtnText = document.getElementById('studentSendBtnText');
             if (sendBtnText) {
                 sendBtnText.textContent = `Изпрати известия (${selectedCount})`;
+            }
+            if (sendBtn) {
+                sendBtn.disabled = selectedCount === 0;
             }
         }
 
@@ -2380,20 +2391,26 @@
                 showToast('Избор на чакащи', `Избрани са ${state.selectedStudentIds.size} студента, чакащи имейл.`, 'success');
             });
 
-            // Select All / Deselect All
+            // Select All / Deselect All (ONLY pending students can be selected)
             document.getElementById('studentSelectAllBtn')?.addEventListener('click', () => {
                 const log = state.selectedStudentLog;
                 if (!log) return;
                 const allStudents = log.students || [];
-                if (state.selectedStudentIds.size === allStudents.length) {
+                const pendingStudents = allStudents.filter(s => !s.is_active && !s.email_sent);
+                if (pendingStudents.length === 0) {
+                    showToast('Инфо', 'Всички студенти в тази партида вече са активни и известени.', 'info');
+                    return;
+                }
+                const allPendingSelected = pendingStudents.every(s => state.selectedStudentIds.has(s.id));
+                if (allPendingSelected) {
                     state.selectedStudentIds.clear();
                 } else {
-                    allStudents.forEach(s => state.selectedStudentIds.add(s.id));
+                    pendingStudents.forEach(s => state.selectedStudentIds.add(s.id));
                 }
                 renderSelectedStudentLog();
             });
 
-            // Header Checkbox (Select all visible in pageSlice)
+            // Header Checkbox (Select all visible pending students in pageSlice)
             document.getElementById('studentSelectAllCheckbox')?.addEventListener('change', (e) => {
                 const log = state.selectedStudentLog;
                 if (!log) return;
@@ -2410,11 +2427,12 @@
                 const pageSize = Number(state.studentPageSize) || 20;
                 const startIndex = (state.studentPage - 1) * pageSize;
                 const pageSlice = filtered.slice(startIndex, startIndex + pageSize);
+                const pendingSlice = pageSlice.filter(s => !s.is_active && !s.email_sent);
 
                 if (e.target.checked) {
-                    pageSlice.forEach(s => state.selectedStudentIds.add(s.id));
+                    pendingSlice.forEach(s => state.selectedStudentIds.add(s.id));
                 } else {
-                    pageSlice.forEach(s => state.selectedStudentIds.delete(s.id));
+                    pendingSlice.forEach(s => state.selectedStudentIds.delete(s.id));
                 }
                 renderSelectedStudentLog();
             });
@@ -2427,9 +2445,15 @@
                     return;
                 }
 
-                const selectedIds = Array.from(state.selectedStudentIds);
+                // Filter out any already sent/active students just in case
+                const rawSelectedIds = Array.from(state.selectedStudentIds);
+                const selectedIds = rawSelectedIds.filter(id => {
+                    const s = (log.students || []).find(st => st.id === id);
+                    return s && !s.is_active && !s.email_sent;
+                });
+
                 if (selectedIds.length === 0) {
-                    showToast('Няма избрани студенти', 'Моля, маркирайте поне един студент за изпращане на имейл.', 'warning');
+                    showToast('Няма чакащи студенти', 'Всички избрани студенти вече са активни или няма маркирани чакащи студенти.', 'warning');
                     return;
                 }
 
@@ -2665,15 +2689,30 @@
         });
 
 
+        document.getElementById('examFile')?.addEventListener('change', (e) => {
+            const file = e.target.files && e.target.files[0];
+            const nameElem = document.getElementById('examFileName');
+            if (nameElem) {
+                nameElem.textContent = file ? `Избран: ${file.name}` : 'Само файлове .xlsx или .xls';
+            }
+        });
+
         document.getElementById('examsForm')?.addEventListener('submit', async (e) => {
             e.preventDefault();
+            const fileInput = document.getElementById("examFile");
+            const file = fileInput?.files && fileInput.files[0];
+            if (!file) {
+                showToast('Липсва файл', 'Моля, изберете Excel файл с изпитен график.', 'warning');
+                return;
+            }
+
             const statusDiv = document.getElementById('examStatus');
             statusDiv.className = 'text-xs p-3 rounded-[var(--radius)] border bg-blue-50 text-blue-700 font-semibold text-center';
             statusDiv.textContent = '🔄 Анализиране на изпитния график...';
             statusDiv.classList.remove('hidden');
 
             const formData = new FormData();
-            formData.append("file", document.getElementById("examFile").files[0]);
+            formData.append("file", file);
 
             try {
                 const response = await authFetch('/admins/upload/exams', {

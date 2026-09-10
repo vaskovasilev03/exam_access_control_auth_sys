@@ -306,6 +306,18 @@ def send_bulk_student_emails(log_id: str, payload: dict | None = Body(default=No
     if not target_students:
         raise HTTPException(status_code=404, detail="There are no matching students for this log entry.")
 
+    if log.action_type == "STUDENT_IMPORT":
+        pending_students = [
+            s for s in target_students
+            if not (s.is_active or (s.hashed_password and s.hashed_password != "LOCKED_UNTIL_EMAIL_SENT"))
+        ]
+        if not pending_students:
+            raise HTTPException(
+                status_code=400,
+                detail="Всички избрани студенти вече са активни и са получили своите временни пароли. Повторно изпращане не е разрешено."
+            )
+        target_students = pending_students
+
     success_sent_count = 0
     for student in target_students:
         if log.action_type == "STUDENT_IMPORT":

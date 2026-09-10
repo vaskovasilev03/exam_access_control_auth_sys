@@ -48,4 +48,13 @@ android/app/components/
 *.ap_
 *.aab
 
+#ESP32 Firmware, until final version is release have decided to ignore it
 *.ino
+
+#Seeding Sheets
+*csv
+*xlsx
+
+#Python Scirpts (Internal helpers)
+extract_group.py
+activate_students.py
