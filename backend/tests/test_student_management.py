@@ -18,24 +18,30 @@ from app.seed import seed_superadmin
 
 client = TestClient(app)
 
+from tests.test_data_isolation import TestDataSnapshot, clean_known_test_data
+
 class StudentManagementTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         init_db()
+        db = SessionLocal()
+        try:
+            clean_known_test_data(db)
+        finally:
+            db.close()
 
     @classmethod
     def tearDownClass(cls):
         db: Session = SessionLocal()
         try:
-            db.query(Student).filter(Student.student_id_number.in_(["88800001", "88800002"])).delete(synchronize_session=False)
-            db.commit()
-        except Exception:
-            db.rollback()
+            clean_known_test_data(db)
         finally:
             db.close()
 
     def setUp(self):
         self.db: Session = SessionLocal()
+        clean_known_test_data(self.db)
+        self.snapshot = TestDataSnapshot(self.db)
         self.superadmin = seed_superadmin(self.db)
         # Login as superadmin to get token
         login_res = client.post("/login", data={
@@ -48,8 +54,8 @@ class StudentManagementTestCase(unittest.TestCase):
 
     def tearDown(self):
         try:
-            self.db.query(Student).filter(Student.student_id_number.in_(["88800001", "88800002"])).delete(synchronize_session=False)
-            self.db.commit()
+            self.snapshot.cleanup()
+            clean_known_test_data(self.db)
         except Exception:
             self.db.rollback()
         finally:

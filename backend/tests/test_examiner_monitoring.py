@@ -15,32 +15,16 @@ from app.models import Admin, Student, Examiner, Exam, ExamRegistration, AccessL
 from app.seed import seed_superadmin
 from app.auth import get_password_hash, create_access_token
 
-client = TestClient(app)
+from tests.test_data_isolation import TestDataSnapshot, clean_known_test_data
 
 class ExaminerMonitoringTestCase(unittest.TestCase):
-    @staticmethod
-    def _clean_test_data(db: Session):
-        try:
-            ACTIVE_EXAMINER_ASSIGNMENTS.clear()
-            db.query(AccessLog).filter(AccessLog.location.like("TEST_ROOM%")).delete(synchronize_session=False)
-            db.query(ExamRegistration).filter(
-                ExamRegistration.exam_id.in_(
-                    db.query(Exam.id).filter(Exam.room_number.like("TEST_ROOM%"))
-                )
-            ).delete(synchronize_session=False)
-            db.query(Exam).filter(Exam.room_number.like("TEST_ROOM%")).delete(synchronize_session=False)
-            db.query(Student).filter(Student.email.like("test_ex_%")).delete(synchronize_session=False)
-            db.query(Student).filter(Student.student_id_number.like("TEST_EX_%")).delete(synchronize_session=False)
-            db.commit()
-        except Exception:
-            db.rollback()
-
     @classmethod
     def setUpClass(cls):
         init_db()
         db = SessionLocal()
         try:
-            cls._clean_test_data(db)
+            ACTIVE_EXAMINER_ASSIGNMENTS.clear()
+            clean_known_test_data(db)
         finally:
             db.close()
 
@@ -48,9 +32,8 @@ class ExaminerMonitoringTestCase(unittest.TestCase):
     def tearDownClass(cls):
         db = SessionLocal()
         try:
-            cls._clean_test_data(db)
-            db.query(Examiner).filter(Examiner.email.in_(["examiner1_test@tu-sofia.bg", "examiner2_test@tu-sofia.bg"])).delete(synchronize_session=False)
-            db.commit()
+            ACTIVE_EXAMINER_ASSIGNMENTS.clear()
+            clean_known_test_data(db)
         finally:
             db.close()
 
@@ -58,7 +41,9 @@ class ExaminerMonitoringTestCase(unittest.TestCase):
         self.client = TestClient(app)
         self.client.cookies.clear()
         self.db: Session = SessionLocal()
-        self._clean_test_data(self.db)
+        ACTIVE_EXAMINER_ASSIGNMENTS.clear()
+        clean_known_test_data(self.db)
+        self.snapshot = TestDataSnapshot(self.db)
         seed_superadmin(self.db)
 
         # Create Examiner 1
@@ -92,7 +77,9 @@ class ExaminerMonitoringTestCase(unittest.TestCase):
 
     def tearDown(self):
         try:
-            self._clean_test_data(self.db)
+            ACTIVE_EXAMINER_ASSIGNMENTS.clear()
+            self.snapshot.cleanup()
+            clean_known_test_data(self.db)
         finally:
             self.db.close()
 

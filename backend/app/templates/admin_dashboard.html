@@ -104,8 +104,9 @@
 
         .sidebar-collapsed .sidebar-brand {
             justify-content: center;
-            padding-left: 0;
-            padding-right: 0;
+            padding-left: 0.35rem;
+            padding-right: 0.35rem;
+            gap: 0.25rem;
         }
 
         /* Custom scrollbar */
@@ -135,16 +136,23 @@
     <!-- =============================================== -->
     <aside id="appSidebar" class="sidebar fixed inset-y-0 left-0 z-50 flex flex-col w-64 bg-[var(--bg-sidebar)] border-r border-[var(--border)] transition-all lg:static shadow-xl lg:shadow-none -translate-x-full lg:translate-x-0">
         <!-- BRAND HEADER -->
-        <div class="sidebar-brand h-16 flex items-center gap-3 px-5 border-b border-slate-800/80 shrink-0">
-            <div class="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold shadow-md shadow-blue-500/20 shrink-0">
-                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+        <div class="sidebar-brand h-16 flex items-center justify-between px-3.5 border-b border-slate-800/80 shrink-0">
+            <div id="sidebarBrandMain" class="sidebar-brand-main flex items-center gap-2.5 min-w-0 cursor-pointer" title="Exam Gate">
+                <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold shadow-md shadow-blue-500/20 shrink-0">
+                    <svg class="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                </div>
+                <div class="sidebar-brand-text min-w-0">
+                    <h1 class="text-sm font-bold text-white tracking-wide truncate">Exam Gate</h1>
+                    <p class="text-[10px] uppercase tracking-wider text-slate-400 truncate">Academic Access</p>
+                </div>
+            </div>
+            <button id="desktopSidebarToggle" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/80 transition cursor-pointer shrink-0 hidden lg:flex items-center justify-center" title="Свиване на менюто">
+                <svg id="collapseIcon" class="w-4 h-4 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
                 </svg>
-            </div>
-            <div class="sidebar-brand-text min-w-0">
-                <h1 class="text-sm font-bold text-white tracking-wide truncate">Exam Gate</h1>
-                <p class="text-[10px] uppercase tracking-wider text-slate-400 truncate">Academic Access</p>
-            </div>
+            </button>
         </div>
 
         <!-- NAVIGATION MENU -->
@@ -223,16 +231,6 @@
             </button>
             {% endif %}
         </nav>
-
-        <!-- SIDEBAR FOOTER (COLLAPSE TOGGLE) -->
-        <div class="p-3 border-t border-slate-800/80 shrink-0 hidden lg:block">
-            <button id="desktopSidebarToggle" class="w-full flex items-center justify-center gap-2 py-2 rounded-[var(--radius)] text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800/60 transition cursor-pointer">
-                <svg id="collapseIcon" class="w-4 h-4 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-                </svg>
-                <span class="sidebar-label text-[11px]">Свиване на менюто</span>
-            </button>
-        </div>
     </aside>
 
     <!-- =============================================== -->
@@ -344,84 +342,267 @@
                     </div>
                 </section>
 
-                <!-- ADMINATOR KPI METRIC GRID -->
-                <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" aria-label="Key Performance Indicators">
-                    <!-- KPI 1: STUDENT IMPORTS -->
-                    <article class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 shadow-xs flex flex-col justify-between hover:border-blue-500/50 transition group cursor-pointer" onclick="switchTab('students')">
-                        <div class="flex items-center justify-between gap-2">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold">
-                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                                    </svg>
-                                </div>
-                                <span class="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Студентски импорти</span>
-                            </div>
-                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400">Партиди</span>
+                <!-- PERSONAL KPI SECTION -->
+                <section class="space-y-3" aria-label="Personal Statistics">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Лични статистики</h3>
                         </div>
-                        <div class="mt-4 flex items-baseline justify-between">
-                            <span id="countStudentImports" class="text-3xl font-extrabold text-[var(--text-main)]">0</span>
-                            <span class="text-xs text-[var(--text-muted)] flex items-center gap-1 group-hover:text-blue-600 transition">Преглед →</span>
-                        </div>
-                    </article>
+                        <span class="text-[11px] text-[var(--text-muted)]">Действия, извършени от Вашия профил</span>
+                    </div>
 
-                    <!-- KPI 2: EXAM IMPORTS -->
-                    <article class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 shadow-xs flex flex-col justify-between hover:border-purple-500/50 transition group cursor-pointer" onclick="switchTab('exams')">
-                        <div class="flex items-center justify-between gap-2">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-lg bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold">
-                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                    </svg>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <!-- KPI 1: STUDENT IMPORTS (BLUE) -->
+                        <article class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 shadow-xs flex flex-col justify-between hover:border-blue-500/50 transition group cursor-pointer" onclick="switchTab('students')">
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold">
+                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                                        </svg>
+                                    </div>
+                                    <span class="text-xs font-bold uppercase tracking-wider text-[var(--text-main)]">Студентски импорти</span>
                                 </div>
-                                <span class="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Изпитни сесии</span>
+                                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400">Партиди</span>
                             </div>
-                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400">Графици</span>
-                        </div>
-                        <div class="mt-4 flex items-baseline justify-between">
-                            <span id="countExamImports" class="text-3xl font-extrabold text-[var(--text-main)]">0</span>
-                            <span class="text-xs text-[var(--text-muted)] flex items-center gap-1 group-hover:text-purple-600 transition">Преглед →</span>
-                        </div>
-                    </article>
+                            <div class="mt-4 flex items-end justify-between gap-2">
+                                <div class="flex items-end gap-5 sm:gap-6">
+                                    <div class="flex flex-col">
+                                        <span class="text-[11px] font-medium text-[var(--text-muted)]">Изпълнени</span>
+                                        <span id="personalStudentBatches" class="text-2xl sm:text-3xl font-extrabold text-[var(--text-main)] tracking-tight">0</span>
+                                    </div>
+                                    <div class="flex flex-col">
+                                        <span class="text-[11px] font-medium text-[var(--text-muted)]">Студенти</span>
+                                        <span id="personalStudentTotal" class="text-2xl sm:text-3xl font-extrabold text-[var(--text-main)] tracking-tight">0</span>
+                                    </div>
+                                </div>
+                                <span class="text-xs font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform self-end pb-1">Преглед →</span>
+                            </div>
+                        </article>
 
-                    <!-- KPI 3: PENDING APPROVALS -->
-                    <article class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 shadow-xs flex flex-col justify-between hover:border-rose-500/50 transition group cursor-pointer" onclick="switchTab('approval')">
-                        <div class="flex items-center justify-between gap-2">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-lg bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center font-bold">
-                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
+                        <!-- KPI 2: EXAM IMPORTS (PURPLE) -->
+                        <article class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 shadow-xs flex flex-col justify-between hover:border-purple-500/50 transition group cursor-pointer" onclick="switchTab('exams')">
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-lg bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold">
+                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                    </div>
+                                    <span class="text-xs font-bold uppercase tracking-wider text-[var(--text-main)]">Изпитни графици</span>
                                 </div>
-                                <span class="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Чакащи биометрия</span>
+                                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400">Графици</span>
                             </div>
-                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400">Опашка</span>
-                        </div>
-                        <div class="mt-4 flex items-baseline justify-between">
-                            <span id="countPendingStudents" class="text-3xl font-extrabold text-rose-600 dark:text-rose-400">0</span>
-                            <span class="text-xs text-rose-600 flex items-center gap-1 font-bold">Одобри →</span>
-                        </div>
-                    </article>
+                            <div class="mt-4 flex items-end justify-between gap-2">
+                                <div class="flex items-end gap-5 sm:gap-6">
+                                    <div class="flex flex-col">
+                                        <span class="text-[11px] font-medium text-[var(--text-muted)]">Импортирани</span>
+                                        <span id="personalExamBatches" class="text-2xl sm:text-3xl font-extrabold text-[var(--text-main)] tracking-tight">0</span>
+                                    </div>
+                                    <div class="flex flex-col">
+                                        <span class="text-[11px] font-medium text-[var(--text-muted)]">Изпити</span>
+                                        <span id="personalExamTotal" class="text-2xl sm:text-3xl font-extrabold text-[var(--text-main)] tracking-tight">0</span>
+                                    </div>
+                                </div>
+                                <span class="text-xs font-bold text-purple-600 dark:text-purple-400 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform self-end pb-1">Преглед →</span>
+                            </div>
+                        </article>
 
-                    <!-- KPI 4: ALLOCATIONS -->
-                    <article class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 shadow-xs flex flex-col justify-between hover:border-emerald-500/50 transition group cursor-pointer" onclick="switchTab('allocation')">
-                        <div class="flex items-center justify-between gap-2">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold">
-                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                                    </svg>
+                        <!-- KPI 3: BIOMETRICS (ROSE) -->
+                        <article class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 shadow-xs flex flex-col justify-between hover:border-rose-500/50 transition group cursor-pointer" onclick="switchTab('approval')">
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-lg bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center font-bold">
+                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                    </div>
+                                    <span class="text-xs font-bold uppercase tracking-wider text-[var(--text-main)]">Биометрия</span>
                                 </div>
-                                <span class="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Разпределения</span>
+                                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400">Опашка</span>
                             </div>
-                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">Зали</span>
-                        </div>
-                        <div class="mt-4 flex items-baseline justify-between">
-                            <span id="countAllocationLogs" class="text-3xl font-extrabold text-[var(--text-main)]">0</span>
-                            <span class="text-xs text-[var(--text-muted)] flex items-center gap-1 group-hover:text-emerald-600 transition">Преглед →</span>
-                        </div>
-                    </article>
+                            <div class="mt-4 flex items-end justify-between gap-2">
+                                <div class="flex items-end gap-5 sm:gap-6">
+                                    <div class="flex flex-col">
+                                        <span class="text-[11px] font-medium text-[var(--text-muted)]">Изпълнени</span>
+                                        <span id="personalBioApproved" class="text-2xl sm:text-3xl font-extrabold text-[var(--text-main)] tracking-tight">0</span>
+                                    </div>
+                                    <div class="flex flex-col">
+                                        <span class="text-[11px] font-medium text-[var(--text-muted)] flex items-center gap-1.5">
+                                            <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>Чакащи
+                                        </span>
+                                        <span id="personalBioPending" class="text-2xl sm:text-3xl font-extrabold text-rose-600 dark:text-rose-400 tracking-tight">0</span>
+                                    </div>
+                                </div>
+                                <span class="text-xs font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform self-end pb-1">Одобри →</span>
+                            </div>
+                        </article>
+
+                        <!-- KPI 4: ALLOCATIONS (EMERALD) -->
+                        <article class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 shadow-xs flex flex-col justify-between hover:border-emerald-500/50 transition group cursor-pointer" onclick="switchTab('allocation')">
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold">
+                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                        </svg>
+                                    </div>
+                                    <span class="text-xs font-bold uppercase tracking-wider text-[var(--text-main)]">Разпределения</span>
+                                </div>
+                                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">Зали</span>
+                            </div>
+                            <div class="mt-4 flex items-end justify-between gap-2">
+                                <div class="flex items-end gap-5 sm:gap-6">
+                                    <div class="flex flex-col">
+                                        <span class="text-[11px] font-medium text-[var(--text-muted)]">Възможни</span>
+                                        <span id="personalAllocPossible" class="text-2xl sm:text-3xl font-extrabold text-[var(--text-main)] tracking-tight">0</span>
+                                    </div>
+                                    <div class="flex flex-col">
+                                        <span class="text-[11px] font-medium text-[var(--text-muted)]">Приключени</span>
+                                        <span id="personalAllocCompleted" class="text-2xl sm:text-3xl font-extrabold text-[var(--text-main)] tracking-tight">0</span>
+                                    </div>
+                                </div>
+                                <span class="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform self-end pb-1">Преглед →</span>
+                            </div>
+                        </article>
+                    </div>
                 </section>
+
+                <!-- SUPERADMIN GLOBAL OVERVIEW KPI SECTION -->
+                <section id="globalKpiSection" class="hidden space-y-3 pt-2 border-t border-[var(--border)]" aria-label="Global System Statistics">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-purple-600"></span>
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Общи системни статистики (Всички администратори)</h3>
+                        </div>
+                        <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">Суперадминистратор</span>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <!-- GLOBAL KPI 1: STUDENT IMPORTS (BLUE) -->
+                        <article class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 shadow-xs flex flex-col justify-between hover:border-blue-500/50 transition group cursor-pointer" onclick="switchTab('students')">
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold">
+                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                                        </svg>
+                                    </div>
+                                    <span class="text-xs font-bold uppercase tracking-wider text-[var(--text-main)]">Студентски импорти</span>
+                                </div>
+                                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400">Партиди</span>
+                            </div>
+                            <div class="mt-4 flex items-end justify-between gap-2">
+                                <div class="flex items-end gap-5 sm:gap-6">
+                                    <div class="flex flex-col">
+                                        <span class="text-[11px] font-medium text-[var(--text-muted)]">Изпълнени</span>
+                                        <span id="globalStudentBatches" class="text-2xl sm:text-3xl font-extrabold text-[var(--text-main)] tracking-tight">0</span>
+                                    </div>
+                                    <div class="flex flex-col">
+                                        <span class="text-[11px] font-medium text-[var(--text-muted)]">Студенти</span>
+                                        <span id="globalStudentTotal" class="text-2xl sm:text-3xl font-extrabold text-[var(--text-main)] tracking-tight">0</span>
+                                    </div>
+                                </div>
+                                <span class="text-xs font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform self-end pb-1">Преглед →</span>
+                            </div>
+                        </article>
+
+                        <!-- GLOBAL KPI 2: EXAM IMPORTS (PURPLE) -->
+                        <article class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 shadow-xs flex flex-col justify-between hover:border-purple-500/50 transition group cursor-pointer" onclick="switchTab('exams')">
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-lg bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold">
+                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                    </div>
+                                    <span class="text-xs font-bold uppercase tracking-wider text-[var(--text-main)]">Изпитни графици</span>
+                                </div>
+                                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400">Графици</span>
+                            </div>
+                            <div class="mt-4 flex items-end justify-between gap-2">
+                                <div class="flex items-end gap-5 sm:gap-6">
+                                    <div class="flex flex-col">
+                                        <span class="text-[11px] font-medium text-[var(--text-muted)]">Импортирани</span>
+                                        <span id="globalExamBatches" class="text-2xl sm:text-3xl font-extrabold text-[var(--text-main)] tracking-tight">0</span>
+                                    </div>
+                                    <div class="flex flex-col">
+                                        <span class="text-[11px] font-medium text-[var(--text-muted)]">Изпити</span>
+                                        <span id="globalExamTotal" class="text-2xl sm:text-3xl font-extrabold text-[var(--text-main)] tracking-tight">0</span>
+                                    </div>
+                                </div>
+                                <span class="text-xs font-bold text-purple-600 dark:text-purple-400 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform self-end pb-1">Преглед →</span>
+                            </div>
+                        </article>
+
+                        <!-- GLOBAL KPI 3: BIOMETRICS (ROSE) -->
+                        <article class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 shadow-xs flex flex-col justify-between hover:border-rose-500/50 transition group cursor-pointer" onclick="switchTab('approval')">
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-lg bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center font-bold">
+                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                    </div>
+                                    <span class="text-xs font-bold uppercase tracking-wider text-[var(--text-main)]">Биометрия</span>
+                                </div>
+                                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400">Опашка</span>
+                            </div>
+                            <div class="mt-4 flex items-end justify-between gap-2">
+                                <div class="flex items-end gap-5 sm:gap-6">
+                                    <div class="flex flex-col">
+                                        <span class="text-[11px] font-medium text-[var(--text-muted)]">Изпълнени</span>
+                                        <span id="globalBioApproved" class="text-2xl sm:text-3xl font-extrabold text-[var(--text-main)] tracking-tight">0</span>
+                                    </div>
+                                    <div class="flex flex-col">
+                                        <span class="text-[11px] font-medium text-[var(--text-muted)] flex items-center gap-1.5">
+                                            <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>Чакащи
+                                        </span>
+                                        <span id="globalBioPending" class="text-2xl sm:text-3xl font-extrabold text-rose-600 dark:text-rose-400 tracking-tight">0</span>
+                                    </div>
+                                </div>
+                                <span class="text-xs font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform self-end pb-1">Одобри →</span>
+                            </div>
+                        </article>
+
+                        <!-- GLOBAL KPI 4: ALLOCATIONS (EMERALD) -->
+                        <article class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 shadow-xs flex flex-col justify-between hover:border-emerald-500/50 transition group cursor-pointer" onclick="switchTab('allocation')">
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold">
+                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                        </svg>
+                                    </div>
+                                    <span class="text-xs font-bold uppercase tracking-wider text-[var(--text-main)]">Разпределения</span>
+                                </div>
+                                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">Зали</span>
+                            </div>
+                            <div class="mt-4 flex items-end justify-between gap-2">
+                                <div class="flex items-end gap-5 sm:gap-6">
+                                    <div class="flex flex-col">
+                                        <span class="text-[11px] font-medium text-[var(--text-muted)]">Възможни</span>
+                                        <span id="globalAllocPossible" class="text-2xl sm:text-3xl font-extrabold text-[var(--text-main)] tracking-tight">0</span>
+                                    </div>
+                                    <div class="flex flex-col">
+                                        <span class="text-[11px] font-medium text-[var(--text-muted)]">Приключени</span>
+                                        <span id="globalAllocCompleted" class="text-2xl sm:text-3xl font-extrabold text-[var(--text-main)] tracking-tight">0</span>
+                                    </div>
+                                </div>
+                                <span class="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform self-end pb-1">Преглед →</span>
+                            </div>
+                        </article>
+                    </div>
+                </section>
+
+                <!-- LEGACY BACKWARD-COMPATIBILITY ELEMENT HOLDERS -->
+                <div class="sr-only" aria-hidden="true">
+                    <span id="countStudentImports">0</span>
+                    <span id="countExamImports">0</span>
+                    <span id="countPendingStudents">0</span>
+                    <span id="countAllocationLogs">0</span>
+                </div>
 
                 <!-- OVERVIEW CONTENT GRID: QUICK ACTIONS & RECENT ACTIVITY -->
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -2064,11 +2245,13 @@
                 appSidebar.classList.remove("w-64");
                 appSidebar.classList.add("w-20");
                 collapseIcon?.classList.add("rotate-180");
+                desktopSidebarToggle?.setAttribute("title", "Разпъване на менюто");
                 localStorage.setItem("admin_sidebar_collapsed", "true");
             } else {
                 appSidebar.classList.remove("w-20");
                 appSidebar.classList.add("w-64");
                 collapseIcon?.classList.remove("rotate-180");
+                desktopSidebarToggle?.setAttribute("title", "Свиване на менюто");
                 localStorage.setItem("admin_sidebar_collapsed", "false");
             }
         }
@@ -2078,6 +2261,11 @@
         }
 
         desktopSidebarToggle?.addEventListener("click", toggleDesktopSidebar);
+        document.getElementById("sidebarBrandMain")?.addEventListener("click", () => {
+            if (document.body.classList.contains("sidebar-collapsed")) {
+                toggleDesktopSidebar();
+            }
+        });
 
         function toggleMobileMenu(open) {
             if (open) {
@@ -2238,10 +2426,55 @@
             verifications: "Верификации & Secure Key"
         };
 
-        function switchTab(tabName) {
+        let currentActiveTab = 'overview';
+        const renderedTabs = new Set();
+
+        function renderTab(tabName) {
+            if (!state.data) return;
+            switch (tabName) {
+                case 'overview':
+                    renderActivityFeed(state.data);
+                    break;
+                case 'students':
+                    renderStudentImportLogs();
+                    renderSelectedStudentLog();
+                    break;
+                case 'exams':
+                    renderExamImportLogs();
+                    break;
+                case 'allocation':
+                    renderAllocationLogs();
+                    updateAllocationPreviewKPIs();
+                    break;
+                case 'approval':
+                    renderPendingStudents();
+                    break;
+                case 'examiners':
+                    renderExaminers();
+                    break;
+                case 'verifications':
+                    if (state.data.is_superadmin) {
+                        loadVerificationsData();
+                    }
+                    break;
+            }
+            renderedTabs.add(tabName);
+        }
+
+        function renderActiveTab() {
+            renderTab(currentActiveTab);
+        }
+
+        function switchTab(tabName, pushHistory = true) {
             if (tabName === 'verifications' && (!state.data || !state.data.is_superadmin)) {
                 return;
             }
+
+            // Sync with browser history for Back/Forward navigation
+            if (pushHistory && tabName !== currentActiveTab) {
+                history.pushState({ tab: tabName }, '', '#' + tabName);
+            }
+            currentActiveTab = tabName;
 
             // Update sidebar nav items
             document.querySelectorAll('#sidebarNav .nav-item').forEach((item) => {
@@ -2267,6 +2500,11 @@
             // Close mobile menu if open
             toggleMobileMenu(false);
 
+            // Lazy render tab content on demand
+            if (!renderedTabs.has(tabName)) {
+                renderTab(tabName);
+            }
+
             // Trigger specific tab data reload
             if (tabName === 'verifications') {
                 setStatus('Верификации и Secure Key');
@@ -2289,6 +2527,27 @@
                     setStatus('База данни: Свързана');
                 }
             }
+        }
+
+        // BROWSER BACK / FORWARD POPSTATE NAVIGATION
+        window.addEventListener('popstate', (e) => {
+            const targetTab = (e.state && e.state.tab) || window.location.hash.replace('#', '') || 'overview';
+            if (tabTitles[targetTab]) {
+                switchTab(targetTab, false);
+            } else {
+                switchTab('overview', false);
+            }
+        });
+
+        // Initialize browser history tab state on page load
+        const initialHashTab = window.location.hash.replace('#', '');
+        if (initialHashTab && tabTitles[initialHashTab]) {
+            history.replaceState({ tab: initialHashTab }, '', '#' + initialHashTab);
+            currentActiveTab = initialHashTab;
+            switchTab(initialHashTab, false);
+        } else {
+            history.replaceState({ tab: 'overview' }, '', '#overview');
+            currentActiveTab = 'overview';
         }
 
         document.querySelectorAll('#sidebarNav .nav-item').forEach((button) => {
@@ -2539,6 +2798,56 @@
         // ===============================================
         // 6. DASHBOARD DATA LOADING & RENDERING
         // ===============================================
+
+        /**
+         * Smooth Count-Up Animation (Odometer Effect)
+         * Animates a numerical element from its current numeric value to the target value
+         * using an ease-out cubic curve.
+         */
+        function animateCount(targetElem, endValue, duration = 900) {
+            const el = typeof targetElem === 'string' ? document.getElementById(targetElem) : targetElem;
+            if (!el) return;
+
+            const target = Number(endValue) || 0;
+            const currentRaw = el.textContent.replace(/[^0-9.-]/g, '');
+            const start = Number(currentRaw) || 0;
+
+            if (start === target) {
+                el.textContent = target.toLocaleString('bg-BG');
+                return;
+            }
+
+            // Cancel previous active animation frame on this element
+            if (el._animFrameId) {
+                cancelAnimationFrame(el._animFrameId);
+                el._animFrameId = null;
+            }
+
+            const startTime = performance.now();
+
+            function easeOutCubic(t) {
+                return 1 - Math.pow(1 - t, 3);
+            }
+
+            function step(now) {
+                const elapsed = now - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const eased = easeOutCubic(progress);
+                const current = Math.round(start + (target - start) * eased);
+
+                el.textContent = current.toLocaleString('bg-BG');
+
+                if (progress < 1) {
+                    el._animFrameId = requestAnimationFrame(step);
+                } else {
+                    el.textContent = target.toLocaleString('bg-BG');
+                    el._animFrameId = null;
+                }
+            }
+
+            el._animFrameId = requestAnimationFrame(step);
+        }
+
         async function loadDashboardData() {
             setStatus('Зареждане на данните...');
             const response = await authFetch('/admins/dashboard-data');
@@ -2569,11 +2878,61 @@
                 }
             }
 
-            // KPI Counts
-            document.getElementById('countStudentImports').textContent = data.counts?.student_import_logs ?? 0;
-            document.getElementById('countExamImports').textContent = data.counts?.exam_import_logs ?? 0;
-            document.getElementById('countPendingStudents').textContent = data.counts?.pending_students ?? 0;
-            document.getElementById('countAllocationLogs').textContent = data.counts?.allocation_logs ?? 0;
+            // Personal KPI Counts (Logged-in Administrator) with Count-Up Animation
+            const pStats = data.personal_stats || {};
+            const pStud = pStats.student_imports || {};
+            const pExam = pStats.exam_imports || {};
+            const pBio = pStats.biometrics || {};
+            const pAlloc = pStats.allocations || {};
+
+            animateCount('personalStudentBatches', pStud.batches ?? 0);
+            animateCount('personalStudentTotal', pStud.students ?? 0);
+
+            animateCount('personalExamBatches', pExam.batches ?? 0);
+            animateCount('personalExamTotal', pExam.exams ?? 0);
+
+            animateCount('personalBioApproved', pBio.approved ?? 0);
+            animateCount('personalBioPending', pBio.pending ?? (data.pending_students?.length ?? 0));
+
+            animateCount('personalAllocPossible', pAlloc.possible ?? 0);
+            animateCount('personalAllocCompleted', pAlloc.completed ?? 0);
+
+            // Global Superadmin KPI Counts (All Administrators) with Count-Up Animation
+            const globalKpiSection = document.getElementById('globalKpiSection');
+            if (globalKpiSection) {
+                if (data.is_superadmin) {
+                    globalKpiSection.classList.remove('hidden');
+                    const gStats = data.global_stats || {};
+                    const gStud = gStats.student_imports || {};
+                    const gExam = gStats.exam_imports || {};
+                    const gBio = gStats.biometrics || {};
+                    const gAlloc = gStats.allocations || {};
+
+                    animateCount('globalStudentBatches', gStud.batches ?? (data.counts?.student_import_logs ?? 0));
+                    animateCount('globalStudentTotal', gStud.students ?? 0);
+
+                    animateCount('globalExamBatches', gExam.batches ?? (data.counts?.exam_import_logs ?? 0));
+                    animateCount('globalExamTotal', gExam.exams ?? (data.counts?.exams ?? 0));
+
+                    animateCount('globalBioApproved', gBio.approved ?? 0);
+                    animateCount('globalBioPending', gBio.pending ?? (data.pending_students?.length ?? 0));
+
+                    animateCount('globalAllocPossible', gAlloc.possible ?? 0);
+                    animateCount('globalAllocCompleted', gAlloc.completed ?? (data.counts?.allocation_logs ?? 0));
+                } else {
+                    globalKpiSection.classList.add('hidden');
+                }
+            }
+
+            // Legacy backward-compatibility elements
+            const legStud = document.getElementById('countStudentImports');
+            if (legStud) legStud.textContent = data.counts?.student_import_logs ?? 0;
+            const legExam = document.getElementById('countExamImports');
+            if (legExam) legExam.textContent = data.counts?.exam_import_logs ?? 0;
+            const legPending = document.getElementById('countPendingStudents');
+            if (legPending) legPending.textContent = data.counts?.pending_students ?? 0;
+            const legAlloc = document.getElementById('countAllocationLogs');
+            if (legAlloc) legAlloc.textContent = data.counts?.allocation_logs ?? 0;
 
             // Nav Badge
             const pendingNavBadge = document.getElementById('pendingCountBadgeNav');
@@ -2591,14 +2950,9 @@
             document.getElementById('startApprovalBtn').textContent = `Старт на одобрения, чакащи: ${data.pending_students?.length ?? 0}`;
             document.getElementById('examinersCount').textContent = data.examiners?.length ?? 0;
 
-            renderActivityFeed(data);
-            renderStudentImportLogs();
-            renderSelectedStudentLog();
-            renderExamImportLogs();
-            renderAllocationLogs();
-            updateAllocationPreviewKPIs();
-            renderPendingStudents();
-            renderExaminers();
+            // Lazy Tab Rendering: Clear render tracker and render only the currently active tab
+            renderedTabs.clear();
+            renderActiveTab();
             setStatus('База данни: Свързана');
         }
 

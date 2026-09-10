@@ -18,37 +18,37 @@ from app.auth import get_password_hash, SECRET_KEY, ALGORITHM
 
 client = TestClient(app)
 
+from tests.test_data_isolation import TestDataSnapshot, clean_known_test_data
+
 class SuperadminVersatilityTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         init_db()
+        db = SessionLocal()
+        try:
+            clean_known_test_data(db)
+        finally:
+            db.close()
 
     @classmethod
     def tearDownClass(cls):
         db: Session = SessionLocal()
         try:
-            db.query(Admin).filter(Admin.is_superadmin == False).delete()
-            db.query(Examiner).delete()
-            db.query(SecureKey).delete()
-            db.query(Student).filter(Student.student_id_number == "999999999").delete()
-            db.commit()
-        except Exception:
-            db.rollback()
+            clean_known_test_data(db)
         finally:
             db.close()
 
     def setUp(self):
         self.db: Session = SessionLocal()
+        clean_known_test_data(self.db)
+        self.snapshot = TestDataSnapshot(self.db)
         # Ensure database is seeded with the superadmin
         self.superadmin = seed_superadmin(self.db)
 
     def tearDown(self):
         try:
-            # Autodelete all newly created test entries
-            self.db.query(Admin).filter(Admin.is_superadmin == False).delete()
-            self.db.query(Examiner).delete()
-            self.db.query(SecureKey).delete()
-            self.db.query(Student).filter(Student.student_id_number == "999999999").delete()
+            self.snapshot.cleanup()
+            clean_known_test_data(self.db)
             # Ensure superadmin password is reset to default SuperAdmin123!
             superadmin = self.db.query(Admin).filter(Admin.is_superadmin == True).first()
             if superadmin:

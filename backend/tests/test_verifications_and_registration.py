@@ -15,36 +15,32 @@ from app.models import Admin, Examiner, SecureKey, Student
 from app.seed import seed_superadmin
 from app.auth import get_password_hash, SECRET_KEY, ALGORITHM
 
+from tests.test_data_isolation import TestDataSnapshot, clean_known_test_data
+
 client = TestClient(app)
 
 class VerificationsAndRegistrationTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         init_db()
+        db = SessionLocal()
+        try:
+            clean_known_test_data(db)
+        finally:
+            db.close()
 
     @classmethod
     def tearDownClass(cls):
         db: Session = SessionLocal()
         try:
-            db.query(Admin).filter(Admin.is_superadmin == False).delete()
-            db.query(Examiner).delete()
-            db.query(SecureKey).delete()
-            db.commit()
-        except Exception:
-            db.rollback()
+            clean_known_test_data(db)
         finally:
             db.close()
 
     def setUp(self):
         self.db: Session = SessionLocal()
-        # Clean any preexisting non-superadmin test records
-        try:
-            self.db.query(Admin).filter(Admin.is_superadmin == False).delete()
-            self.db.query(Examiner).delete()
-            self.db.query(SecureKey).delete()
-            self.db.commit()
-        except Exception:
-            self.db.rollback()
+        clean_known_test_data(self.db)
+        self.snapshot = TestDataSnapshot(self.db)
 
         self.superadmin = seed_superadmin(self.db)
         # Login as superadmin to get token
@@ -61,10 +57,8 @@ class VerificationsAndRegistrationTestCase(unittest.TestCase):
 
     def tearDown(self):
         try:
-            # Autodelete all newly created test entries
-            self.db.query(Admin).filter(Admin.is_superadmin == False).delete()
-            self.db.query(Examiner).delete()
-            self.db.query(SecureKey).delete()
+            self.snapshot.cleanup()
+            clean_known_test_data(self.db)
             # Ensure superadmin password is reset to default SuperAdmin123!
             superadmin = self.db.query(Admin).filter(Admin.is_superadmin == True).first()
             if superadmin:

@@ -22,24 +22,30 @@ TEST_STUDENT_ID_NUM = "99900001"
 TEST_STUDENT_EMAIL = "test.biometric@tu-sofia.bg"
 
 
+from tests.test_data_isolation import TestDataSnapshot, clean_known_test_data
+
 class BiometricApprovalTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         init_db()
+        db = SessionLocal()
+        try:
+            clean_known_test_data(db)
+        finally:
+            db.close()
 
     @classmethod
     def tearDownClass(cls):
         db: Session = SessionLocal()
         try:
-            db.query(Student).filter(Student.student_id_number == TEST_STUDENT_ID_NUM).delete(synchronize_session=False)
-            db.commit()
-        except Exception:
-            db.rollback()
+            clean_known_test_data(db)
         finally:
             db.close()
 
     def setUp(self):
         self.db: Session = SessionLocal()
+        clean_known_test_data(self.db)
+        self.snapshot = TestDataSnapshot(self.db)
         self.superadmin = seed_superadmin(self.db)
 
         # Login as superadmin to get token
@@ -51,17 +57,15 @@ class BiometricApprovalTestCase(unittest.TestCase):
         self.admin_token = login_res.cookies.get("admin_token")
         self.auth_headers = {"Authorization": f"Bearer {self.admin_token}"}
 
-        # Ensure clean state for test student
-        self._cleanup_test_records()
-
     def tearDown(self):
         self._cleanup_test_records()
         self.db.close()
 
     def _cleanup_test_records(self):
         try:
-            self.db.query(Student).filter(Student.student_id_number == TEST_STUDENT_ID_NUM).delete(synchronize_session=False)
-            self.db.commit()
+            if hasattr(self, "snapshot"):
+                self.snapshot.cleanup()
+            clean_known_test_data(self.db)
         except Exception:
             self.db.rollback()
 

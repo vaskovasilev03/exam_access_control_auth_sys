@@ -1,6 +1,7 @@
 import os
 import io
 import json
+import re
 import mimetypes
 import asyncio
 import secrets
@@ -43,7 +44,10 @@ from .stream_esp32 import generate_from_memory, fetch_frames_from_esp32, ACTIVE_
 from .storage import init_storage, upload_photo_to_cloud, get_photo_from_cloud, BUCKET_NAME
 from .mailer import send_welcome_email, send_allocation_email
 
+from starlette.middleware.gzip import GZipMiddleware
+
 app = FastAPI()
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 templates = Jinja2Templates(directory="app/templates")
 timezone = ZoneInfo("Europe/Sofia")
 
@@ -96,28 +100,44 @@ def _student_payload(student: Student) -> dict:
     }
 
 
-def _exam_payload(exam: Exam, db: Optional[Session] = None) -> dict:
+def _exam_payload(
+    exam: Exam,
+    db: Optional[Session] = None,
+    precomputed_allocated_counts: Optional[dict] = None,
+    precomputed_student_stats: Optional[dict] = None,
+) -> dict:
     allocated_count = 0
     eligible_count = 0
     approved_count = 0
 
-    if db:
+    if precomputed_allocated_counts is not None:
+        allocated_count = precomputed_allocated_counts.get(exam.id, 0)
+    elif db:
         allocated_count = db.query(ExamRegistration).filter(ExamRegistration.exam_id == exam.id).count()
+    elif exam.registrations is not None:
+        allocated_count = len(exam.registrations)
+
+    if precomputed_student_stats is not None:
         if exam.group:
             allowed_groups = [int(g.strip()) for g in str(exam.group).split(",") if g.strip().isdigit()]
-            if allowed_groups:
-                students_query = db.query(Student.id, Student.status).filter(
-                    Student.faculty == exam.faculty,
-                    Student.specialty == exam.specialty,
-                    Student.course == exam.course,
-                    Student.stream == exam.stream,
-                    Student.group.in_(allowed_groups)
-                ).all()
-                eligible_count = len(students_query)
-                approved_count = sum(1 for s in students_query if s.status == "APPROVED")
-    else:
-        if exam.registrations is not None:
-            allocated_count = len(exam.registrations)
+            for g in allowed_groups:
+                key = (exam.faculty, exam.specialty, exam.course, str(exam.stream), g)
+                stat = precomputed_student_stats.get(key)
+                if stat:
+                    eligible_count += stat.get("total", 0)
+                    approved_count += stat.get("approved", 0)
+    elif db and exam.group:
+        allowed_groups = [int(g.strip()) for g in str(exam.group).split(",") if g.strip().isdigit()]
+        if allowed_groups:
+            students_query = db.query(Student.id, Student.status).filter(
+                Student.faculty == exam.faculty,
+                Student.specialty == exam.specialty,
+                Student.course == exam.course,
+                Student.stream == exam.stream,
+                Student.group.in_(allowed_groups)
+            ).all()
+            eligible_count = len(students_query)
+            approved_count = sum(1 for s in students_query if s.status == "APPROVED")
 
     return {
         "id": str(exam.id),
@@ -154,7 +174,12 @@ def _admin_log_payload(log: AdminLog) -> dict:
     }
 
 
-def _resolve_log_students(db: Session, log: AdminLog, selected_student_ids: Optional[list[str]] = None) -> list[Student]:
+def _resolve_log_students(
+    db: Session,
+    log: AdminLog,
+    selected_student_ids: Optional[list[str]] = None,
+    preloaded_students_by_spec_group: Optional[dict] = None,
+) -> list[Student]:
     parsed_details = _parse_admin_log_details(log.details)
     
     if log.action_type == "STUDENT_IMPORT":
@@ -165,6 +190,14 @@ def _resolve_log_students(db: Session, log: AdminLog, selected_student_ids: Opti
                 group_int = int(float(log.group))
             except ValueError:
                 pass
+
+        if preloaded_students_by_spec_group is not None:
+            target_group = group_int if group_int is not None else log.group
+            matched = list(preloaded_students_by_spec_group.get((log.specialty, target_group), []))
+            if selected_student_ids:
+                sel_set = set(selected_student_ids)
+                matched = [s for s in matched if str(s.id) in sel_set]
+            return sorted(matched, key=lambda s: s.created_at if s.created_at else datetime.min)
 
         # Филтрираме по специалност
         query = db.query(Student).filter(Student.specialty == log.specialty)
@@ -182,6 +215,8 @@ def _resolve_log_students(db: Session, log: AdminLog, selected_student_ids: Opti
 
     if log.action_type.startswith("ALLOCATION_EXECUTION"):
         exam_ids = parsed_details.get("exam_ids", [])
+        if not exam_ids:
+            return []
         query = db.query(Student).join(ExamRegistration, ExamRegistration.student_id == Student.id).filter(
             ExamRegistration.exam_id.in_(exam_ids)
         )
@@ -192,13 +227,22 @@ def _resolve_log_students(db: Session, log: AdminLog, selected_student_ids: Opti
     return []
 
 
-def _resolve_log_exams(db: Session, log: AdminLog) -> list[Exam]:
+def _resolve_log_exams(
+    db: Session,
+    log: AdminLog,
+    all_exams_list: Optional[list[Exam]] = None,
+    exams_by_id_map: Optional[dict] = None,
+) -> list[Exam]:
     parsed_details = _parse_admin_log_details(log.details)
     
     if log.action_type == "EXAM_IMPORT":
         start_window = log.created_at - timedelta(seconds=10)
         end_window = log.created_at + timedelta(seconds=10)
         
+        if all_exams_list is not None:
+            matched = [e for e in all_exams_list if e.created_at and start_window <= e.created_at <= end_window]
+            return sorted(matched, key=lambda e: e.date_time if e.date_time else datetime.min)
+
         return db.query(Exam).filter(
             Exam.created_at >= start_window,
             Exam.created_at <= end_window
@@ -207,14 +251,29 @@ def _resolve_log_exams(db: Session, log: AdminLog) -> list[Exam]:
     exam_ids = parsed_details.get("exam_ids", [])
     if not exam_ids:
         return []
+
+    if exams_by_id_map is not None:
+        matched = [exams_by_id_map[str(eid)] for eid in exam_ids if str(eid) in exams_by_id_map]
+        return sorted(matched, key=lambda e: e.date_time if e.date_time else datetime.min)
+
     return db.query(Exam).filter(Exam.id.in_(exam_ids)).order_by(Exam.date_time.asc()).all()
 
 
-def _resolve_log_registrations(db: Session, log: AdminLog) -> list[dict]:
+def _resolve_log_registrations(
+    db: Session,
+    log: AdminLog,
+    preloaded_registrations_by_exam_id: Optional[dict] = None,
+) -> list[dict]:
     parsed_details = _parse_admin_log_details(log.details)
-    exam_ids = parsed_details.get("exam_ids", [])
+    exam_ids = [str(eid) for eid in parsed_details.get("exam_ids", [])]
     if not exam_ids:
         return []
+
+    if preloaded_registrations_by_exam_id is not None:
+        results = []
+        for eid in exam_ids:
+            results.extend(preloaded_registrations_by_exam_id.get(eid, []))
+        return results
 
     registrations = db.query(ExamRegistration).filter(
         ExamRegistration.exam_id.in_(exam_ids)
@@ -716,33 +775,222 @@ def get_admin_dashboard_data(db: Session = Depends(get_db), current_admin: dict 
     if not admin or not admin.is_verified:
         raise HTTPException(status_code=403, detail="Unauthorized access. Admin privileges required.")
 
-    student_import_logs = db.query(AdminLog).filter(AdminLog.action_type == "STUDENT_IMPORT").order_by(AdminLog.created_at.desc()).all()
-    exam_import_logs = db.query(AdminLog).filter(AdminLog.action_type == "EXAM_IMPORT").order_by(AdminLog.created_at.desc()).all()
-    allocation_logs = db.query(AdminLog).filter(AdminLog.action_type.in_(["ALLOCATION_EXECUTION", "ALLOCATION_EXECUTION_NO_NEW"])).order_by(AdminLog.created_at.desc()).all()
-    pending_students = db.query(Student).filter(Student.status == "PENDING_APPROVAL").order_by(Student.created_at.asc()).all()
+    # 1. Total counts
+    total_student_import_logs_count = db.query(AdminLog).filter(AdminLog.action_type == "STUDENT_IMPORT").count()
+    total_exam_import_logs_count = db.query(AdminLog).filter(AdminLog.action_type == "EXAM_IMPORT").count()
+    total_allocation_logs_count = db.query(AdminLog).filter(AdminLog.action_type.in_(["ALLOCATION_EXECUTION", "ALLOCATION_EXECUTION_NO_NEW"])).count()
+
+    # 2. Fetch recent logs (bounded to recent batches to eliminate multi-megabyte JSON bloat)
+    student_import_logs = db.query(AdminLog).filter(AdminLog.action_type == "STUDENT_IMPORT").order_by(AdminLog.created_at.desc()).limit(30).all()
+    exam_import_logs = db.query(AdminLog).filter(AdminLog.action_type == "EXAM_IMPORT").order_by(AdminLog.created_at.desc()).limit(30).all()
+    allocation_logs = db.query(AdminLog).filter(AdminLog.action_type.in_(["ALLOCATION_EXECUTION", "ALLOCATION_EXECUTION_NO_NEW"])).order_by(AdminLog.created_at.desc()).limit(30).all()
+
+    all_students = db.query(Student).order_by(Student.created_at.asc()).all()
+    pending_students = [s for s in all_students if s.status == "PENDING_APPROVAL"]
     examiners = db.query(Examiner).order_by(Examiner.created_at.desc()).all()
     exams = db.query(Exam).order_by(Exam.date_time.asc()).all()
 
+    # 3. Pre-index exams by str(id)
+    exams_by_id_map = {str(e.id): e for e in exams}
+
+    # 4. Pre-index students by (specialty, group) and build student group statistics for exam payload
+    students_by_spec_group = defaultdict(list)
+    student_stats_map = defaultdict(lambda: {"total": 0, "approved": 0})
+    for s in all_students:
+        students_by_spec_group[(s.specialty, s.group)].append(s)
+        key = (s.faculty, s.specialty, s.course, str(s.stream), s.group)
+        student_stats_map[key]["total"] += 1
+        if s.status == "APPROVED":
+            student_stats_map[key]["approved"] += 1
+
+    # 5. Batch fetch allocated counts for all exams in 1 single query
+    allocated_counts_raw = db.query(ExamRegistration.exam_id, func.count(ExamRegistration.id)).group_by(ExamRegistration.exam_id).all()
+    allocated_counts = {eid: cnt for eid, cnt in allocated_counts_raw}
+
+    # 6. Memoized exam payload generator
+    cached_exam_payloads = {}
+    def get_cached_exam_payload(exam: Exam) -> dict:
+        if exam.id not in cached_exam_payloads:
+            cached_exam_payloads[exam.id] = _exam_payload(
+                exam,
+                precomputed_allocated_counts=allocated_counts,
+                precomputed_student_stats=student_stats_map
+            )
+        return cached_exam_payloads[exam.id]
+
+    # 7. Pre-fetch registrations for recent allocation logs in 1 single joined query
+    all_alloc_exam_ids = set()
+    for log in allocation_logs:
+        p_details = _parse_admin_log_details(log.details)
+        for eid in p_details.get("exam_ids", [])[:20]:
+            all_alloc_exam_ids.add(eid)
+
+    preloaded_registrations_by_exam_id = defaultdict(list)
+    if all_alloc_exam_ids:
+        alloc_regs = db.query(ExamRegistration).filter(
+            ExamRegistration.exam_id.in_(all_alloc_exam_ids)
+        ).join(Student, ExamRegistration.student_id == Student.id
+        ).join(Exam, ExamRegistration.exam_id == Exam.id
+        ).order_by(Exam.date_time.asc(), Student.student_id_number.asc()).all()
+
+        for reg in alloc_regs:
+            reg_dict = {
+                "id": str(reg.id),
+                "student_id": str(reg.student_id),
+                "student_name": reg.student.full_name if reg.student else "Неизвестен",
+                "student_fac_num": reg.student.student_id_number if reg.student else "-",
+                "student_email": reg.student.email if reg.student else "",
+                "student_specialty": reg.student.specialty if reg.student else "-",
+                "student_group": reg.student.group if reg.student else "-",
+                "exam_id": str(reg.exam_id),
+                "exam_subject": reg.exam.subject if reg.exam else "Неизвестен",
+                "session_type": reg.exam.session_type.value if (reg.exam and reg.exam.session_type) else None,
+                "room_number": reg.exam.room_number if reg.exam else "-",
+                "date_time": reg.exam.date_time.isoformat() if (reg.exam and reg.exam.date_time) else None,
+            }
+            preloaded_registrations_by_exam_id[str(reg.exam_id)].append(reg_dict)
+
+    # 8. Superadmin counts
     pending_verifications_count = 0
     if admin.is_superadmin:
         pending_admins_count = db.query(Admin).filter(Admin.is_verified == False, Admin.is_superadmin == False).count()
         pending_examiners_count = db.query(Examiner).filter(Examiner.is_verified == False).count()
         pending_verifications_count = pending_admins_count + pending_examiners_count
 
+    # 9. Clean, de-duplicated allocation payloads
+    allocation_payloads = []
+    for log in allocation_logs:
+        p_details = _parse_admin_log_details(log.details)
+        eids = [str(x) for x in p_details.get("exam_ids", [])]
+
+        # In allocation logs, include representative exam (at most 1) to prevent duplicating 1,720 exams 50 times
+        log_exams = [get_cached_exam_payload(exams_by_id_map[eid]) for eid in eids if eid in exams_by_id_map][:1]
+        
+        regs = []
+        for eid in eids[:20]:
+            regs.extend(preloaded_registrations_by_exam_id.get(eid, []))
+
+        # Trim parsed details exam_ids if huge (e.g. global allocation with thousands of UUIDs)
+        trimmed_p_details = dict(p_details)
+        if len(trimmed_p_details.get("exam_ids", [])) > 10:
+            trimmed_p_details["exam_ids"] = trimmed_p_details["exam_ids"][:10]
+
+        short_details = log.details
+        if short_details and len(short_details) > 300:
+            short_details = short_details[:300] + "..."
+
+        allocation_payloads.append({
+            "id": str(log.id),
+            "action_type": log.action_type,
+            "details": short_details,
+            "parsed_details": trimmed_p_details,
+            "specialty": log.specialty,
+            "group": log.group,
+            "notification_sent": log.notification_sent,
+            "created_at": log.created_at.isoformat() if log.created_at else None,
+            "student_ids": p_details.get("student_ids", [])[:10],
+            "exam_ids": eids[:10],
+            "exams": log_exams,
+            "students": [],
+            "registrations": regs,
+        })
+
+    # 10. Calculate personal and global multi-tenant KPI statistics
+    # 10a. Student Imports
+    all_student_import_logs_raw = db.query(AdminLog.admin_id, AdminLog.details).filter(AdminLog.action_type == "STUDENT_IMPORT").all()
+    personal_student_batches = 0
+    personal_student_count = 0
+    for aid, details in all_student_import_logs_raw:
+        m = re.search(r"(\d+)\s+студент", details or "")
+        cnt = int(m.group(1)) if m else 0
+        if str(aid) == str(admin.id):
+            personal_student_batches += 1
+            personal_student_count += cnt
+
+    # 10b. Exam Imports
+    all_exam_import_logs_raw = db.query(AdminLog.admin_id, AdminLog.details).filter(AdminLog.action_type == "EXAM_IMPORT").all()
+    personal_exam_batches = 0
+    personal_exam_count = 0
+    for aid, details in all_exam_import_logs_raw:
+        m = re.search(r"Създадени\s+(\d+)", details or "")
+        cnt = int(m.group(1)) if m else 0
+        if str(aid) == str(admin.id):
+            personal_exam_batches += 1
+            personal_exam_count += cnt
+
+    # 10c. Biometrics
+    personal_bio_approved = db.query(AdminLog).filter(
+        AdminLog.action_type == "STUDENT_APPROVE",
+        AdminLog.admin_id == admin.id
+    ).count()
+    global_bio_approved = db.query(AdminLog).filter(
+        AdminLog.action_type == "STUDENT_APPROVE"
+    ).count()
+    approved_students_in_db = sum(1 for s in all_students if s.status == "APPROVED")
+    if approved_students_in_db > global_bio_approved:
+        global_bio_approved = approved_students_in_db
+
+    # 10d. Allocations
+    possible_allocations_count = 0
+    for exam in exams:
+        cached_p = get_cached_exam_payload(exam)
+        if cached_p.get("approved_count", 0) > cached_p.get("allocated_count", 0):
+            possible_allocations_count += 1
+
+    personal_allocations_count = db.query(AdminLog).filter(
+        AdminLog.action_type.in_(["ALLOCATION_EXECUTION", "ALLOCATION_EXECUTION_NO_NEW"]),
+        AdminLog.admin_id == admin.id
+    ).count()
+
     return {
         "is_superadmin": bool(admin.is_superadmin),
         "pending_verifications_count": pending_verifications_count,
         "counts": {
-            "student_import_logs": len(student_import_logs),
-            "exam_import_logs": len(exam_import_logs),
-            "allocation_logs": len(allocation_logs),
+            "student_import_logs": total_student_import_logs_count,
+            "exam_import_logs": total_exam_import_logs_count,
+            "allocation_logs": total_allocation_logs_count,
             "pending_students": len(pending_students),
             "examiners": len(examiners),
             "exams": len(exams),
             "pending_verifications": pending_verifications_count,
         },
+        "personal_stats": {
+            "student_imports": {
+                "batches": personal_student_batches,
+                "students": personal_student_count,
+            },
+            "exam_imports": {
+                "batches": personal_exam_batches,
+                "exams": personal_exam_count,
+            },
+            "biometrics": {
+                "approved": personal_bio_approved,
+                "pending": len(pending_students),
+            },
+            "allocations": {
+                "possible": possible_allocations_count,
+                "completed": personal_allocations_count,
+            },
+        },
+        "global_stats": {
+            "student_imports": {
+                "batches": total_student_import_logs_count,
+                "students": len(all_students),
+            },
+            "exam_imports": {
+                "batches": total_exam_import_logs_count,
+                "exams": len(exams),
+            },
+            "biometrics": {
+                "approved": global_bio_approved,
+                "pending": len(pending_students),
+            },
+            "allocations": {
+                "possible": possible_allocations_count,
+                "completed": total_allocation_logs_count,
+            },
+        },
         "student_import_logs": [
-
             {
                 **_admin_log_payload(log),
                 "students": [
@@ -750,7 +998,11 @@ def get_admin_dashboard_data(db: Session = Depends(get_db), current_admin: dict 
                         **_student_payload(student),
                         "photo_url": _photo_url_for_student(student),
                     }
-                    for student in _resolve_log_students(db, log)
+                    for student in _resolve_log_students(
+                        db,
+                        log,
+                        preloaded_students_by_spec_group=students_by_spec_group
+                    )
                 ],
             }
             for log in student_import_logs
@@ -758,19 +1010,19 @@ def get_admin_dashboard_data(db: Session = Depends(get_db), current_admin: dict 
         "exam_import_logs": [
             {
                 **_admin_log_payload(log),
-                "exams": [_exam_payload(exam, db) for exam in _resolve_log_exams(db, log)],
+                "exams": [
+                    get_cached_exam_payload(exam)
+                    for exam in _resolve_log_exams(
+                        db,
+                        log,
+                        all_exams_list=exams,
+                        exams_by_id_map=exams_by_id_map
+                    )
+                ],
             }
             for log in exam_import_logs
         ],
-        "allocation_logs": [
-            {
-                **_admin_log_payload(log),
-                "exams": [_exam_payload(exam, db) for exam in _resolve_log_exams(db, log)],
-                "students": [_student_payload(student) for student in _resolve_log_students(db, log)],
-                "registrations": _resolve_log_registrations(db, log),
-            }
-            for log in allocation_logs
-        ],
+        "allocation_logs": allocation_payloads,
         "pending_students": [
             {
                 **_student_payload(student),
@@ -789,7 +1041,7 @@ def get_admin_dashboard_data(db: Session = Depends(get_db), current_admin: dict 
             }
             for examiner in examiners
         ],
-        "exams": [_exam_payload(exam, db) for exam in exams],
+        "exams": [get_cached_exam_payload(exam) for exam in exams],
     }
 
 

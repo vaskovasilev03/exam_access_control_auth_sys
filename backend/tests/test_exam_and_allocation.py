@@ -18,10 +18,13 @@ from app.seed import seed_superadmin
 
 client = TestClient(app)
 
+from tests.test_data_isolation import TestDataSnapshot, clean_known_test_data
+
 class ExamAndAllocationTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         init_db()
+        cls._cleanup_database()
 
     @classmethod
     def tearDownClass(cls):
@@ -31,27 +34,14 @@ class ExamAndAllocationTestCase(unittest.TestCase):
     def _cleanup_database(cls):
         db: Session = SessionLocal()
         try:
-            # Delete exam registrations for test exams
-            test_exams = db.query(Exam).filter(Exam.faculty == "TEST-FKSU").all()
-            test_exam_ids = [e.id for e in test_exams]
-            if test_exam_ids:
-                db.query(ExamRegistration).filter(ExamRegistration.exam_id.in_(test_exam_ids)).delete(synchronize_session=False)
-
-            # Delete test exams
-            db.query(Exam).filter(Exam.faculty == "TEST-FKSU").delete(synchronize_session=False)
-
-            # Delete test students
-            test_student_ids = ["99900001", "99900002", "99900003"]
-            db.query(Student).filter(Student.student_id_number.in_(test_student_ids)).delete(synchronize_session=False)
-
-            db.commit()
-        except Exception:
-            db.rollback()
+            clean_known_test_data(db)
         finally:
             db.close()
 
     def setUp(self):
         self.db: Session = SessionLocal()
+        clean_known_test_data(self.db)
+        self.snapshot = TestDataSnapshot(self.db)
         self.superadmin = seed_superadmin(self.db)
         # Login as superadmin
         login_res = client.post("/login", data={
@@ -63,8 +53,13 @@ class ExamAndAllocationTestCase(unittest.TestCase):
         self.auth_headers = {"Authorization": f"Bearer {self.token}"}
 
     def tearDown(self):
-        self._cleanup_database()
-        self.db.close()
+        try:
+            self.snapshot.cleanup()
+            clean_known_test_data(self.db)
+        except Exception:
+            self.db.rollback()
+        finally:
+            self.db.close()
 
     def _create_mock_exam_excel(self):
         data = {
