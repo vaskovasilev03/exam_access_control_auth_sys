@@ -32,7 +32,6 @@ class BiometricApprovalTestCase(unittest.TestCase):
         db: Session = SessionLocal()
         try:
             db.query(Student).filter(Student.student_id_number == TEST_STUDENT_ID_NUM).delete(synchronize_session=False)
-            db.query(AdminLog).filter(AdminLog.details.like(f"%{TEST_STUDENT_ID_NUM}%")).delete(synchronize_session=False)
             db.commit()
         except Exception:
             db.rollback()
@@ -62,7 +61,6 @@ class BiometricApprovalTestCase(unittest.TestCase):
     def _cleanup_test_records(self):
         try:
             self.db.query(Student).filter(Student.student_id_number == TEST_STUDENT_ID_NUM).delete(synchronize_session=False)
-            self.db.query(AdminLog).filter(AdminLog.details.like(f"%{TEST_STUDENT_ID_NUM}%")).delete(synchronize_session=False)
             self.db.commit()
         except Exception:
             self.db.rollback()
@@ -221,7 +219,7 @@ class BiometricApprovalTestCase(unittest.TestCase):
         log = self.db.query(AdminLog).filter(
             AdminLog.action_type == "STUDENT_APPROVE",
             AdminLog.details.like(f"%{TEST_STUDENT_ID_NUM}%")
-        ).first()
+        ).order_by(AdminLog.created_at.desc()).first()
         self.assertIsNotNone(log)
 
     def test_06_reject_pending_student_with_reason(self):

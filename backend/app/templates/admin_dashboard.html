@@ -1351,88 +1351,195 @@
             <!-- 7. PANEL: VERIFICATIONS (Superadmin Only)       -->
             <!-- =============================================== -->
             <div id="panel-verifications" class="panel space-y-6">
-                <div class="border-b border-[var(--border)] pb-4">
-                    <span class="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Superadmin Control</span>
-                    <h2 class="text-xl font-bold text-[var(--text-main)] mt-0.5">Управление на верификации & Secure Key</h2>
-                    <p class="text-xs text-[var(--text-muted)]">Преглед на чакащи персонални акаунти и управление на ключове за автоматично одобрение.</p>
+                <!-- Panel Header & Quick Actions -->
+                <div class="border-b border-[var(--border)] pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                                </svg>
+                                Superadmin Control
+                            </span>
+                            <span id="secureKeyStatusHeaderBadge" class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-[var(--border)]">
+                                <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                                Проверка на статус...
+                            </span>
+                        </div>
+                        <h2 class="text-xl font-bold text-[var(--text-main)] mt-1.5">Управление на верификации & Secure Key</h2>
+                        <p class="text-xs text-[var(--text-muted)] mt-0.5">Контрол на регистрационния достъп за персонал, одобрение на заявки и генериране на защитени ключове.</p>
+                    </div>
+                    <!-- Quick Refresh Button -->
+                    <div class="flex items-center gap-2">
+                        <button id="refreshVerificationsBtn" title="Презареди данните за ключове и верификации" class="px-3 py-1.5 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--border-subtle)] text-xs font-semibold text-[var(--text-main)] transition flex items-center gap-1.5 cursor-pointer shadow-2xs">
+                            <svg id="refreshVerificationsIcon" class="w-3.5 h-3.5 text-[var(--text-muted)] transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            <span>Обнови</span>
+                        </button>
+                    </div>
                 </div>
 
-                <div class="grid grid-cols-1 xl:grid-cols-[420px_1fr] gap-6">
-                    <!-- SECURE KEY CARD -->
-                    <section class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 sm:p-6 shadow-xs space-y-4">
-                        <div class="border-b border-[var(--border)] pb-3">
-                            <h3 class="text-sm font-bold text-[var(--text-main)]">Необслужвана регистрация</h3>
-                            <p class="text-xs text-[var(--text-muted)] mt-0.5">Позволява мигновена активация на нови администратори и квестори със Secure Key.</p>
+                <!-- Master-Detail Grid (Left: Secure Key Hub, Right: Pending Verifications Directory) -->
+                <div class="grid grid-cols-1 xl:grid-cols-[420px_1fr] gap-6 items-start">
+                    
+                    <!-- 1. LEFT CARD: SECURE KEY CONTROL HUB -->
+                    <section class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 sm:p-6 shadow-xs space-y-5">
+                        <!-- Card Header -->
+                        <div class="flex items-center justify-between border-b border-[var(--border)] pb-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-9 h-9 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-500/20 shrink-0">
+                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 class="text-sm font-bold text-[var(--text-main)]">Secure Key Hub</h3>
+                                    <p class="text-xs text-[var(--text-muted)]">Необслужвана регистрация</p>
+                                </div>
+                            </div>
+                            <span id="secureKeyBadgePill" class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-[var(--border)]">
+                                Проверка...
+                            </span>
                         </div>
 
-                        <!-- TOGGLE SWITCH -->
-                        <div class="flex items-center justify-between py-1">
-                            <span class="text-xs font-semibold text-[var(--text-main)]">Активиране без намеса на администратор</span>
-                            <label class="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" id="unattendedToggle" class="sr-only peer">
-                                <div class="w-11 h-6 bg-[var(--border)] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600 peer-disabled:opacity-60 peer-disabled:cursor-not-allowed"></div>
-                            </label>
+                        <!-- Toggle Switch Box -->
+                        <div class="p-3.5 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--bg-body)]/60 space-y-2">
+                            <div class="flex items-center justify-between gap-3">
+                                <div>
+                                    <span class="text-xs font-bold text-[var(--text-main)] block">Автоматична регистрация</span>
+                                    <span class="text-[11px] text-[var(--text-muted)] leading-tight block mt-0.5">Разрешава мигновена активация при въведен валиден Secure Key</span>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer shrink-0">
+                                    <input type="checkbox" id="unattendedToggle" class="sr-only peer">
+                                    <div class="w-11 h-6 bg-[var(--border)] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600 peer-disabled:opacity-60 peer-disabled:cursor-not-allowed shadow-inner"></div>
+                                </label>
+                            </div>
                         </div>
-                        <p id="toggleLockNotice" class="hidden text-xs text-amber-700 bg-amber-50 dark:bg-amber-500/10 border border-amber-500/20 p-2.5 rounded-[var(--radius)] font-medium leading-relaxed">
-                            🔒 Превключвателят е заключен, докато има активен Secure Key. Използвайте "Анулирай Secure Key", за да го изтриете.
-                        </p>
 
-                        <!-- GENERATE BUTTON AREA -->
-                        <div id="generateKeyArea" class="hidden pt-1">
-                            <button id="generateKeyBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-[var(--radius)] shadow-sm transition text-xs cursor-pointer">
-                                Генерирай Secure Key
+                        <!-- Toggle Lock Notice -->
+                        <div id="toggleLockNotice" class="hidden text-xs text-amber-800 dark:text-amber-300 bg-amber-500/10 border border-amber-500/30 p-3 rounded-[var(--radius)] font-medium leading-relaxed flex items-start gap-2.5">
+                            <svg class="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                            </svg>
+                            <div>
+                                <span class="font-bold">Ключът е в активен режим:</span>
+                                <p class="text-[11px] mt-0.5 opacity-90">Превключвателят е защитно заключен, докато съществува активен ключ. За да спрете необслужваната регистрация, анулирайте ключа чрез червения бутон по-долу.</p>
+                            </div>
+                        </div>
+
+                        <!-- Generate Button Area -->
+                        <div id="generateKeyArea" class="hidden space-y-2 pt-1">
+                            <button id="generateKeyBtn" class="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold py-2.5 px-4 rounded-[var(--radius)] shadow-sm hover:shadow transition flex items-center justify-center gap-2 text-xs cursor-pointer">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                                </svg>
+                                <span>Генерирай Secure Key</span>
                             </button>
+                            <p class="text-[11px] text-[var(--text-muted)] text-center">Генерираният ключ може да се предостави на нови колеги за директен достъп.</p>
                         </div>
 
-                        <!-- LOADING SPINNER -->
-                        <div id="keyLoadingSpinner" class="hidden flex items-center justify-center gap-2 py-4 text-xs font-semibold text-blue-600">
-                            <svg class="animate-spin h-5 w-5 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <!-- Loading Spinner -->
+                        <div id="keyLoadingSpinner" class="hidden flex flex-col items-center justify-center gap-2 py-6 text-xs font-semibold text-blue-600 dark:text-blue-400 bg-[var(--bg-body)]/40 rounded-[var(--radius)] border border-[var(--border)] border-dashed">
+                            <svg class="animate-spin h-6 w-6 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
-                            <span>Генериране на Secure Key...</span>
+                            <span>Генериране на криптографски ключ...</span>
                         </div>
 
-                        <!-- KEY DISPLAY AREA -->
-                        <div id="keyDisplayArea" class="hidden space-y-3 p-4 bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)]">
+                        <!-- Active Key Display Area -->
+                        <div id="keyDisplayArea" class="hidden space-y-3.5 p-4 bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)]">
                             <div>
-                                <label class="text-[10px] uppercase tracking-wider text-[var(--text-muted)] font-bold block mb-1">Активен Secure Key</label>
+                                <div class="flex items-center justify-between mb-1.5">
+                                    <label class="text-[10px] uppercase tracking-wider text-[var(--text-muted)] font-bold flex items-center gap-1.5">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                        Активен криптографски ключ
+                                    </label>
+                                    <span id="keyMaskedBadge" class="text-[10px] font-mono text-[var(--text-muted)]"></span>
+                                </div>
                                 <div class="flex items-center gap-2">
-                                    <input type="text" id="keyDisplayInput" readonly class="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] px-3 py-2 text-xs font-mono select-all focus:outline-none" value="********">
-                                    <button id="copyKeyBtn" title="Копирай в клипборда" class="px-3 py-2 bg-blue-600 text-white rounded-[var(--radius)] text-xs font-semibold hover:bg-blue-700 transition cursor-pointer shrink-0">
-                                        Копирай
+                                    <input type="text" id="keyDisplayInput" readonly class="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] px-3 py-2 text-xs font-mono text-[var(--text-main)] select-all focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs" value="********">
+                                    <button id="copyKeyBtn" title="Копирай в клипборда" class="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-[var(--radius)] text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer shadow-2xs">
+                                        <svg id="copyIcon" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                        </svg>
+                                        <span id="copyKeyBtnText">Копирай</span>
                                     </button>
                                 </div>
                             </div>
 
-                            <p id="keyWarningNotice" class="text-xs font-bold italic text-amber-700 bg-amber-50 dark:bg-amber-500/10 border border-amber-500/20 p-2.5 rounded-[var(--radius)] leading-relaxed">
-                                Please store this Secure Key somewhere outside of this page, you will see this key only once so be sure to not lose this key!
+                            <!-- Warning Notice (Only shown on initial generate) -->
+                            <p id="keyWarningNotice" class="text-xs font-semibold text-amber-800 dark:text-amber-300 bg-amber-500/10 border border-amber-500/30 p-2.5 rounded-[var(--radius)] leading-relaxed flex items-start gap-2">
+                                <svg class="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                                <span>Please store this Secure Key somewhere outside of this page, you will see this key only once so be sure to not lose this key!</span>
                             </p>
 
-                            <div class="text-xs text-[var(--text-muted)] space-y-0.5">
-                                <p id="keyDurationMeta">-</p>
-                                <p id="keyExpiryMeta">-</p>
+                            <!-- Meta Grid -->
+                            <div class="grid grid-cols-2 gap-2 text-[11px] pt-1">
+                                <div class="p-2 rounded bg-[var(--bg-card)] border border-[var(--border)]">
+                                    <span class="text-[10px] text-[var(--text-muted)] uppercase tracking-wider block font-bold">Период</span>
+                                    <span id="keyDurationMeta" class="font-semibold text-[var(--text-main)] truncate block">-</span>
+                                </div>
+                                <div class="p-2 rounded bg-[var(--bg-card)] border border-[var(--border)]">
+                                    <span class="text-[10px] text-[var(--text-muted)] uppercase tracking-wider block font-bold">Валиден до</span>
+                                    <span id="keyExpiryMeta" class="font-semibold text-[var(--text-main)] truncate block">-</span>
+                                </div>
                             </div>
 
-                            <button id="deleteKeyBtn" class="w-full border border-red-500 text-red-600 hover:bg-red-600 hover:text-white font-bold py-2 px-3 rounded-[var(--radius)] text-xs transition cursor-pointer mt-2">
-                                Анулирай Secure Key
+                            <!-- Revoke Button -->
+                            <button id="deleteKeyBtn" class="w-full border border-red-500/80 hover:border-red-600 text-red-600 dark:text-red-400 hover:bg-red-600 hover:text-white font-bold py-2 px-3 rounded-[var(--radius)] text-xs transition flex items-center justify-center gap-1.5 cursor-pointer mt-2 shadow-2xs">
+                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                                <span>Анулирай Secure Key</span>
                             </button>
                         </div>
                     </section>
 
-                    <!-- PENDING VERIFICATIONS LIST -->
-                    <section class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 sm:p-6 shadow-xs flex flex-col justify-between">
+                    <!-- 2. RIGHT CARD: PENDING VERIFICATIONS DIRECTORY -->
+                    <section class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 sm:p-6 shadow-xs flex flex-col justify-between space-y-4">
                         <div>
-                            <div class="flex items-center justify-between border-b border-[var(--border)] pb-3 mb-4">
-                                <div>
-                                    <h3 class="text-sm font-bold text-[var(--text-main)]">Чакащи заявки за верификация</h3>
-                                    <p class="text-xs text-[var(--text-muted)] mt-0.5">Заявки за администратори и квестори (най-старите първи).</p>
+                            <!-- Directory Header -->
+                            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-[var(--border)] pb-4 mb-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-9 h-9 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-500/20 shrink-0">
+                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <div class="flex items-center gap-2">
+                                            <h3 class="text-sm font-bold text-[var(--text-main)]">Чакащи заявки за верификация</h3>
+                                            <span id="verificationsListCount" class="text-xs px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold border border-blue-200 dark:border-blue-500/20">0</span>
+                                        </div>
+                                        <p class="text-xs text-[var(--text-muted)] mt-0.5">Хронологичен списък на кандидатстващите администратори и квестори (най-старите първи).</p>
+                                    </div>
                                 </div>
-                                <span id="verificationsListCount" class="text-xs px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold">0</span>
+
+                                <!-- Role Filter Tabs -->
+                                <div class="flex items-center p-0.5 bg-[var(--bg-body)] rounded-[var(--radius)] border border-[var(--border)] shrink-0 text-xs font-semibold">
+                                    <button id="verifFilterAll" data-filter="all" class="verif-filter-btn px-2.5 py-1 rounded-[var(--radius)] transition bg-[var(--bg-card)] text-[var(--text-main)] shadow-2xs cursor-pointer font-bold">Всички</button>
+                                    <button id="verifFilterAdmin" data-filter="admin" class="verif-filter-btn px-2.5 py-1 rounded-[var(--radius)] transition text-[var(--text-muted)] hover:text-[var(--text-main)] cursor-pointer">Администратори</button>
+                                    <button id="verifFilterExaminer" data-filter="examiner" class="verif-filter-btn px-2.5 py-1 rounded-[var(--radius)] transition text-[var(--text-muted)] hover:text-[var(--text-main)] cursor-pointer">Квестори</button>
+                                </div>
                             </div>
 
+                            <!-- Search / Quick Filter -->
+                            <div class="mb-3">
+                                <div class="relative">
+                                    <svg class="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                    </svg>
+                                    <input type="text" id="verificationsSearchInput" placeholder="Търси по име или имейл (@tu-sofia.bg)..." class="w-full bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)] pl-9 pr-3 py-2 text-xs text-[var(--text-main)] placeholder-[var(--text-muted)] focus:outline-none focus:border-blue-500 transition">
+                                </div>
+                            </div>
+
+                            <!-- Requests List Container -->
                             <div id="verificationsList" class="space-y-2.5">
-                                <div class="text-xs text-[var(--text-muted)] text-center py-6">Зареждане на чакащите заявки...</div>
+                                <div class="text-xs text-[var(--text-muted)] text-center py-8">Зареждане на чакащите заявки...</div>
                             </div>
                         </div>
                     </section>
@@ -1445,68 +1552,123 @@
 
     {% if is_superadmin %}
     <!-- =============================================== -->
-    <!-- SECURE KEY MODAL DIALOG                         -->
+    <!-- SECURE KEY MODAL DIALOG (Adminator Tile Cards)  -->
     <!-- =============================================== -->
-    <div id="generateKeyModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-        <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] max-w-md w-full p-6 shadow-2xl space-y-4">
-            <div id="modalStep1">
-                <h3 class="text-base font-bold text-[var(--text-main)] mb-2">Генериране на Secure Key</h3>
-                <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-4">
-                    Сигурен ли сте, че искате да генерирате Secure Key? Това действие ще позволи създаването на акаунти на администратори и квестори, които притежават ключа.
+    <div id="generateKeyModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 transition-opacity duration-200">
+        <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] max-w-lg w-full p-6 shadow-2xl space-y-5">
+            <!-- Modal Header -->
+            <div class="flex items-start justify-between border-b border-[var(--border)] pb-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-500/20 shrink-0">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-[var(--text-main)]">Генериране на Secure Key</h3>
+                        <p class="text-xs text-[var(--text-muted)] mt-0.5">Изберете валидност за автоматична регистрация</p>
+                    </div>
+                </div>
+                <button id="modalCloseXBtn" title="Затвори (Esc)" class="text-[var(--text-muted)] hover:text-[var(--text-main)] p-1 rounded transition cursor-pointer">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Modal Content / Interactive Duration Selector Cards -->
+            <div class="space-y-3">
+                <p class="text-xs text-[var(--text-muted)] leading-relaxed">
+                    Генерираният ключ ще позволи на притежателя му да се регистрира директно като потвърден администратор или квестор без ръчно одобрение. Изберете период на активност:
                 </p>
-                <div class="flex justify-end gap-2 pt-2">
-                    <button id="modalCancelBtn1" class="px-4 py-2 border border-[var(--border)] rounded-[var(--radius)] text-xs font-semibold hover:bg-[var(--border-subtle)] transition cursor-pointer">
-                        Отказ
-                    </button>
-                    <button id="modalProceedBtn" class="px-4 py-2 bg-blue-600 text-white rounded-[var(--radius)] text-xs font-bold hover:bg-blue-700 transition cursor-pointer">
-                        Продължи
-                    </button>
+
+                <!-- 2x2 Grid of Interactive Duration Selector Cards -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1" id="durationTilesContainer">
+                    <!-- Tile 1: 1 Day -->
+                    <label class="duration-tile relative flex flex-col p-3.5 border border-blue-600 dark:border-blue-400 bg-blue-50/50 dark:bg-blue-500/10 rounded-[var(--radius)] cursor-pointer hover:border-blue-500 transition ring-2 ring-blue-500/20 shadow-2xs select-none">
+                        <input type="radio" name="keyDuration" value="1_day" checked class="sr-only">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <span class="w-7 h-7 rounded-lg bg-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xs font-bold">⚡</span>
+                            <span class="duration-check-indicator text-blue-600 dark:text-blue-400 text-xs font-bold">✓</span>
+                        </div>
+                        <span class="text-xs font-bold text-[var(--text-main)]">1 ден</span>
+                        <span class="text-[11px] text-[var(--text-muted)] mt-0.5 leading-tight">Валиден за 24 часа. Подходящ за единична сесия.</span>
+                    </label>
+
+                    <!-- Tile 2: 1 Week -->
+                    <label class="duration-tile relative flex flex-col p-3.5 border border-[var(--border)] bg-[var(--bg-card)] rounded-[var(--radius)] cursor-pointer hover:border-blue-500/60 transition shadow-2xs select-none">
+                        <input type="radio" name="keyDuration" value="1_week" class="sr-only">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <span class="w-7 h-7 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-xs font-bold">📆</span>
+                            <span class="duration-check-indicator hidden text-blue-600 dark:text-blue-400 text-xs font-bold">✓</span>
+                        </div>
+                        <span class="text-xs font-bold text-[var(--text-main)]">1 седмица</span>
+                        <span class="text-[11px] text-[var(--text-muted)] mt-0.5 leading-tight">Валиден за 7 дни. Подходящ за седмични кампании.</span>
+                    </label>
+
+                    <!-- Tile 3: 1 Month -->
+                    <label class="duration-tile relative flex flex-col p-3.5 border border-[var(--border)] bg-[var(--bg-card)] rounded-[var(--radius)] cursor-pointer hover:border-blue-500/60 transition shadow-2xs select-none">
+                        <input type="radio" name="keyDuration" value="1_month" class="sr-only">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <span class="w-7 h-7 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center text-xs font-bold">🗓️</span>
+                            <span class="duration-check-indicator hidden text-blue-600 dark:text-blue-400 text-xs font-bold">✓</span>
+                        </div>
+                        <span class="text-xs font-bold text-[var(--text-main)]">1 месец</span>
+                        <span class="text-[11px] text-[var(--text-muted)] mt-0.5 leading-tight">Валиден за 30 дни. За активния изпитен семестър.</span>
+                    </label>
+
+                    <!-- Tile 4: Indefinite -->
+                    <label class="duration-tile relative flex flex-col p-3.5 border border-[var(--border)] bg-[var(--bg-card)] rounded-[var(--radius)] cursor-pointer hover:border-blue-500/60 transition shadow-2xs select-none">
+                        <input type="radio" name="keyDuration" value="indefinite" class="sr-only">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <span class="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center text-xs font-bold">♾️</span>
+                            <span class="duration-check-indicator hidden text-blue-600 dark:text-blue-400 text-xs font-bold">✓</span>
+                        </div>
+                        <span class="text-xs font-bold text-[var(--text-main)]">Безсрочен</span>
+                        <span class="text-[11px] text-[var(--text-muted)] mt-0.5 leading-tight">Активен до изрично анулиране от супервайзъра.</span>
+                    </label>
                 </div>
             </div>
 
-            <div id="modalStep2" class="hidden space-y-4">
-                <h3 class="text-base font-bold text-[var(--text-main)]">Избор на валидност на ключа</h3>
-                <p class="text-xs text-[var(--text-muted)]">Изберете за какъв период от време генерираният ключ да бъде активен:</p>
-                
-                <div class="space-y-2">
-                    <label class="flex items-center gap-3 p-3 border border-[var(--border)] rounded-[var(--radius)] cursor-pointer hover:bg-[var(--border-subtle)] transition">
-                        <input type="radio" name="keyDuration" value="1_day" checked class="w-4 h-4 text-blue-600">
-                        <div>
-                            <p class="text-xs font-bold text-[var(--text-main)]">1 ден</p>
-                            <p class="text-[11px] text-[var(--text-muted)]">Валиден за следващите 24 часа</p>
-                        </div>
-                    </label>
-                    <label class="flex items-center gap-3 p-3 border border-[var(--border)] rounded-[var(--radius)] cursor-pointer hover:bg-[var(--border-subtle)] transition">
-                        <input type="radio" name="keyDuration" value="1_week" class="w-4 h-4 text-blue-600">
-                        <div>
-                            <p class="text-xs font-bold text-[var(--text-main)]">1 седмица</p>
-                            <p class="text-[11px] text-[var(--text-muted)]">Валиден за 7 дни</p>
-                        </div>
-                    </label>
-                    <label class="flex items-center gap-3 p-3 border border-[var(--border)] rounded-[var(--radius)] cursor-pointer hover:bg-[var(--border-subtle)] transition">
-                        <input type="radio" name="keyDuration" value="1_month" class="w-4 h-4 text-blue-600">
-                        <div>
-                            <p class="text-xs font-bold text-[var(--text-main)]">1 месец</p>
-                            <p class="text-[11px] text-[var(--text-muted)]">Валиден за 30 дни</p>
-                        </div>
-                    </label>
-                    <label class="flex items-center gap-3 p-3 border border-[var(--border)] rounded-[var(--radius)] cursor-pointer hover:bg-[var(--border-subtle)] transition">
-                        <input type="radio" name="keyDuration" value="indefinite" class="w-4 h-4 text-blue-600">
-                        <div>
-                            <p class="text-xs font-bold text-[var(--text-main)]">Безсрочен</p>
-                            <p class="text-[11px] text-[var(--text-muted)]">Валиден до изрично анулиране</p>
-                        </div>
-                    </label>
-                </div>
+            <!-- Modal Footer -->
+            <div class="flex items-center justify-end gap-2.5 pt-3 border-t border-[var(--border)]">
+                <button id="modalCancelBtn1" class="px-4 py-2 border border-[var(--border)] rounded-[var(--radius)] text-xs font-semibold text-[var(--text-main)] hover:bg-[var(--border-subtle)] transition cursor-pointer">
+                    Отказ
+                </button>
+                <button id="modalConfirmGenerateBtn" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-[var(--radius)] text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>Потвърди и генерирай</span>
+                </button>
+            </div>
+        </div>
+    </div>
 
-                <div class="flex justify-end gap-2 pt-2">
-                    <button id="modalCancelBtn2" class="px-4 py-2 border border-[var(--border)] rounded-[var(--radius)] text-xs font-semibold hover:bg-[var(--border-subtle)] transition cursor-pointer">
-                        Отказ
-                    </button>
-                    <button id="modalConfirmGenerateBtn" class="px-4 py-2 bg-emerald-600 text-white rounded-[var(--radius)] text-xs font-bold hover:bg-emerald-700 transition cursor-pointer">
-                        Потвърди и генерирай
-                    </button>
+    <!-- =============================================== -->
+    <!-- DESTRUCTIVE ACTION CONFIRMATION MODAL           -->
+    <!-- =============================================== -->
+    <div id="verificationConfirmModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 transition-opacity">
+        <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] max-w-sm w-full p-5 shadow-2xl space-y-4">
+            <div class="flex items-start gap-3">
+                <div id="confirmModalIconContainer" class="w-9 h-9 rounded-lg bg-red-500/10 text-red-600 dark:text-red-400 flex items-center justify-center border border-red-500/20 shrink-0">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
                 </div>
+                <div>
+                    <h3 id="confirmModalTitle" class="text-sm font-bold text-[var(--text-main)]">Потвърждение на действие</h3>
+                    <p id="confirmModalMessage" class="text-xs text-[var(--text-muted)] mt-1 leading-relaxed">Сигурни ли сте, че искате да изпълните това действие?</p>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border)]">
+                <button id="confirmModalCancelBtn" class="px-3.5 py-1.5 border border-[var(--border)] rounded-[var(--radius)] text-xs font-semibold text-[var(--text-main)] hover:bg-[var(--border-subtle)] transition cursor-pointer">
+                    Отказ
+                </button>
+                <button id="confirmModalActionBtn" class="px-3.5 py-1.5 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white rounded-[var(--radius)] text-xs font-bold transition cursor-pointer shadow-2xs">
+                    Потвърди
+                </button>
             </div>
         </div>
     </div>
@@ -2572,12 +2734,12 @@
                 if (refreshed) {
                     state.selectedStudentLog = refreshed;
                 } else if (allLogs.length) {
-                    selectBatchLog(allLogs[0]);
+                    selectBatchLog(allLogs.find(l => l.students && l.students.length > 0) || allLogs[0]);
                 } else {
                     state.selectedStudentLog = null;
                 }
             } else if (allLogs.length) {
-                selectBatchLog(allLogs[0]);
+                selectBatchLog(allLogs.find(l => l.students && l.students.length > 0) || allLogs[0]);
             }
         }
 
@@ -2888,12 +3050,12 @@
                 if (refreshed) {
                     state.selectedExamLog = refreshed;
                 } else if (allLogs.length) {
-                    selectExamBatchLog(allLogs[0]);
+                    selectExamBatchLog(allLogs.find(l => l.exams && l.exams.length > 0) || allLogs[0]);
                 } else {
                     state.selectedExamLog = null;
                 }
             } else if (allLogs.length) {
-                selectExamBatchLog(allLogs[0]);
+                selectExamBatchLog(allLogs.find(l => l.exams && l.exams.length > 0) || allLogs[0]);
             }
         }
 
@@ -5072,6 +5234,11 @@
         // ===============================================
         // 7. SUPERADMIN: SECURE KEY & VERIFICATIONS
         // ===============================================
+        let rawPendingVerifications = [];
+        let pendingVerificationsFilter = 'all';
+        let pendingVerificationsSearch = '';
+        let isKeyJustGenerated = false;
+
         const unattendedToggle = document.getElementById('unattendedToggle');
         const generateKeyArea = document.getElementById('generateKeyArea');
         const generateKeyBtn = document.getElementById('generateKeyBtn');
@@ -5079,21 +5246,111 @@
         const keyDisplayArea = document.getElementById('keyDisplayArea');
         const keyDisplayInput = document.getElementById('keyDisplayInput');
         const copyKeyBtn = document.getElementById('copyKeyBtn');
+        const copyKeyBtnText = document.getElementById('copyKeyBtnText');
         const keyWarningNotice = document.getElementById('keyWarningNotice');
         const keyDurationMeta = document.getElementById('keyDurationMeta');
         const keyExpiryMeta = document.getElementById('keyExpiryMeta');
         const deleteKeyBtn = document.getElementById('deleteKeyBtn');
         const toggleLockNotice = document.getElementById('toggleLockNotice');
+        const secureKeyBadgePill = document.getElementById('secureKeyBadgePill');
+        const secureKeyStatusHeaderBadge = document.getElementById('secureKeyStatusHeaderBadge');
+        const refreshVerificationsBtn = document.getElementById('refreshVerificationsBtn');
+        const refreshVerificationsIcon = document.getElementById('refreshVerificationsIcon');
+        const verificationsSearchInput = document.getElementById('verificationsSearchInput');
 
         const generateKeyModal = document.getElementById('generateKeyModal');
-        const modalStep1 = document.getElementById('modalStep1');
-        const modalStep2 = document.getElementById('modalStep2');
+        const modalCloseXBtn = document.getElementById('modalCloseXBtn');
         const modalCancelBtn1 = document.getElementById('modalCancelBtn1');
-        const modalCancelBtn2 = document.getElementById('modalCancelBtn2');
-        const modalProceedBtn = document.getElementById('modalProceedBtn');
         const modalConfirmGenerateBtn = document.getElementById('modalConfirmGenerateBtn');
 
-        let isKeyJustGenerated = false;
+        function showVerificationConfirm({ title, message, confirmText = 'Потвърди', confirmColor = 'red', onConfirm }) {
+            const modal = document.getElementById('verificationConfirmModal');
+            const titleElem = document.getElementById('confirmModalTitle');
+            const msgElem = document.getElementById('confirmModalMessage');
+            const actionBtn = document.getElementById('confirmModalActionBtn');
+            const cancelBtn = document.getElementById('confirmModalCancelBtn');
+            const iconContainer = document.getElementById('confirmModalIconContainer');
+
+            if (!modal) {
+                if (confirm(message)) {
+                    onConfirm?.();
+                }
+                return;
+            }
+
+            if (titleElem) titleElem.textContent = title;
+            if (msgElem) msgElem.textContent = message;
+            if (actionBtn) {
+                actionBtn.textContent = confirmText;
+                if (confirmColor === 'red') {
+                    actionBtn.className = 'px-3.5 py-1.5 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white rounded-[var(--radius)] text-xs font-bold transition cursor-pointer shadow-2xs';
+                    if (iconContainer) iconContainer.className = 'w-9 h-9 rounded-lg bg-red-500/10 text-red-600 dark:text-red-400 flex items-center justify-center border border-red-500/20 shrink-0';
+                } else {
+                    actionBtn.className = 'px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-[var(--radius)] text-xs font-bold transition cursor-pointer shadow-2xs';
+                    if (iconContainer) iconContainer.className = 'w-9 h-9 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-500/20 shrink-0';
+                }
+            }
+
+            modal.classList.remove('hidden');
+
+            const cleanup = () => {
+                modal.classList.add('hidden');
+                if (actionBtn) actionBtn.onclick = null;
+                if (cancelBtn) cancelBtn.onclick = null;
+            };
+
+            if (cancelBtn) cancelBtn.onclick = cleanup;
+            if (actionBtn) {
+                actionBtn.onclick = async () => {
+                    cleanup();
+                    if (typeof onConfirm === 'function') {
+                        await onConfirm();
+                    }
+                };
+            }
+        }
+
+        function getRelativeTime(value) {
+            if (!value) return '-';
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return value;
+            const diffSec = Math.floor((Date.now() - date.getTime()) / 1000);
+            if (diffSec < 60) return 'току-що';
+            const diffMin = Math.floor(diffSec / 60);
+            if (diffMin < 60) return `преди ${diffMin} мин`;
+            const diffHours = Math.floor(diffMin / 60);
+            if (diffHours < 24) return `преди ${diffHours} ч`;
+            const diffDays = Math.floor(diffHours / 24);
+            if (diffDays < 7) return `преди ${diffDays} д`;
+            return formatDateTime(value);
+        }
+
+        function getInitials(name) {
+            if (!name) return '?';
+            const parts = name.trim().split(/\s+/);
+            if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+            return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+        }
+
+        function initDurationTiles() {
+            const tiles = document.querySelectorAll('.duration-tile');
+            tiles.forEach((tile) => {
+                tile.addEventListener('click', () => {
+                    const radio = tile.querySelector('input[name="keyDuration"]');
+                    if (radio) radio.checked = true;
+
+                    tiles.forEach((t) => {
+                        t.className = 'duration-tile relative flex flex-col p-3.5 border border-[var(--border)] bg-[var(--bg-card)] rounded-[var(--radius)] cursor-pointer hover:border-blue-500/60 transition shadow-2xs select-none';
+                        const check = t.querySelector('.duration-check-indicator');
+                        if (check) check.classList.add('hidden');
+                    });
+
+                    tile.className = 'duration-tile relative flex flex-col p-3.5 border border-blue-600 dark:border-blue-400 bg-blue-50/50 dark:bg-blue-500/10 rounded-[var(--radius)] cursor-pointer hover:border-blue-500 transition ring-2 ring-blue-500/20 shadow-2xs select-none';
+                    const currentCheck = tile.querySelector('.duration-check-indicator');
+                    if (currentCheck) currentCheck.classList.remove('hidden');
+                });
+            });
+        }
 
         async function loadSecureKeyStatus() {
             if (!unattendedToggle) return;
@@ -5105,16 +5362,27 @@
                 if (data.has_active_key) {
                     unattendedToggle.checked = true;
                     unattendedToggle.disabled = true;
-                    toggleLockNotice.classList.remove('hidden');
-                    generateKeyArea.classList.add('hidden');
-                    keyDisplayArea.classList.remove('hidden');
+                    if (toggleLockNotice) toggleLockNotice.classList.remove('hidden');
+                    if (generateKeyArea) generateKeyArea.classList.add('hidden');
+                    if (keyDisplayArea) keyDisplayArea.classList.remove('hidden');
+
+                    if (secureKeyBadgePill) {
+                        secureKeyBadgePill.className = 'text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5';
+                        secureKeyBadgePill.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>Активен';
+                    }
+                    if (secureKeyStatusHeaderBadge) {
+                        secureKeyStatusHeaderBadge.className = 'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20';
+                        secureKeyStatusHeaderBadge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>Активен Secure Key';
+                    }
 
                     if (!isKeyJustGenerated) {
-                        keyDisplayInput.value = data.masked_key || "********";
-                        keyWarningNotice.classList.add('hidden');
-                        copyKeyBtn.disabled = true;
-                        copyKeyBtn.classList.add('opacity-50', 'cursor-not-allowed');
-                        copyKeyBtn.title = "Ключът е маскиран и не може да бъде копиран отново";
+                        if (keyDisplayInput) keyDisplayInput.value = data.masked_key || "********";
+                        if (keyWarningNotice) keyWarningNotice.classList.add('hidden');
+                        if (copyKeyBtn) {
+                            copyKeyBtn.disabled = true;
+                            copyKeyBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                            copyKeyBtn.title = "Ключът е маскиран и не може да бъде копиран отново";
+                        }
                     }
 
                     const durationLabel = {
@@ -5124,22 +5392,194 @@
                         "indefinite": "Безсрочен (Indefinite)"
                     }[data.duration_type] || data.duration_type || "-";
 
-                    keyDurationMeta.textContent = `Период: ${durationLabel}`;
-                    keyExpiryMeta.textContent = data.expires_at ? `Валиден до: ${formatDateTime(data.expires_at)}` : "Валиден до: Безсрочен";
+                    if (keyDurationMeta) keyDurationMeta.textContent = durationLabel;
+                    if (keyExpiryMeta) keyExpiryMeta.textContent = data.expires_at ? formatDateTime(data.expires_at) : "Безсрочен";
                 } else {
                     isKeyJustGenerated = false;
                     unattendedToggle.disabled = false;
-                    toggleLockNotice.classList.add('hidden');
-                    keyDisplayArea.classList.add('hidden');
+                    if (toggleLockNotice) toggleLockNotice.classList.add('hidden');
+                    if (keyDisplayArea) keyDisplayArea.classList.add('hidden');
+
+                    if (secureKeyBadgePill) {
+                        secureKeyBadgePill.className = 'text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 border border-[var(--border)] flex items-center gap-1.5';
+                        secureKeyBadgePill.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>Неактивен';
+                    }
+                    if (secureKeyStatusHeaderBadge) {
+                        secureKeyStatusHeaderBadge.className = 'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-[var(--border)]';
+                        secureKeyStatusHeaderBadge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>Няма активен ключ';
+                    }
+
                     if (unattendedToggle.checked) {
-                        generateKeyArea.classList.remove('hidden');
+                        if (generateKeyArea) generateKeyArea.classList.remove('hidden');
                     } else {
-                        generateKeyArea.classList.add('hidden');
+                        if (generateKeyArea) generateKeyArea.classList.add('hidden');
                     }
                 }
             } catch (err) {
                 console.error("Грешка при зареждане на статус на Secure Key:", err);
             }
+        }
+
+        function renderVerificationsList() {
+            const list = document.getElementById('verificationsList');
+            if (!list) return;
+
+            let items = rawPendingVerifications || [];
+
+            // Filter by role
+            if (pendingVerificationsFilter === 'admin') {
+                items = items.filter(i => i.role === 'admin');
+            } else if (pendingVerificationsFilter === 'examiner') {
+                items = items.filter(i => i.role === 'examiner');
+            }
+
+            // Filter by search query
+            if (pendingVerificationsSearch) {
+                const q = pendingVerificationsSearch.toLowerCase();
+                items = items.filter(i => 
+                    (i.full_name || '').toLowerCase().includes(q) || 
+                    (i.email || '').toLowerCase().includes(q)
+                );
+            }
+
+            if (!items.length) {
+                if (!rawPendingVerifications.length) {
+                    list.innerHTML = `
+                        <div class="flex flex-col items-center justify-center py-12 px-4 text-center bg-[var(--bg-body)]/50 rounded-[var(--radius)] border border-[var(--border)] border-dashed">
+                            <div class="w-12 h-12 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-3">
+                                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                                </svg>
+                            </div>
+                            <h4 class="text-sm font-bold text-[var(--text-main)]">Няма чакащи заявки за верификация</h4>
+                            <p class="text-xs text-[var(--text-muted)] max-w-sm mt-1">Всички персонални акаунти на администратори и квестори са одобрени.</p>
+                        </div>
+                    `;
+                } else {
+                    list.innerHTML = `
+                        <div class="text-center py-8 text-xs text-[var(--text-muted)] bg-[var(--bg-body)]/40 rounded-[var(--radius)] border border-[var(--border)]">
+                            Няма намерени заявки с избрания филтър.
+                        </div>
+                    `;
+                }
+                return;
+            }
+
+            list.innerHTML = items.map((item) => {
+                const isAdmin = item.role === 'admin';
+                const avatarStyle = isAdmin
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 ring-1 ring-blue-500/30'
+                    : 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 ring-1 ring-purple-500/30';
+                const roleBadgeStyle = isAdmin
+                    ? 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20'
+                    : 'bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-500/10 dark:text-purple-400 dark:border-purple-500/20';
+                const initials = getInitials(item.full_name);
+                const relTime = getRelativeTime(item.created_at);
+                const fullTime = formatDateTime(item.created_at);
+
+                return `
+                    <div class="p-3.5 border border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-body)] hover:border-blue-500/30 transition shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 group">
+                        <div class="flex items-center gap-3 min-w-0">
+                            <div class="w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold shrink-0 ${avatarStyle}">
+                                ${initials}
+                            </div>
+                            <div class="min-w-0 space-y-0.5">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <span class="text-xs font-bold text-[var(--text-main)] truncate">${escapeHtml(item.full_name)}</span>
+                                    <span class="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${roleBadgeStyle}">
+                                        ${escapeHtml(item.role_display)}
+                                    </span>
+                                </div>
+                                <div class="flex items-center gap-2 flex-wrap text-[11px] text-[var(--text-muted)]">
+                                    <span class="inline-flex items-center gap-1 font-mono">
+                                        <svg class="w-3 h-3 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                        </svg>
+                                        ${escapeHtml(item.email)}
+                                    </span>
+                                    <span>•</span>
+                                    <span title="${fullTime}">${relTime}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-1.5 sm:self-center shrink-0">
+                            <button title="Одобри достъп" data-id="${item.id}" data-role="${item.role}" data-name="${escapeHtml(item.full_name)}" class="btn-grant-access px-3 py-1.5 rounded-[var(--radius)] bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold flex items-center gap-1.5 text-xs shadow-2xs transition cursor-pointer">
+                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                                </svg>
+                                <span>Одобри</span>
+                            </button>
+                            <button title="Отхвърли заявка" data-id="${item.id}" data-role="${item.role}" data-name="${escapeHtml(item.full_name)}" class="btn-reject-access px-3 py-1.5 rounded-[var(--radius)] bg-red-600/10 hover:bg-red-600 text-red-600 hover:text-white border border-red-500/20 hover:border-red-600 font-bold flex items-center gap-1.5 text-xs shadow-2xs transition cursor-pointer">
+                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                                <span>Отхвърли</span>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // Grant access handler
+            list.querySelectorAll('.btn-grant-access').forEach((btn) => {
+                btn.addEventListener('click', async () => {
+                    const id = btn.dataset.id;
+                    const role = btn.dataset.role;
+                    const name = btn.dataset.name;
+                    btn.disabled = true;
+                    try {
+                        const resp = await authFetch(`/admins/verifications/${role}/${id}/grant`, { method: 'POST' });
+                        const result = await resp.json();
+                        if (resp.ok) {
+                            showToast('Достъпът е одобрен', result.message || `Достъпът за ${name} е одобрен.`, 'success');
+                            await loadPendingVerifications();
+                            await loadDashboardData();
+                        } else {
+                            showToast('Грешка при одобрение', result.detail || 'Неуспешно одобрение.', 'error');
+                        }
+                    } catch (err) {
+                        showToast('Грешка', 'Възникна грешка при връзката със сървъра.', 'error');
+                    } finally {
+                        btn.disabled = false;
+                    }
+                });
+            });
+
+            // Reject access handler with in-app confirmation modal
+            list.querySelectorAll('.btn-reject-access').forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    const id = btn.dataset.id;
+                    const role = btn.dataset.role;
+                    const name = btn.dataset.name;
+                    const roleLabel = role === 'admin' ? 'Администратор' : 'Квестор';
+
+                    showVerificationConfirm({
+                        title: `Отхвърляне на заявка: ${name}`,
+                        message: `Сигурни ли сте, че искате да отхвърлите заявката за регистрация на ${name} (${roleLabel})? Записът ще бъде перманентно премахнат от опашката.`,
+                        confirmText: 'Отхвърли заявката',
+                        confirmColor: 'red',
+                        onConfirm: async () => {
+                            btn.disabled = true;
+                            try {
+                                const resp = await authFetch(`/admins/verifications/${role}/${id}/reject`, { method: 'POST' });
+                                const result = await resp.json();
+                                if (resp.ok) {
+                                    showToast('Заявката е отхвърлена', result.message || `Заявката за ${name} е отхвърлена.`, 'info');
+                                    await loadPendingVerifications();
+                                    await loadDashboardData();
+                                } else {
+                                    showToast('Грешка при отхвърляне', result.detail || 'Неуспешно отхвърляне.', 'error');
+                                }
+                            } catch (err) {
+                                showToast('Грешка', 'Възникна грешка при връзката със сървъра.', 'error');
+                            } finally {
+                                btn.disabled = false;
+                            }
+                        }
+                    });
+                });
+            });
         }
 
         async function loadPendingVerifications() {
@@ -5152,97 +5592,26 @@
                 const res = await authFetch('/admins/verifications/pending');
                 if (!res.ok) return;
                 const data = await res.json();
-                const items = data.pending_verifications || [];
+                rawPendingVerifications = data.pending_verifications || [];
 
-                countBadge.textContent = items.length;
+                if (countBadge) countBadge.textContent = rawPendingVerifications.length;
                 if (tabBadge) {
-                    tabBadge.textContent = items.length;
-                    tabBadge.classList.toggle('hidden', items.length === 0);
+                    tabBadge.textContent = rawPendingVerifications.length;
+                    tabBadge.classList.toggle('hidden', rawPendingVerifications.length === 0);
                 }
 
-                if (!items.length) {
-                    list.innerHTML = '<div class="text-xs text-[var(--text-muted)] text-center py-8 bg-[var(--bg-body)] rounded-[var(--radius)] border border-[var(--border)]">Няма чакащи заявки за верификация на персонал.</div>';
-                    return;
-                }
+                const adminCount = rawPendingVerifications.filter(i => i.role === 'admin').length;
+                const examinerCount = rawPendingVerifications.filter(i => i.role === 'examiner').length;
 
-                list.innerHTML = items.map((item) => `
-                    <div class="flex items-center justify-between gap-3 p-3 border border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-body)]">
-                        <div class="flex items-center gap-3 min-w-0">
-                            <div class="flex items-center gap-1.5 shrink-0">
-                                <button title="Grant Access" data-id="${item.id}" data-role="${item.role}" data-name="${escapeHtml(item.full_name)}" class="btn-grant-access w-7 h-7 rounded-[var(--radius)] bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center justify-center text-xs shadow-xs transition cursor-pointer">
-                                    ✓
-                                </button>
-                                <button title="Reject" data-id="${item.id}" data-role="${item.role}" data-name="${escapeHtml(item.full_name)}" class="btn-reject-access w-7 h-7 rounded-[var(--radius)] bg-red-600 hover:bg-red-700 text-white font-bold flex items-center justify-center text-xs shadow-xs transition cursor-pointer">
-                                    ✕
-                                </button>
-                            </div>
+                const fAll = document.getElementById('verifFilterAll');
+                const fAdmin = document.getElementById('verifFilterAdmin');
+                const fExam = document.getElementById('verifFilterExaminer');
 
-                            <div class="min-w-0">
-                                <div class="flex items-center gap-2 flex-wrap">
-                                    <span class="text-xs font-bold text-[var(--text-main)] truncate">${escapeHtml(item.full_name)}</span>
-                                    <span class="text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${item.role === 'admin' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'}">
-                                        ${escapeHtml(item.role_display)}
-                                    </span>
-                                </div>
-                                <p class="text-[11px] text-[var(--text-muted)] truncate">${escapeHtml(item.email)}</p>
-                            </div>
-                        </div>
+                if (fAll) fAll.textContent = `Всички (${rawPendingVerifications.length})`;
+                if (fAdmin) fAdmin.textContent = `Администратори (${adminCount})`;
+                if (fExam) fExam.textContent = `Квестори (${examinerCount})`;
 
-                        <div class="text-right shrink-0">
-                            <span class="text-[10px] text-[var(--text-muted)]">${formatDateTime(item.created_at)}</span>
-                        </div>
-                    </div>
-                `).join('');
-
-                list.querySelectorAll('.btn-grant-access').forEach((btn) => {
-                    btn.addEventListener('click', async () => {
-                        const id = btn.dataset.id;
-                        const role = btn.dataset.role;
-                        const name = btn.dataset.name;
-                        btn.disabled = true;
-                        try {
-                            const resp = await authFetch(`/admins/verifications/${role}/${id}/grant`, { method: 'POST' });
-                            const result = await resp.json();
-                            if (resp.ok) {
-                                alert(result.message || `Достъпът за ${name} е одобрен.`);
-                                await loadPendingVerifications();
-                                await loadDashboardData();
-                            } else {
-                                alert(`Грешка: ${result.detail || 'Неуспешно одобрение.'}`);
-                            }
-                        } catch (err) {
-                            alert('Възникна грешка при връзката със сървъра.');
-                        } finally {
-                            btn.disabled = false;
-                        }
-                    });
-                });
-
-                list.querySelectorAll('.btn-reject-access').forEach((btn) => {
-                    btn.addEventListener('click', async () => {
-                        const id = btn.dataset.id;
-                        const role = btn.dataset.role;
-                        const name = btn.dataset.name;
-                        if (!confirm(`Сигурни ли сте, че искате да отхвърлите заявката на ${name}?`)) return;
-
-                        btn.disabled = true;
-                        try {
-                            const resp = await authFetch(`/admins/verifications/${role}/${id}/reject`, { method: 'POST' });
-                            const result = await resp.json();
-                            if (resp.ok) {
-                                alert(result.message || `Заявката за ${name} е отхвърлена.`);
-                                await loadPendingVerifications();
-                                await loadDashboardData();
-                            } else {
-                                alert(`Грешка: ${result.detail || 'Неуспешно отхвърляне.'}`);
-                            }
-                        } catch (err) {
-                            alert('Възникна грешка при връзката със сървъра.');
-                        } finally {
-                            btn.disabled = false;
-                        }
-                    });
-                });
+                renderVerificationsList();
             } catch (err) {
                 console.error("Грешка при зареждане на чакащи верификации:", err);
             }
@@ -5255,39 +5624,33 @@
         if (unattendedToggle) {
             unattendedToggle.addEventListener('change', () => {
                 if (unattendedToggle.checked) {
-                    generateKeyArea.classList.remove('hidden');
+                    if (generateKeyArea) generateKeyArea.classList.remove('hidden');
                 } else {
-                    generateKeyArea.classList.add('hidden');
+                    if (generateKeyArea) generateKeyArea.classList.add('hidden');
                 }
             });
         }
 
         if (generateKeyBtn) {
             generateKeyBtn.addEventListener('click', () => {
-                modalStep1.classList.remove('hidden');
-                modalStep2.classList.add('hidden');
-                generateKeyModal.classList.remove('hidden');
+                if (generateKeyModal) generateKeyModal.classList.remove('hidden');
             });
         }
 
-        if (modalCancelBtn1) modalCancelBtn1.addEventListener('click', () => generateKeyModal.classList.add('hidden'));
-        if (modalCancelBtn2) modalCancelBtn2.addEventListener('click', () => generateKeyModal.classList.add('hidden'));
-
-        if (modalProceedBtn) {
-            modalProceedBtn.addEventListener('click', () => {
-                modalStep1.classList.add('hidden');
-                modalStep2.classList.remove('hidden');
-            });
-        }
+        const closeGenModal = () => {
+            if (generateKeyModal) generateKeyModal.classList.add('hidden');
+        };
+        if (modalCancelBtn1) modalCancelBtn1.addEventListener('click', closeGenModal);
+        if (modalCloseXBtn) modalCloseXBtn.addEventListener('click', closeGenModal);
 
         if (modalConfirmGenerateBtn) {
             modalConfirmGenerateBtn.addEventListener('click', async () => {
                 const selectedRadio = document.querySelector('input[name="keyDuration"]:checked');
                 const duration = selectedRadio ? selectedRadio.value : '1_day';
 
-                generateKeyModal.classList.add('hidden');
-                generateKeyArea.classList.add('hidden');
-                keyLoadingSpinner.classList.remove('hidden');
+                closeGenModal();
+                if (generateKeyArea) generateKeyArea.classList.add('hidden');
+                if (keyLoadingSpinner) keyLoadingSpinner.classList.remove('hidden');
 
                 try {
                     const resp = await authFetch('/admins/secure-key/generate', {
@@ -5299,11 +5662,14 @@
 
                     if (resp.ok) {
                         isKeyJustGenerated = true;
-                        keyDisplayInput.value = data.secure_key;
-                        keyWarningNotice.classList.remove('hidden');
-                        copyKeyBtn.disabled = false;
-                        copyKeyBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-                        copyKeyBtn.innerText = "Копирай";
+                        if (keyDisplayInput) keyDisplayInput.value = data.secure_key;
+                        if (keyWarningNotice) keyWarningNotice.classList.remove('hidden');
+                        if (copyKeyBtn) {
+                            copyKeyBtn.disabled = false;
+                            copyKeyBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                            copyKeyBtn.title = "Копирай в клипборда";
+                            if (copyKeyBtnText) copyKeyBtnText.innerText = "Копирай";
+                        }
 
                         const durationLabel = {
                             "1_day": "1 ден (24 часа)",
@@ -5312,74 +5678,135 @@
                             "indefinite": "Безсрочен (Indefinite)"
                         }[data.duration_type] || data.duration_type || "-";
 
-                        keyDurationMeta.textContent = `Период: ${durationLabel}`;
-                        keyExpiryMeta.textContent = data.expires_at ? `Валиден до: ${formatDateTime(data.expires_at)}` : "Валиден до: Безсрочен";
+                        if (keyDurationMeta) keyDurationMeta.textContent = durationLabel;
+                        if (keyExpiryMeta) keyExpiryMeta.textContent = data.expires_at ? formatDateTime(data.expires_at) : "Безсрочен";
 
-                        keyDisplayArea.classList.remove('hidden');
-                        unattendedToggle.checked = true;
-                        unattendedToggle.disabled = true;
-                        toggleLockNotice.classList.remove('hidden');
+                        if (keyDisplayArea) keyDisplayArea.classList.remove('hidden');
+                        if (unattendedToggle) {
+                            unattendedToggle.checked = true;
+                            unattendedToggle.disabled = true;
+                        }
+                        if (toggleLockNotice) toggleLockNotice.classList.remove('hidden');
+
+                        if (secureKeyBadgePill) {
+                            secureKeyBadgePill.className = 'text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5';
+                            secureKeyBadgePill.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>Активен';
+                        }
+                        if (secureKeyStatusHeaderBadge) {
+                            secureKeyStatusHeaderBadge.className = 'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20';
+                            secureKeyStatusHeaderBadge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>Активен Secure Key';
+                        }
+
+                        showToast('Secure Key е генериран', 'Ключът е готов за еднократно копиране.', 'success');
                     } else {
-                        alert(`Грешка при генериране: ${data.detail || 'Неуспешно генериране.'}`);
-                        generateKeyArea.classList.remove('hidden');
+                        showToast('Грешка при генериране', data.detail || 'Неуспешно генериране.', 'error');
+                        if (generateKeyArea) generateKeyArea.classList.remove('hidden');
                     }
                 } catch (err) {
-                    alert('Критична грешка при връзка със сървъра.');
-                    generateKeyArea.classList.remove('hidden');
+                    showToast('Грешка', 'Критична грешка при връзка със сървъра.', 'error');
+                    if (generateKeyArea) generateKeyArea.classList.remove('hidden');
                 } finally {
-                    keyLoadingSpinner.classList.add('hidden');
+                    if (keyLoadingSpinner) keyLoadingSpinner.classList.add('hidden');
                 }
             });
         }
 
         if (copyKeyBtn) {
             copyKeyBtn.addEventListener('click', () => {
-                if (copyKeyBtn.disabled) return;
+                if (copyKeyBtn.disabled || !keyDisplayInput) return;
                 const textToCopy = keyDisplayInput.value;
+                const markCopied = () => {
+                    if (copyKeyBtnText) copyKeyBtnText.innerText = "✓ Копирано!";
+                    showToast('Ключът е копиран', 'Secure Key беше успешно копиран в клипборда.', 'success');
+                    setTimeout(() => {
+                        if (copyKeyBtnText) copyKeyBtnText.innerText = "Копирай";
+                    }, 2000);
+                };
+
                 if (navigator.clipboard && navigator.clipboard.writeText) {
-                    navigator.clipboard.writeText(textToCopy).then(() => {
-                        copyKeyBtn.innerText = "✓ Копирано!";
-                        setTimeout(() => { copyKeyBtn.innerText = "Копирай"; }, 2000);
-                    }).catch(() => {
+                    navigator.clipboard.writeText(textToCopy).then(markCopied).catch(() => {
                         keyDisplayInput.select();
                         document.execCommand('copy');
-                        copyKeyBtn.innerText = "✓ Копирано!";
-                        setTimeout(() => { copyKeyBtn.innerText = "Копирай"; }, 2000);
+                        markCopied();
                     });
                 } else {
                     keyDisplayInput.select();
                     document.execCommand('copy');
-                    copyKeyBtn.innerText = "✓ Копирано!";
-                    setTimeout(() => { copyKeyBtn.innerText = "Копирай"; }, 2000);
+                    markCopied();
                 }
             });
         }
 
         if (deleteKeyBtn) {
-            deleteKeyBtn.addEventListener('click', async () => {
-                if (!confirm('Сигурни ли сте, че искате да анулирате активния Secure Key?')) return;
-                deleteKeyBtn.disabled = true;
-                try {
-                    const resp = await authFetch('/admins/secure-key', { method: 'DELETE' });
-                    const data = await resp.json();
-                    if (resp.ok) {
-                        alert(data.message || 'Secure Key беше изтрит успешно.');
-                        isKeyJustGenerated = false;
-                        keyDisplayArea.classList.add('hidden');
-                        unattendedToggle.disabled = false;
-                        unattendedToggle.checked = true;
-                        toggleLockNotice.classList.add('hidden');
-                        generateKeyArea.classList.remove('hidden');
-                    } else {
-                        alert(`Грешка при изтриване: ${data.detail || 'Неуспешно изтриване.'}`);
+            deleteKeyBtn.addEventListener('click', () => {
+                showVerificationConfirm({
+                    title: 'Анулиране на Secure Key',
+                    message: 'Сигурни ли сте, че искате да анулирате активния Secure Key? След деактивация, нови регистрации няма да могат да използват този ключ.',
+                    confirmText: 'Анулирай ключа',
+                    confirmColor: 'red',
+                    onConfirm: async () => {
+                        deleteKeyBtn.disabled = true;
+                        try {
+                            const resp = await authFetch('/admins/secure-key', { method: 'DELETE' });
+                            const data = await resp.json();
+                            if (resp.ok) {
+                                showToast('Secure Key е анулиран', data.message || 'Ключът беше изтрит успешно.', 'warning');
+                                isKeyJustGenerated = false;
+                                if (keyDisplayArea) keyDisplayArea.classList.add('hidden');
+                                if (unattendedToggle) {
+                                    unattendedToggle.disabled = false;
+                                    unattendedToggle.checked = true;
+                                }
+                                if (toggleLockNotice) toggleLockNotice.classList.add('hidden');
+                                if (generateKeyArea) generateKeyArea.classList.remove('hidden');
+                                await loadSecureKeyStatus();
+                            } else {
+                                showToast('Грешка при изтриване', data.detail || 'Неуспешно изтриване.', 'error');
+                            }
+                        } catch (err) {
+                            showToast('Грешка', 'Критична грешка при връзка със сървъра.', 'error');
+                        } finally {
+                            deleteKeyBtn.disabled = false;
+                        }
                     }
-                } catch (err) {
-                    alert('Критична грешка при връзка със сървъра.');
+                });
+            });
+        }
+
+        if (refreshVerificationsBtn) {
+            refreshVerificationsBtn.addEventListener('click', async () => {
+                if (refreshVerificationsIcon) refreshVerificationsIcon.classList.add('animate-spin');
+                try {
+                    await loadVerificationsData();
+                    showToast('Данните са обновени', 'Информацията за Secure Key и верификации е актуална.', 'info');
                 } finally {
-                    deleteKeyBtn.disabled = false;
+                    setTimeout(() => {
+                        if (refreshVerificationsIcon) refreshVerificationsIcon.classList.remove('animate-spin');
+                    }, 500);
                 }
             });
         }
+
+        const filterBtns = document.querySelectorAll('.verif-filter-btn');
+        filterBtns.forEach((btn) => {
+            btn.addEventListener('click', () => {
+                pendingVerificationsFilter = btn.dataset.filter || 'all';
+                filterBtns.forEach((b) => {
+                    b.className = 'verif-filter-btn px-2.5 py-1 rounded-[var(--radius)] transition text-[var(--text-muted)] hover:text-[var(--text-main)] cursor-pointer';
+                });
+                btn.className = 'verif-filter-btn px-2.5 py-1 rounded-[var(--radius)] transition bg-[var(--bg-card)] text-[var(--text-main)] shadow-2xs cursor-pointer font-bold';
+                renderVerificationsList();
+            });
+        });
+
+        if (verificationsSearchInput) {
+            verificationsSearchInput.addEventListener('input', (e) => {
+                pendingVerificationsSearch = e.target.value.trim();
+                renderVerificationsList();
+            });
+        }
+
+        initDurationTiles();
 
         function adminLogout() {
             localStorage.removeItem('admin_token');

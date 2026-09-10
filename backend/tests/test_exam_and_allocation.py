@@ -44,12 +44,6 @@ class ExamAndAllocationTestCase(unittest.TestCase):
             test_student_ids = ["99900001", "99900002", "99900003"]
             db.query(Student).filter(Student.student_id_number.in_(test_student_ids)).delete(synchronize_session=False)
 
-            # Delete test logs
-            db.query(AdminLog).filter(
-                (AdminLog.action_type == "EXAM_IMPORT") |
-                (AdminLog.action_type.startswith("ALLOCATION_EXECUTION"))
-            ).delete(synchronize_session=False)
-
             db.commit()
         except Exception:
             db.rollback()
@@ -366,7 +360,9 @@ class ExamAndAllocationTestCase(unittest.TestCase):
         self.assertEqual(exec_res.json()["new_registrations_created"], 4)
 
         # Count logs in DB
-        initial_log_count = self.db.query(AdminLog).filter(AdminLog.action_type == "ALLOCATION_EXECUTION").count()
+        initial_log_count = self.db.query(AdminLog).filter(
+            AdminLog.action_type.in_(["ALLOCATION_EXECUTION", "ALLOCATION_EXECUTION_NO_NEW"])
+        ).count()
 
         # 4. Preview after all approved students are allocated
         post_preview = client.get(

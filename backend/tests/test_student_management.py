@@ -28,7 +28,6 @@ class StudentManagementTestCase(unittest.TestCase):
         db: Session = SessionLocal()
         try:
             db.query(Student).filter(Student.student_id_number.in_(["88800001", "88800002"])).delete(synchronize_session=False)
-            db.query(AdminLog).filter(AdminLog.specialty == "TEST-CSI").delete(synchronize_session=False)
             db.commit()
         except Exception:
             db.rollback()
@@ -50,7 +49,6 @@ class StudentManagementTestCase(unittest.TestCase):
     def tearDown(self):
         try:
             self.db.query(Student).filter(Student.student_id_number.in_(["88800001", "88800002"])).delete(synchronize_session=False)
-            self.db.query(AdminLog).filter(AdminLog.specialty == "TEST-CSI").delete(synchronize_session=False)
             self.db.commit()
         except Exception:
             self.db.rollback()
@@ -103,7 +101,7 @@ class StudentManagementTestCase(unittest.TestCase):
     def test_02_dashboard_data_reflects_student_status(self):
         """ Test that dashboard-data exposes is_active and email_sent accurately in student payload """
         excel_file = self._create_mock_excel()
-        client.post(
+        upload_res = client.post(
             "/admins/upload/students",
             headers=self.auth_headers,
             data={
@@ -117,12 +115,14 @@ class StudentManagementTestCase(unittest.TestCase):
                 "file": ("students.xlsx", excel_file, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
             }
         )
+        self.assertEqual(upload_res.status_code, 200)
+        upload_log_id = upload_res.json()["admin_log_id"]
 
         dash_res = client.get("/admins/dashboard-data", headers=self.auth_headers)
         self.assertEqual(dash_res.status_code, 200)
         dash_data = dash_res.json()
         
-        test_log = next((l for l in dash_data.get("student_import_logs", []) if l.get("specialty") == "TEST-CSI"), None)
+        test_log = next((l for l in dash_data.get("student_import_logs", []) if str(l.get("id")) == str(upload_log_id)), None)
         self.assertIsNotNone(test_log)
         self.assertEqual(len(test_log["students"]), 2)
         for s in test_log["students"]:
