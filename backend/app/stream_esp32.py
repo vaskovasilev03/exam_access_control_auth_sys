@@ -139,6 +139,9 @@ def analyze_frame_outside_ui(jpg_bytes: bytes, room_number: str, known_face_enco
             state["faculty_number"] = student_found.student_id_number
 
             if valid_registration and is_time_valid:
+                # Маркираме допуска в базата данни
+                valid_registration.is_admitted = True
+                valid_registration.admitted_at = current_now
                 # Записваме лога в базата
                 new_log = AccessLog(student_id=student_found.id, location=room_number, status="GRANTED")
                 db.add(new_log)

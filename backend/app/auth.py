@@ -4,7 +4,7 @@ import bcrypt
 from datetime import datetime, timedelta
 from typing import Optional
 from dotenv import load_dotenv
-from fastapi import HTTPException, Security, Depends
+from fastapi import HTTPException, Security, Depends, Request, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 load_dotenv()
@@ -13,6 +13,7 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
 
 security_agent = HTTPBearer()
+security_optional = HTTPBearer(auto_error=False)
 
 def create_access_token(data: dict, expires_delta: timedelta = timedelta(hours=2)):
     """ Генерира JWT токен с роля и ID """
@@ -49,6 +50,35 @@ def require_examiner(current_user: dict = Depends(get_current_user)):
     if current_user.get("role") not in ("examiner", "superadmin") and not is_superadmin_user(current_user):
         raise HTTPException(status_code=403, detail="Permission denied. Examiners only.")
     return current_user
+
+def get_current_examiner(
+    request: Request,
+    token: Optional[str] = Query(None),
+    credentials: Optional[HTTPAuthorizationCredentials] = Security(security_optional)
+):
+    """ Гъвкава валидация на квестор през Bearer Header, Query токен или Cookie """
+    raw_token = None
+    if credentials and credentials.credentials:
+        raw_token = credentials.credentials
+    elif token:
+        raw_token = token
+    elif request:
+        raw_token = request.cookies.get("examiner_token") or request.cookies.get("admin_token")
+
+    if not raw_token:
+        raise HTTPException(status_code=401, detail="Authentication token required.")
+
+    try:
+        payload = jwt.decode(raw_token, SECRET_KEY, algorithms=[ALGORITHM])
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token has expired.")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token.")
+
+    if payload.get("role") not in ("examiner", "superadmin", "admin") and not is_superadmin_user(payload):
+        raise HTTPException(status_code=403, detail="Permission denied. Examiners only.")
+
+    return payload
 
 def require_student(current_user: dict = Depends(get_current_user)):
     """ Защитна стена: Допуска потребители с роля 'student' или права на Superadmin """

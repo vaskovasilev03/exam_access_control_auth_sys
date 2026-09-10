@@ -25,6 +25,8 @@ def init_db():
     with engine.connect() as conn:
         conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_single_superadmin ON admins (is_superadmin) WHERE is_superadmin = true"))
         conn.execute(text("ALTER TABLE students ADD COLUMN IF NOT EXISTS student_book_photo_path VARCHAR"))
+        conn.execute(text("ALTER TABLE exam_registrations ADD COLUMN IF NOT EXISTS is_admitted BOOLEAN NOT NULL DEFAULT FALSE"))
+        conn.execute(text("ALTER TABLE exam_registrations ADD COLUMN IF NOT EXISTS admitted_at TIMESTAMP WITH TIME ZONE"))
         conn.commit()
 
 

@@ -22,7 +22,7 @@ postgres_data/
 
 #Agent
 agent.md
-ui-theme.md
+*feature*.md
 refractoring*.md
 future*.md
 agent_data/

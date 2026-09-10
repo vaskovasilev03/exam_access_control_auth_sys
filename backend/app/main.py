@@ -34,7 +34,7 @@ from .schemas import (
     StudentSummarySchema, SecureKeyGenerateSchema, UnifiedRegisterSchema
 )
 from .auth import (
-    create_access_token, get_current_user, require_admin, require_examiner,
+    create_access_token, get_current_user, get_current_examiner, require_admin, require_examiner,
     require_student, require_superadmin, is_superadmin_user, verify_password,
     get_password_hash, validate_secure_key, SECRET_KEY, ALGORITHM
 )
@@ -46,6 +46,20 @@ from .mailer import send_welcome_email, send_allocation_email
 app = FastAPI()
 templates = Jinja2Templates(directory="app/templates")
 timezone = ZoneInfo("Europe/Sofia")
+
+# Речник за активни квесторски назначения по зали (1-Examiner Exclusive Lock)
+ACTIVE_EXAMINER_ASSIGNMENTS: dict[str, dict] = {}
+EXAMINER_HEARTBEAT_TIMEOUT = 60.0  # секунди валидност на сърцебиенето
+
+def _cleanup_expired_assignments():
+    """ Изчиства квесторски назначения с изтекъл heartbeat таймаут """
+    now = time.time()
+    expired = [
+        room for room, data in list(ACTIVE_EXAMINER_ASSIGNMENTS.items())
+        if now - data.get("last_heartbeat", 0) > EXAMINER_HEARTBEAT_TIMEOUT
+    ]
+    for r in expired:
+        del ACTIVE_EXAMINER_ASSIGNMENTS[r]
 
 
 def _parse_admin_log_details(details: Optional[str]) -> dict:
@@ -1053,6 +1067,15 @@ def unified_login(
                 raise HTTPException(status_code=400, detail="Invalid email or password.")
 
             access_token = create_access_token(data={"sub": str(examiner.id), "role": "examiner", "is_superadmin": False})
+            response.set_cookie(
+                key="examiner_token",
+                value=access_token,
+                max_age=60 * 60 * 2,
+                httponly=False,
+                samesite="lax",
+                secure=False,
+                path="/"
+            )
             return {
                 "access_token": access_token,
                 "token_type": "bearer",
@@ -1065,6 +1088,15 @@ def unified_login(
         admin = db.query(Admin).filter(func.lower(Admin.email) == clean_email, Admin.is_superadmin == True).first()
         if admin and verify_password(password, admin.hashed_password):
             access_token = create_access_token(data={"sub": str(admin.id), "role": "examiner", "is_superadmin": True})
+            response.set_cookie(
+                key="examiner_token",
+                value=access_token,
+                max_age=60 * 60 * 2,
+                httponly=False,
+                samesite="lax",
+                secure=False,
+                path="/"
+            )
             return {
                 "access_token": access_token,
                 "token_type": "bearer",
@@ -1968,9 +2000,448 @@ async def stream_exam_room(room_number: str, background_tasks: BackgroundTasks, 
 #         media_type="multipart/x-mixed-replace; boundary=frame"
 #     )
 
+# ==========================================================
+# EXAMINER LIVE HALL MONITOR & MULTI-ROOM ORCHESTRATION APIS
+# ==========================================================
+
+@app.get("/examiner/lobby", response_class=HTMLResponse)
+def get_examiner_lobby_page(request: fastapi.Request, response: Response):
+    """ Връща страницата за избор на активна изпитна зала от квестори """
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return templates.TemplateResponse(
+        request=request,
+        name="examiner_lobby.html",
+        context={"request": request}
+    )
+
+@app.get("/api/v1/examiner/rooms-overview")
+def get_examiner_rooms_overview(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_examiner)
+):
+    """
+    Връща списък с всички активни изпитни зали, състояние на камерата,
+    брой допуснати и чакащи студенти, както и информация кой квестор наблюдава залата в реално време.
+    """
+    _cleanup_expired_assignments()
+
+    # 1. Извличаме всички уникални зали от планираните изпити
+    exam_rooms = db.query(Exam.room_number).distinct().all()
+    all_rooms_set = {r[0] for r in exam_rooms if r[0]}
+
+    # Добавяме и зали, регистрирани хардуерно от ESP32 камерите
+    for r in ACTIVE_CAMERAS.keys():
+        if r:
+            all_rooms_set.add(r)
+
+    # Подреждаме залите възходящо
+    sorted_rooms = sorted(list(all_rooms_set))
+    now = datetime.now()
+
+    rooms_list = []
+    total_all_students = 0
+    total_all_admitted = 0
+    total_cameras_online = 0
+
+    for room_num in sorted_rooms:
+        # Търсим днешен изпит или най-скоро планирания изпит за тази зала
+        primary_exam = db.query(Exam).filter(
+            Exam.room_number == room_num,
+            func.date(Exam.date_time) == now.date()
+        ).first()
+
+        if not primary_exam:
+            primary_exam = db.query(Exam).filter(
+                Exam.room_number == room_num
+            ).order_by(Exam.date_time.desc()).first()
+
+        total_expected = 0
+        admitted_count = 0
+        subject = "Няма активен изпит"
+        lecturer = "—"
+        exam_date_time = "—"
+        session_type = "—"
+
+        if primary_exam:
+            subject = primary_exam.subject
+            lecturer = primary_exam.lecturer or "—"
+            if primary_exam.date_time:
+                exam_date_time = primary_exam.date_time.strftime("%d.%m.%Y %H:%M")
+            if primary_exam.session_type:
+                session_type = primary_exam.session_type.value if hasattr(primary_exam.session_type, 'value') else str(primary_exam.session_type)
+
+            regs = db.query(ExamRegistration).filter(ExamRegistration.exam_id == primary_exam.id).all()
+            total_expected = len(regs)
+            admitted_count = sum(1 for r in regs if r.is_admitted)
+
+        total_all_students += total_expected
+        total_all_admitted += admitted_count
+
+        # Проверка за камера
+        esp32_ip = ACTIVE_CAMERAS.get(room_num)
+        health = CAMERA_HEALTH.get(room_num, {})
+        camera_online = bool(
+            esp32_ip and
+            health.get("is_online", False) and
+            (time.time() - health.get("last_frame_time", 0) < 8.0)
+        )
+        if camera_online:
+            total_cameras_online += 1
+
+        # Квесторско заключване
+        assignment = ACTIVE_EXAMINER_ASSIGNMENTS.get(room_num)
+        is_occupied = assignment is not None
+        my_id = str(current_user.get("sub"))
+        is_occupied_by_me = is_occupied and assignment["examiner_id"] == my_id
+        can_claim = (not is_occupied) or is_occupied_by_me
+
+        admission_ratio_pct = round((admitted_count / total_expected * 100), 1) if total_expected > 0 else 0.0
+
+        rooms_list.append({
+            "room_number": room_num,
+            "subject": subject,
+            "lecturer": lecturer,
+            "date_time": exam_date_time,
+            "session_type": session_type,
+            "total_expected": total_expected,
+            "admitted_count": admitted_count,
+            "waiting_count": max(0, total_expected - admitted_count),
+            "admission_ratio_pct": admission_ratio_pct,
+            "camera_online": camera_online,
+            "esp32_ip": esp32_ip,
+            "is_occupied": is_occupied,
+            "is_occupied_by_me": is_occupied_by_me,
+            "can_claim": can_claim,
+            "assigned_examiner": assignment["examiner_name"] if is_occupied else None,
+            "assigned_examiner_email": assignment.get("examiner_email") if is_occupied else None,
+        })
+
+    return {
+        "rooms": rooms_list,
+        "metrics": {
+            "total_rooms": len(sorted_rooms),
+            "active_rooms": len([r for r in rooms_list if r["total_expected"] > 0]),
+            "total_students": total_all_students,
+            "total_admitted": total_all_admitted,
+            "cameras_online": total_cameras_online
+        }
+    }
+
+
+@app.post("/api/v1/examiner/rooms/{room_number}/claim")
+def claim_exam_room(
+    room_number: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_examiner)
+):
+    """
+    Заявява ексклузивно наблюдение на дадена зала от квестор (1-Examiner Lock).
+    Ако залата вече се наблюдава от друг квестор, връща 409 Conflict.
+    """
+    _cleanup_expired_assignments()
+    my_id = str(current_user.get("sub"))
+
+    if room_number in ACTIVE_EXAMINER_ASSIGNMENTS:
+        existing = ACTIVE_EXAMINER_ASSIGNMENTS[room_number]
+        if existing["examiner_id"] != my_id:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Залата вече се наблюдава от квестор: {existing['examiner_name']}"
+            )
+        # Ако е същият квестор, просто обновяваме heartbeat
+        existing["last_heartbeat"] = time.time()
+        return {
+            "status": "claimed",
+            "room_number": room_number,
+            "examiner_name": existing["examiner_name"],
+            "claimed_at": existing["claimed_at"]
+        }
+
+    # Намираме името и имейла на квестора
+    examiner_name = "Квестор"
+    examiner_email = ""
+    if is_superadmin_user(current_user):
+        admin = db.query(Admin).filter(Admin.id == my_id).first()
+        if admin:
+            examiner_name = f"{admin.full_name} (Superadmin)"
+            examiner_email = admin.email
+    else:
+        examiner = db.query(Examiner).filter(Examiner.id == my_id).first()
+        if examiner:
+            examiner_name = examiner.full_name
+            examiner_email = examiner.email
+
+    # Ако квесторът е държал друга зала, освобождаваме старата
+    for other_room, data in list(ACTIVE_EXAMINER_ASSIGNMENTS.items()):
+        if data["examiner_id"] == my_id and other_room != room_number:
+            del ACTIVE_EXAMINER_ASSIGNMENTS[other_room]
+
+    now_ts = time.time()
+    ACTIVE_EXAMINER_ASSIGNMENTS[room_number] = {
+        "examiner_id": my_id,
+        "examiner_name": examiner_name,
+        "examiner_email": examiner_email,
+        "claimed_at": now_ts,
+        "last_heartbeat": now_ts
+    }
+
+    return {
+        "status": "claimed",
+        "room_number": room_number,
+        "examiner_name": examiner_name,
+        "claimed_at": now_ts
+    }
+
+
+@app.post("/api/v1/examiner/rooms/{room_number}/heartbeat")
+def heartbeat_exam_room(
+    room_number: str,
+    current_user: dict = Depends(get_current_examiner)
+):
+    """ Поддържа активно квесторското заключване за залата """
+    _cleanup_expired_assignments()
+    my_id = str(current_user.get("sub"))
+
+    if room_number in ACTIVE_EXAMINER_ASSIGNMENTS:
+        assigned = ACTIVE_EXAMINER_ASSIGNMENTS[room_number]
+        if assigned["examiner_id"] == my_id:
+            assigned["last_heartbeat"] = time.time()
+            return {"status": "alive", "room_number": room_number}
+
+    return {"status": "not_claimed", "room_number": room_number}
+
+
+@app.post("/api/v1/examiner/rooms/{room_number}/release")
+def release_exam_room(
+    room_number: str,
+    current_user: dict = Depends(get_current_examiner)
+):
+    """ Освобождава квесторското заключване за залата """
+    my_id = str(current_user.get("sub"))
+
+    if room_number in ACTIVE_EXAMINER_ASSIGNMENTS:
+        assigned = ACTIVE_EXAMINER_ASSIGNMENTS[room_number]
+        if assigned["examiner_id"] == my_id or is_superadmin_user(current_user):
+            del ACTIVE_EXAMINER_ASSIGNMENTS[room_number]
+            return {"status": "released", "room_number": room_number}
+
+    return {"status": "noop", "room_number": room_number}
+
+
+@app.get("/api/v1/exams/{room_number}/roster")
+def get_exam_room_roster(
+    room_number: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_examiner)
+):
+    """
+    Връща пълния списък от очаквани/допуснати студенти за изпита в тази зала
+    с техните 3 цветови състояния (Сив, Зелен, Червен), телеметрия и таймлайн.
+    """
+    _cleanup_expired_assignments()
+    assigned_info = ACTIVE_EXAMINER_ASSIGNMENTS.get(room_number)
+
+    now = datetime.now()
+    exam = db.query(Exam).filter(
+        Exam.room_number == room_number,
+        func.date(Exam.date_time) == now.date()
+    ).first()
+
+    if not exam:
+        exam = db.query(Exam).filter(
+            Exam.room_number == room_number
+        ).order_by(Exam.date_time.desc()).first()
+
+    if not exam:
+        return {
+            "exam_info": {
+                "id": None,
+                "room_number": room_number,
+                "subject": "Няма активен изпит",
+                "lecturer": "—",
+                "date_time": "—",
+                "session_type": "—"
+            },
+            "assigned_examiner": assigned_info.get("examiner_name") if assigned_info else None,
+            "metrics": {
+                "total_expected": 0,
+                "total_admitted": 0,
+                "total_waiting": 0,
+                "total_unpermitted": 0,
+                "admission_ratio_pct": 0.0
+            },
+            "students": [],
+            "recent_admissions": []
+        }
+
+    # Взимаме регистрациите за този изпит
+    registrations = (
+        db.query(ExamRegistration)
+        .join(Student, ExamRegistration.student_id == Student.id)
+        .filter(ExamRegistration.exam_id == exam.id)
+        .order_by(Student.full_name.asc())
+        .all()
+    )
+
+    students_payload = []
+    admitted_list = []
+
+    for reg in registrations:
+        st = reg.student
+        has_bio = bool(st.face_embedding is not None)
+        is_approved = (st.status == "APPROVED")
+        is_admitted = bool(reg.is_admitted)
+
+        # Логика за 3-те живи цвята:
+        # Green: Допуснат в залата
+        # Red: Няма право / непълна биометрия / не е одобрен
+        # Gray: Одобрен студент, чакащ на входа
+        if is_admitted:
+            color_state = "green"
+        elif (not is_approved) or (not has_bio):
+            color_state = "red"
+        else:
+            color_state = "gray"
+
+        adm_time_str = reg.admitted_at.strftime("%H:%M:%S") if reg.admitted_at else None
+
+        student_data = {
+            "student_id": str(st.id),
+            "registration_id": str(reg.id),
+            "full_name": st.full_name,
+            "student_id_number": st.student_id_number,
+            "faculty_number": st.student_id_number,
+            "email": st.email,
+            "faculty": st.faculty or "ФКСУ",
+            "specialty": st.specialty or "КСИ",
+            "course": st.course or 1,
+            "stream": st.stream or "1",
+            "group": st.group or "1",
+            "biometric_status": st.status,
+            "has_face_embedding": has_bio,
+            "is_admitted": is_admitted,
+            "admitted_at": adm_time_str,
+            "color_state": color_state
+        }
+        students_payload.append(student_data)
+
+        if is_admitted:
+            admitted_list.append(student_data)
+
+    total_expected = len(students_payload)
+    total_admitted = sum(1 for s in students_payload if s["is_admitted"])
+    total_unpermitted = sum(1 for s in students_payload if s["color_state"] == "red")
+    total_waiting = sum(1 for s in students_payload if s["color_state"] == "gray")
+    admission_ratio_pct = round((total_admitted / total_expected * 100), 1) if total_expected > 0 else 0.0
+
+    # Сортираме последните допуснати за хронологичния таймлайн
+    recent_admissions = sorted(
+        admitted_list,
+        key=lambda s: s.get("admitted_at") or "",
+        reverse=True
+    )[:15]
+
+    return {
+        "exam_info": {
+            "id": str(exam.id),
+            "room_number": exam.room_number,
+            "subject": exam.subject,
+            "lecturer": exam.lecturer or "—",
+            "date_time": exam.date_time.strftime("%d.%m.%Y %H:%M") if exam.date_time else "—",
+            "session_type": exam.session_type.value if hasattr(exam.session_type, 'value') else str(exam.session_type)
+        },
+        "assigned_examiner": assigned_info.get("examiner_name") if assigned_info else None,
+        "metrics": {
+            "total_expected": total_expected,
+            "total_admitted": total_admitted,
+            "total_waiting": total_waiting,
+            "total_unpermitted": total_unpermitted,
+            "admission_ratio_pct": admission_ratio_pct
+        },
+        "students": students_payload,
+        "recent_admissions": recent_admissions
+    }
+
+
+@app.post("/api/v1/exams/{room_number}/admit/{student_id}")
+def admit_student_manual(
+    room_number: str,
+    student_id: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_examiner)
+):
+    """
+    Ръчно допускане на студент от квестора (ин-ап модал или чип).
+    Маркира is_admitted = True и записва GRANTED събитие в AccessLog.
+    """
+    # Намираме студента по UUID или фак. номер
+    student = None
+    try:
+        student = db.query(Student).filter(Student.id == student_id).first()
+    except Exception:
+        pass
+    if not student:
+        student = db.query(Student).filter(Student.student_id_number == student_id.strip()).first()
+
+    if not student:
+        raise HTTPException(status_code=404, detail="Студентът не е намерен.")
+
+    # 1. Първо проверяваме дали студентът вече има регистрация за изпит в тази зала
+    reg = db.query(ExamRegistration).join(Exam).filter(
+        ExamRegistration.student_id == student.id,
+        Exam.room_number == room_number
+    ).first()
+
+    now_ts = datetime.now().astimezone()
+    if reg:
+        reg.is_admitted = True
+        reg.admitted_at = now_ts
+    else:
+        # 2. Ако няма, намираме изпита за създаване на нова регистрация
+        now = datetime.now()
+        exam = db.query(Exam).filter(
+            Exam.room_number == room_number,
+            func.date(Exam.date_time) == now.date()
+        ).first()
+
+        if not exam:
+            exam = db.query(Exam).filter(
+                Exam.room_number == room_number
+            ).order_by(Exam.date_time.desc()).first()
+
+        if not exam:
+            raise HTTPException(status_code=404, detail=f"Няма активен изпит в зала {room_number}.")
+
+        reg = ExamRegistration(
+            student_id=student.id,
+            exam_id=exam.id,
+            is_admitted=True,
+            admitted_at=now_ts
+        )
+        db.add(reg)
+
+    log_entry = AccessLog(
+        student_id=student.id,
+        location=room_number,
+        status="GRANTED"
+    )
+    db.add(log_entry)
+    db.commit()
+
+    return {
+        "status": "admitted",
+        "student_id": str(student.id),
+        "student_name": student.full_name,
+        "faculty_number": student.student_id_number,
+        "admitted_at": now_ts.strftime("%H:%M:%S")
+    }
+
+
 @app.get("/api/v1/exams/{room_number}/monitor", response_class=HTMLResponse)
 def get_monitor_page(room_number: str, request: fastapi.Request, response: Response):
-
+    """ Връща страницата за жив мониторинг на залата """
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
@@ -1978,26 +2449,24 @@ def get_monitor_page(room_number: str, request: fastapi.Request, response: Respo
     return templates.TemplateResponse(
         request=request, 
         name="monitor.html", 
-        context={"room_number": room_number}
+        context={"request": request, "room_number": room_number}
     )
+
 
 @app.post("/api/v1/exams/{room_number}/force-register")
 def force_register_student_to_exam(
     room_number: str, 
     student_id_number: str = Form(...), 
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user) # Защита през хедъра на Fetch API
+    current_user: dict = Depends(get_current_examiner) # Позволява Bearer хедър, токен или куки
 ):
-    """ Академичен модул: Принудително записване на студент за изпит в текущата зала """
-    if current_user.get("role") not in ("examiner", "superadmin") and not is_superadmin_user(current_user):
-        raise HTTPException(status_code=403, detail="Операцията е разрешена само за квестори.")
-
+    """ Академичен модул: Принудително записване и допускане на студент за изпит в текущата зала """
     # 1. Търсим студента
     student = db.query(Student).filter(Student.student_id_number == student_id_number.strip()).first()
     if not student:
-        raise HTTPException(status_code=44, detail="Студент с такъв факултетен номер не съществува.")
+        raise HTTPException(status_code=404, detail="Студент с такъв факултетен номер не съществува.")
 
-    # 2. Намираме изпита за тази зала, провеждащ се ДНЕС
+    # 2. Намираме изпита за тази зала, провеждащ се ДНЕС или най-скоро планирания
     current_date = datetime.now().date()
     current_exam = db.query(Exam).filter(
         Exam.room_number == room_number,
@@ -2005,7 +2474,12 @@ def force_register_student_to_exam(
     ).first()
 
     if not current_exam:
-        raise HTTPException(status_code=404, detail=f"Днес няма планиран изпит в зала {room_number}.")
+        current_exam = db.query(Exam).filter(Exam.room_number == room_number).order_by(Exam.date_time.desc()).first()
+
+    if not current_exam:
+        raise HTTPException(status_code=404, detail=f"Няма планиран изпит в зала {room_number}.")
+
+    now_ts = datetime.now().astimezone()
 
     # 3. Проверяваме дали вече няма регистрация
     already_registered = db.query(ExamRegistration).filter(
@@ -2014,14 +2488,25 @@ def force_register_student_to_exam(
     ).first()
 
     if already_registered:
-        return {"status": "already_done", "message": "Студентът вече има валидна регистрация."}
+        if not already_registered.is_admitted:
+            already_registered.is_admitted = True
+            already_registered.admitted_at = now_ts
+            log_entry = AccessLog(student_id=student.id, location=room_number, status="GRANTED")
+            db.add(log_entry)
+            db.commit()
+            return {"status": "success", "message": f"Студентът {student.full_name} вече имаше регистрация и беше допуснат в зала {room_number}."}
+        return {"status": "already_done", "message": "Студентът вече има валидна регистрация и е допуснат."}
 
-    # 4. Създаваме принудителна нова регистрация
+    # 4. Създаваме принудителна нова регистрация с допуск
     new_registration = ExamRegistration(
         student_id=student.id,
-        exam_id=current_exam.id
+        exam_id=current_exam.id,
+        is_admitted=True,
+        admitted_at=now_ts
     )
     db.add(new_registration)
+    log_entry = AccessLog(student_id=student.id, location=room_number, status="GRANTED")
+    db.add(log_entry)
     db.commit()
 
     print(f"[Спешен Допуск] Квесторът записа студент {student.full_name} за изпит в зала {room_number}")
@@ -2337,17 +2822,14 @@ def get_exam_room_camera_status(room_number: str):
     }
 
 @app.get("/api/v1/exams/{room_number}/status")
-async def get_exam_room_biometric_status(room_number: str, token: str = Query(...)):
+async def get_exam_room_biometric_status(
+    room_number: str,
+    current_user: dict = Depends(get_current_examiner)
+):
     """
     Ендпоинт за Квесторския панел. 
     Връща JSON с името, факултетния номер и статуса на засичане извън видеото.
     """
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        if payload.get("role") not in ["examiner", "superadmin"] and not is_superadmin_user(payload):
-            raise HTTPException(status_code=403, detail="Достъпът е отказан.")
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid or expired token.")
 
 
     if room_number not in AI_ROOM_STATES:

@@ -5,282 +5,1074 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Exam Gate: Мониторинг на Зала {{ room_number }}</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         :root {
-            --card: #f5f5f5;
-            --ring: #606060;
-            --input: #e0e0e0;
-            --muted: #d9d9d9;
-            --accent: #c0c0c0;
-            --border: #d0d0d0;
-            --radius: 0.35rem;
-            --popover: #f5f5f5;
-            --primary: #606060;
-            --sidebar: #eaeaea;
-            --font-mono: Fira Code, monospace;
-            --font-sans: Montserrat, sans-serif;
-            --secondary: #e0e0e0;
-            --background: #f0f0f0;
-            --font-serif: Georgia, serif;
-            --foreground: #333333;
-            --destructive: #cc3333;
-            --card-foreground: #333333;
-            --muted-foreground: #666666;
-            --accent-foreground: #333333;
-            --popover-foreground: #333333;
+            --card: #ffffff;
+            --ring: #4f46e5;
+            --input: #f3f4f6;
+            --muted: #f9fafb;
+            --accent: #e5e7eb;
+            --border: #e5e7eb;
+            --radius: 0.75rem;
+            --popover: #ffffff;
+            --primary: #4f46e5;
+            --sidebar: #111827;
+            --font-mono: 'Fira Code', monospace;
+            --font-sans: 'Montserrat', sans-serif;
+            --secondary: #f3f4f6;
+            --background: #f8fafc;
+            --foreground: #0f172a;
+            --destructive: #ef4444;
+            --card-foreground: #0f172a;
+            --muted-foreground: #64748b;
             --primary-foreground: #ffffff;
-            --secondary-foreground: #333333;
-            --destructive-foreground: #ffffff;
+        }
+
+        body.dark-mode {
+            --card: #1e293b;
+            --ring: #6366f1;
+            --input: #0f172a;
+            --muted: #334155;
+            --accent: #334155;
+            --border: #334155;
+            --popover: #1e293b;
+            --primary: #6366f1;
+            --sidebar: #0f172a;
+            --secondary: #1e293b;
+            --background: #0f172a;
+            --foreground: #f8fafc;
+            --card-foreground: #f8fafc;
+            --muted-foreground: #94a3b8;
+            --primary-foreground: #ffffff;
         }
 
         body {
-            background: var(--background);
+            background-color: var(--background);
             color: var(--foreground);
             font-family: var(--font-sans);
         }
+
+        /* Radar scan animation */
+        @keyframes radar-sweep {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .animate-radar {
+            animation: radar-sweep 4s linear infinite;
+        }
     </style>
 </head>
-<body class="min-h-screen">
+<body class="min-h-screen flex flex-col transition-colors duration-200">
 
-    <header class="bg-[var(--card)] border-b border-[var(--border)] px-6 py-4 flex justify-between items-center shadow-[0_2px_8px_hsl(0_0%_20%/0.12)]">
-        <div class="flex items-center space-x-3">
-            <h1 class="text-xl font-bold tracking-wide text-[var(--primary)]">Система за биометричен контрол на изпити</h1>
+    <!-- Toast Notifications Container -->
+    <div id="toastContainer" class="fixed bottom-6 right-6 z-50 flex flex-col gap-3 pointer-events-none max-w-md w-full px-4"></div>
+
+    <!-- Top Mission-Control Bar -->
+    <header class="sticky top-0 z-30 bg-[var(--card)]/90 backdrop-blur border-b border-[var(--border)] px-4 sm:px-6 py-3 transition-colors duration-200">
+        <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
+            
+            <!-- Left: Back to Lobby & Room Breadcrumb -->
+            <div class="flex items-center gap-3">
+                <a href="/examiner/lobby" onclick="releaseAndLeave(event)" class="px-3 py-1.5 rounded-lg bg-[var(--input)] hover:bg-[var(--accent)] text-[var(--foreground)] text-xs font-bold transition flex items-center gap-1.5 border border-[var(--border)] cursor-pointer">
+                    <span>←</span>
+                    <span class="hidden sm:inline">Списък със зали</span>
+                </a>
+
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-semibold text-[var(--muted-foreground)] hidden md:inline">Зала:</span>
+                    <div class="px-3 py-1 rounded-lg bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 font-extrabold text-sm border border-indigo-500/20 flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span>Зала {{ room_number }}</span>
+                    </div>
+                </div>
+
+                <!-- Exam Subject Tag -->
+                <div id="topExamSubjectTag" class="hidden lg:flex items-center gap-1.5 text-xs text-[var(--muted-foreground)] font-semibold border-l border-[var(--border)] pl-3">
+                    <span id="topExamSubject">Зареждане на изпит...</span>
+                </div>
+            </div>
+
+            <!-- Right: Assigned Examiner, Clock & Toggles -->
+            <div class="flex items-center gap-3">
+                <!-- Digital Clock -->
+                <div class="hidden sm:flex flex-col text-right pr-3 border-r border-[var(--border)]">
+                    <span id="liveClockTime" class="text-sm font-bold font-mono text-[var(--foreground)]">--:--:--</span>
+                    <span id="liveClockDate" class="text-[10px] uppercase font-semibold text-[var(--muted-foreground)]">--</span>
+                </div>
+
+                <!-- Sound Chime Toggle -->
+                <button onclick="toggleAudio()" id="audioToggleBtn" title="Звукова сигнализация" class="p-2 rounded-lg bg-[var(--input)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--accent)] transition cursor-pointer">
+                    <span id="audioIcon">🔊</span>
+                </button>
+
+                <!-- Dark/Light Theme Toggle -->
+                <button onclick="toggleTheme()" id="themeToggleBtn" title="Смяна на тема" class="p-2 rounded-lg bg-[var(--input)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--accent)] transition cursor-pointer">
+                    <span id="themeIcon">☀️</span>
+                </button>
+
+                <!-- Assigned Examiner Pill -->
+                <div class="flex items-center gap-2 pl-2">
+                    <div class="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shadow-sm">
+                        КВ
+                    </div>
+                    <div class="hidden md:flex flex-col text-left">
+                        <span id="topExaminerName" class="text-xs font-bold text-[var(--foreground)] leading-tight">Квестор</span>
+                        <span class="text-[10px] text-emerald-500 font-semibold">Назначен (1-Lock)</span>
+                    </div>
+                </div>
+
+                <!-- Exit Room Button -->
+                <button onclick="logoutExaminer()" title="Изход от системата" class="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 transition cursor-pointer">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                    </svg>
+                </button>
+            </div>
         </div>
-        <div class="flex items-center space-x-4">
-            <div class="relative group inline-flex items-center">
-                <span class="bg-[var(--sidebar)] px-3 py-1 rounded-[var(--radius)] text-sm text-[var(--foreground)] cursor-pointer select-none border border-[var(--border)]">
-                    Зала: <b class="text-[var(--primary)]">{{ room_number }}</b>
-                </span>
+    </header>
 
-                <div class="absolute right-0 top-full mt-0 w-72 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--popover)] p-3 shadow-[0_2px_8px_hsl(0_0%_20%/0.12)] z-20 opacity-0 invisible pointer-events-none transition-all duration-150 group-hover:opacity-100 group-hover:visible group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:visible group-focus-within:pointer-events-auto">
-                    <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-[var(--muted-foreground)]">Смени зала</label>
-                    <div class="flex gap-2">
-                        <input id="switchRoomInput" type="text" inputmode="numeric" placeholder="Нов номер на зала" class="w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--input)] px-3 py-2 text-sm text-[var(--foreground)] outline-none transition focus:ring-2 focus:ring-[var(--ring)]">
-                        <button type="button" onclick="switchRoom()" class="rounded-[var(--radius)] bg-[var(--primary)] px-3 py-2 text-sm font-bold text-[var(--primary-foreground)] transition hover:opacity-90">
-                            Потвърди
+    <!-- Main Content: Two-Column Mission Control HUD -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        <!-- LEFT COLUMN: ESP32-CAM Live Viewport + Biometric Feedback (col-span-7) -->
+        <section class="lg:col-span-7 flex flex-col gap-6">
+            
+            <!-- Video Viewport Card -->
+            <div class="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius)] p-4 shadow-sm flex flex-col justify-between">
+                <div class="flex justify-between items-center mb-3">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold uppercase tracking-wider text-[var(--muted-foreground)]">Видео стрийм: ESP32-CAM</span>
+                        <span id="streamResolutionBadge" class="hidden sm:inline-block text-[10px] font-mono px-2 py-0.5 rounded bg-[var(--input)] text-[var(--muted-foreground)] border border-[var(--border)]">
+                            720p • 25 FPS
+                        </span>
+                    </div>
+
+                    <!-- Camera Armed Status -->
+                    <div class="flex items-center gap-2">
+                        <span id="cameraStatusBadge" class="flex items-center text-xs text-red-400 bg-red-500/10 px-2.5 py-0.5 rounded-full font-bold uppercase border border-red-500/30">
+                            <span id="cameraStatusDot" class="w-2 h-2 bg-red-400 rounded-full mr-1.5 animate-pulse"></span>
+                            <span id="cameraStatusText">Камера Офлайн</span>
+                        </span>
+                        
+                        <!-- Fullscreen Button -->
+                        <button onclick="toggleFullscreenStream()" title="Цял екран" class="p-1.5 rounded-md bg-[var(--input)] hover:bg-[var(--accent)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition cursor-pointer">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Video Frame Container with HUD Overlays -->
+                <div id="videoContainer" class="bg-slate-950 rounded-xl overflow-hidden flex items-center justify-center border border-[var(--border)] aspect-[16/10] shadow-inner relative group min-h-[320px]">
+                    
+                    <!-- HUD Overlay: Top Left (LIVE dot & Ticker) -->
+                    <div class="absolute top-3 left-3 z-20 flex items-center gap-2 pointer-events-none">
+                        <span class="flex items-center gap-1.5 text-[11px] font-bold text-white bg-red-600/80 backdrop-blur px-2.5 py-1 rounded-full shadow tracking-wider uppercase">
+                            <span class="w-2 h-2 rounded-full bg-white animate-ping"></span>
+                            <span>LIVE</span>
+                        </span>
+                        <span id="hudTimestamp" class="text-[11px] font-mono font-semibold text-white/90 bg-black/60 backdrop-blur px-2.5 py-1 rounded-full shadow">
+                            --:--:--
+                        </span>
+                    </div>
+
+                    <!-- HUD Overlay: Top Right (Room Tag) -->
+                    <div class="absolute top-3 right-3 z-20 pointer-events-none">
+                        <span class="text-[11px] font-bold text-white/90 bg-black/60 backdrop-blur px-2.5 py-1 rounded-full shadow border border-white/10">
+                            Терминал: Зала {{ room_number }}
+                        </span>
+                    </div>
+
+                    <!-- MJPEG Live Stream Image -->
+                    <img id="videoStream" class="w-full h-full object-cover hidden" src="" alt="Свързване с терминала..." />
+
+                    <!-- Offline Radar Graphic -->
+                    <div id="videoOfflineRadar" class="flex flex-col items-center justify-center text-center p-6 space-y-3">
+                        <div class="relative w-20 h-20 rounded-full border-2 border-indigo-500/20 flex items-center justify-center">
+                            <div class="w-12 h-12 rounded-full border border-indigo-500/40"></div>
+                            <div class="w-3 h-3 rounded-full bg-indigo-500 animate-ping"></div>
+                            <div class="absolute inset-0 rounded-full border-t-2 border-indigo-500 animate-radar pointer-events-none"></div>
+                        </div>
+                        <div class="space-y-1">
+                            <div class="text-sm font-bold text-white">Очакване на видео сигнал</div>
+                            <div class="text-xs text-slate-400 max-w-xs">ESP32-CAM терминалът за Зала {{ room_number }} не излъчва в момента.</div>
+                        </div>
+                        <button onclick="checkCameraStatus(true)" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow transition cursor-pointer">
+                            Провери връзката
                         </button>
                     </div>
                 </div>
             </div>
-            <button onclick="logout()" class="bg-[var(--destructive)] hover:opacity-90 text-[var(--destructive-foreground)] px-4 py-1.5 rounded-[var(--radius)] text-sm font-semibold transition cursor-pointer">Изход</button>
-        </div>
-    </header>
 
-    <main class="max-w-screen-2xl mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        
-        <section class="lg:col-span-8 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius)] p-4 sm:p-5 flex flex-col justify-between shadow-[0_2px_8px_hsl(0_0%_20%/0.12)] min-h-[420px] lg:min-h-[72vh]">
-            <div class="flex justify-between items-center mb-3">
-                <span class="text-sm font-medium text-[var(--muted-foreground)]">Видео стрийм от ESP32-CAM</span>
-                <span id="cameraStatusBadge" class="flex items-center text-xs text-[var(--destructive)] bg-[var(--destructive)]/10 px-2.5 py-1 rounded-full font-bold uppercase animate-pulse border border-[var(--destructive)]/30">
-                    <span id="cameraStatusDot" class="w-2 h-2 bg-[var(--destructive)] rounded-full mr-2"></span>
-                    <span id="cameraStatusText">System Disarmed</span>
-                </span>
-            </div>
-            
-            <div class="bg-[var(--input)] rounded-[var(--radius)] overflow-hidden flex items-center justify-center border border-[var(--border)] aspect-[16/10] lg:aspect-[16/9] shadow-inner relative min-h-[320px] lg:min-h-[calc(72vh-76px)]">
-                <img id="videoStream" class="w-full h-full object-cover" src="" alt="Свързване с ESP32..." />
-            </div>
-        </section>
-
-        <section class="lg:col-span-4 flex flex-col space-y-6">
-            
-            <div id="statusCard" class="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius)] p-6 transition-all duration-300 shadow-[0_2px_8px_hsl(0_0%_20%/0.12)] flex-1 flex flex-col justify-between">
+            <!-- Biometric Recognition Result Card -->
+            <div id="statusCard" class="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius)] p-6 transition-all duration-300 shadow-sm flex flex-col justify-between space-y-5">
                 <div>
-                    <h3 class="text-[var(--muted-foreground)] font-semibold text-sm uppercase tracking-wider mb-4">Резултат от Биометрия</h3>
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-[var(--muted-foreground)]">Резултат от Биометрия (InsightFace)</h3>
+                        <span id="biometricStatePill" class="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-[var(--input)] text-[var(--muted-foreground)] border border-[var(--border)]">
+                            Терминалът е готов
+                        </span>
+                    </div>
                     
-                    <div class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
                         <div>
-                            <label class="text-xs text-[var(--muted-foreground)] block uppercase font-bold">Име на студент</label>
-                            <span id="studentName" class="text-2xl font-bold text-[var(--foreground)] transition-all">—</span>
+                            <label class="text-[10px] text-[var(--muted-foreground)] block uppercase font-bold mb-1">Име на студент</label>
+                            <span id="studentName" class="text-xl sm:text-2xl font-extrabold text-[var(--foreground)] transition-all line-clamp-1">—</span>
                         </div>
                         <div>
-                            <label class="text-xs text-[var(--muted-foreground)] block uppercase font-bold">Факултетен Номер</label>
-                            <span id="facultyNumber" class="text-xl font-mono text-[var(--primary)] transition-all">—</span>
+                            <label class="text-[10px] text-[var(--muted-foreground)] block uppercase font-bold mb-1">Факултетен Номер</label>
+                            <span id="facultyNumber" class="text-lg sm:text-xl font-mono font-bold text-indigo-600 dark:text-indigo-400 transition-all">—</span>
                         </div>
                     </div>
                 </div>
 
-                <div id="statusAlertBox" class="mt-6 p-4 bg-[var(--muted)]/60 border border-[var(--border)] rounded-[var(--radius)] text-center transition-all">
-                    <p id="statusText" class="font-bold text-lg text-[var(--foreground)]">Очакване на обект пред камерата...</p>
+                <!-- Dynamic Status Alert Box -->
+                <div id="statusAlertBox" class="p-4 bg-[var(--input)] border border-[var(--border)] rounded-xl text-center transition-all">
+                    <p id="statusText" class="font-bold text-base text-[var(--foreground)]">Очакване на студент пред терминала...</p>
                 </div>
 
-                <div id="forceActionSection" class="hidden mt-4">
-                    <button onclick="executeForceAllow()" class="w-full bg-[var(--primary)] hover:opacity-90 text-[var(--primary-foreground)] font-bold py-3 px-4 rounded-[var(--radius)] shadow-[0_2px_8px_hsl(0_0%_20%/0.12)] transition transform active:scale-95 cursor-pointer">
-                        ✍️ Допусни извънредно в тази зала
+                <!-- Emergency Manual Admission Button -->
+                <div class="pt-2">
+                    <button onclick="openEmergencyAdmitModal()" class="w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white font-bold py-3 px-4 rounded-xl shadow-md shadow-indigo-600/20 transition transform active:scale-98 flex items-center justify-center gap-2 text-xs sm:text-sm cursor-pointer">
+                        <span>✍️</span>
+                        <span>Допусни извънредно в тази зала</span>
                     </button>
                 </div>
             </div>
         </section>
+
+        <!-- RIGHT COLUMN: Permitted Students Hall Roster Grid & Recent Timeline (col-span-5) -->
+        <section class="lg:col-span-5 flex flex-col gap-6">
+            
+            <!-- Permitted Students Hall Roster Card -->
+            <div class="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius)] p-5 shadow-sm space-y-4">
+                
+                <!-- Roster Header & KPI Badge -->
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-base font-extrabold text-[var(--foreground)]">Списък на допуснатите студенти</h2>
+                        <p class="text-xs text-[var(--muted-foreground)]">Интерактивна мрежа от очаквани кандидати</p>
+                    </div>
+                    <div class="text-right">
+                        <div id="rosterAdmissionRatio" class="text-sm font-extrabold text-indigo-600 dark:text-indigo-400 font-mono">0 / 0 (0%)</div>
+                        <div class="text-[10px] text-[var(--muted-foreground)] font-semibold uppercase">Допуснати</div>
+                    </div>
+                </div>
+
+                <!-- Live Progress Bar -->
+                <div class="w-full bg-[var(--input)] rounded-full h-2.5 overflow-hidden border border-[var(--border)]">
+                    <div id="rosterProgressBar" class="bg-gradient-to-r from-emerald-500 to-teal-400 h-2.5 rounded-full transition-all duration-500" style="width: 0%;"></div>
+                </div>
+
+                <!-- Search & Filters Toolbar -->
+                <div class="space-y-2">
+                    <div class="relative">
+                        <input 
+                            type="text" 
+                            id="rosterSearchInput" 
+                            placeholder="Търси по име или фак. номер..." 
+                            class="w-full pl-8 pr-3 py-1.5 text-xs bg-[var(--input)] border border-[var(--border)] rounded-lg text-[var(--foreground)] placeholder-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] transition"
+                            oninput="filterRoster()"
+                        >
+                        <span class="absolute left-2.5 top-2 text-[var(--muted-foreground)] text-xs">🔍</span>
+                    </div>
+
+                    <!-- Filter Tabs with Badges -->
+                    <div class="flex items-center gap-1 overflow-x-auto pb-1 text-xs">
+                        <button onclick="setRosterTab('all')" id="tabAllBtn" class="px-2.5 py-1 rounded-md font-bold transition bg-indigo-600 text-white cursor-pointer flex items-center gap-1">
+                            <span>Всички</span>
+                            <span id="tabAllBadge" class="px-1.5 py-0.2 rounded-full text-[10px] bg-white/20">0</span>
+                        </button>
+                        <button onclick="setRosterTab('waiting')" id="tabWaitingBtn" class="px-2.5 py-1 rounded-md font-bold transition bg-[var(--input)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer flex items-center gap-1">
+                            <span>Чакащи</span>
+                            <span id="tabWaitingBadge" class="px-1.5 py-0.2 rounded-full text-[10px] bg-[var(--border)]">0</span>
+                        </button>
+                        <button onclick="setRosterTab('admitted')" id="tabAdmittedBtn" class="px-2.5 py-1 rounded-md font-bold transition bg-[var(--input)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer flex items-center gap-1">
+                            <span>Допуснати</span>
+                            <span id="tabAdmittedBadge" class="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-500/20 text-emerald-500">0</span>
+                        </button>
+                        <button onclick="setRosterTab('problem')" id="tabProblemBtn" class="px-2.5 py-1 rounded-md font-bold transition bg-[var(--input)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer flex items-center gap-1">
+                            <span>С проблем</span>
+                            <span id="tabProblemBadge" class="px-1.5 py-0.2 rounded-full text-[10px] bg-red-500/20 text-red-500">0</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Chips Grid Container (Max Height with custom scrollbar) -->
+                <div id="rosterChipsGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[380px] overflow-y-auto pr-1">
+                    <!-- Dynamic Student Chips -->
+                    <div class="col-span-full py-8 text-center text-xs text-[var(--muted-foreground)] animate-pulse">
+                        Зареждане на списъка със студенти...
+                    </div>
+                </div>
+
+                <!-- Empty State for Roster -->
+                <div id="emptyRosterState" class="hidden py-8 text-center text-xs text-[var(--muted-foreground)] space-y-1">
+                    <div class="text-xl">👥</div>
+                    <div class="font-bold text-[var(--foreground)]">Няма студенти за показване</div>
+                    <div>Няма резултати, отговарящи на избрания филтър.</div>
+                </div>
+            </div>
+
+            <!-- Recent Admissions Timeline Card -->
+            <div class="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius)] p-5 shadow-sm space-y-3">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-[var(--muted-foreground)]">Хронология на допуска (Последно влезли)</h3>
+                    <span class="text-[10px] font-semibold text-[var(--muted-foreground)]" id="recentAdmissionsCount">0 влезли</span>
+                </div>
+
+                <div id="recentAdmissionsList" class="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                    <div class="text-xs text-[var(--muted-foreground)] text-center py-4">
+                        Все още няма допуснати студенти за този изпит.
+                    </div>
+                </div>
+            </div>
+
+        </section>
+
     </main>
+
+    <!-- Emergency Admission Modal -->
+    <div id="emergencyModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 shadow-2xl max-w-md w-full space-y-4">
+            <div class="flex items-center justify-between border-b border-[var(--border)] pb-3">
+                <div class="flex items-center gap-2">
+                    <span class="text-lg">✍️</span>
+                    <h3 class="text-base font-extrabold text-[var(--foreground)]">Извънредно допускане</h3>
+                </div>
+                <button onclick="closeEmergencyAdmitModal()" class="text-[var(--muted-foreground)] hover:text-[var(--foreground)] text-lg cursor-pointer">✕</button>
+            </div>
+
+            <p class="text-xs text-[var(--muted-foreground)] leading-relaxed">
+                Въведете факултетния номер на студента, за да го запишете и допуснете служебно в Зала {{ room_number }} за текущия изпит.
+            </p>
+
+            <div class="space-y-1">
+                <label class="text-xs font-bold uppercase text-[var(--muted-foreground)]">Факултетен номер</label>
+                <input 
+                    type="text" 
+                    id="emergencyFacNumInput" 
+                    placeholder="напр. 12122001" 
+                    class="w-full px-4 py-2.5 text-sm font-mono bg-[var(--input)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] transition"
+                >
+            </div>
+
+            <div class="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border)]">
+                <button onclick="closeEmergencyAdmitModal()" class="px-4 py-2 text-xs font-bold rounded-xl bg-[var(--input)] hover:bg-[var(--accent)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition cursor-pointer">
+                    Отказ
+                </button>
+                <button onclick="submitEmergencyAdmit()" class="px-4 py-2 text-xs font-bold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-600/20 transition cursor-pointer">
+                    Потвърди и допусни
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Student Dossier Modal -->
+    <div id="dossierModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 shadow-2xl max-w-md w-full space-y-4">
+            <div class="flex items-center justify-between border-b border-[var(--border)] pb-3">
+                <div class="flex items-center gap-2">
+                    <span class="text-lg">📋</span>
+                    <h3 class="text-base font-extrabold text-[var(--foreground)]">Студентско досие</h3>
+                </div>
+                <button onclick="closeDossierModal()" class="text-[var(--muted-foreground)] hover:text-[var(--foreground)] text-lg cursor-pointer">✕</button>
+            </div>
+
+            <!-- Student Summary Details -->
+            <div class="space-y-3">
+                <div class="flex items-center gap-3">
+                    <div id="dossierAvatar" class="w-12 h-12 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-extrabold text-base shadow">
+                        СТ
+                    </div>
+                    <div>
+                        <div id="dossierFullName" class="text-base font-extrabold text-[var(--foreground)]">Иван Иванов</div>
+                        <div id="dossierFacNum" class="text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400">Фак. № 12122001</div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 text-xs p-3 bg-[var(--input)] rounded-xl border border-[var(--border)]">
+                    <div>
+                        <span class="text-[var(--muted-foreground)] block">Специалност:</span>
+                        <span id="dossierSpecialty" class="font-bold text-[var(--foreground)]">—</span>
+                    </div>
+                    <div>
+                        <span class="text-[var(--muted-foreground)] block">Факултет / Курс:</span>
+                        <span id="dossierFacultyCourse" class="font-bold text-[var(--foreground)]">—</span>
+                    </div>
+                    <div>
+                        <span class="text-[var(--muted-foreground)] block">Поток / Група:</span>
+                        <span id="dossierStreamGroup" class="font-bold text-[var(--foreground)]">—</span>
+                    </div>
+                    <div>
+                        <span class="text-[var(--muted-foreground)] block">Статус на биометрия:</span>
+                        <span id="dossierBiometricStatus" class="font-bold text-emerald-500">—</span>
+                    </div>
+                </div>
+
+                <div id="dossierAdmissionStatusBox" class="p-3 rounded-xl border text-xs font-bold text-center">
+                    <!-- Filled dynamically -->
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border)]">
+                <button onclick="closeDossierModal()" class="px-4 py-2 text-xs font-bold rounded-xl bg-[var(--input)] hover:bg-[var(--accent)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition cursor-pointer">
+                    Затвори
+                </button>
+                <button id="dossierAdmitActionBtn" onclick="executeDossierAdmit()" class="px-4 py-2 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/20 transition cursor-pointer">
+                    Допусни ръчно в залата
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="border-t border-[var(--border)] py-4 text-center text-xs text-[var(--muted-foreground)] mt-auto">
+        Exam Gate Academic Control &copy; 2026. Зала {{ room_number }} • Квесторско наблюдение на живо.
+    </footer>
 
     <script>
         const roomNumber = "{{ room_number }}";
-        // Взимаме JWT токена, записан в localStorage след login
-        const token = localStorage.getItem("examiner_token");
+        const token = localStorage.getItem("examiner_token") || localStorage.getItem("admin_token");
+
+        // Строга защита за наличие на токен
+        if (!token) {
+            window.location.href = "/login?role=examiner";
+        }
+
+        let cameraArmed = false;
+        let offlineCount = 0;
+        let currentDetectedFacNum = "";
+        let audioMuted = localStorage.getItem("sound_muted") === "true";
+        let allRosterStudents = [];
+        let currentRosterTab = 'all';
+        let selectedDossierStudent = null;
+
+        // Web Audio API Synthesizer
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSuccessChime() {
+            if (audioMuted) return;
+            try {
+                const now = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523.25, now); // C5
+                osc.frequency.setValueAtTime(659.25, now + 0.1); // E5
+                osc.frequency.setValueAtTime(783.99, now + 0.2); // G5
+                osc.frequency.setValueAtTime(1046.50, now + 0.3); // C6
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.6);
+            } catch (e) {
+                console.warn("Audio play warning:", e);
+            }
+        }
+
+        function playAlertTone() {
+            if (audioMuted) return;
+            try {
+                const now = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(220, now); // A3
+                osc.frequency.setValueAtTime(180, now + 0.15);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.4);
+            } catch (e) {
+                console.warn("Audio play warning:", e);
+            }
+        }
+
+        function toggleAudio() {
+            audioMuted = !audioMuted;
+            localStorage.setItem("sound_muted", audioMuted);
+            document.getElementById("audioIcon").innerText = audioMuted ? "🔇" : "🔊";
+            showToast(audioMuted ? "Звукът е изключен." : "Звукът е активиран.", "info");
+        }
+        if (audioMuted) document.getElementById("audioIcon").innerText = "🔇";
+
+        // Live Clock
+        function updateLiveClock() {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString("bg-BG", { hour12: false });
+            document.getElementById("liveClockTime").innerText = timeStr;
+            document.getElementById("hudTimestamp").innerText = timeStr;
+            document.getElementById("liveClockDate").innerText = now.toLocaleDateString("bg-BG", { day: 'numeric', month: 'short', year: 'numeric' });
+        }
+        setInterval(updateLiveClock, 1000);
+        updateLiveClock();
+
+        // Theme Toggle
+        function applyTheme(isDark) {
+            if (isDark) {
+                document.body.classList.add("dark-mode");
+                document.getElementById("themeIcon").innerText = "🌙";
+                localStorage.setItem("theme", "dark");
+            } else {
+                document.body.classList.remove("dark-mode");
+                document.getElementById("themeIcon").innerText = "☀️";
+                localStorage.setItem("theme", "light");
+            }
+        }
+
+        function toggleTheme() {
+            const isDark = document.body.classList.contains("dark-mode");
+            applyTheme(!isDark);
+        }
+
+        if (localStorage.getItem("theme") === "dark") {
+            applyTheme(true);
+        }
+
+        // Floating Toasts
+        function showToast(message, type = 'info') {
+            const container = document.getElementById("toastContainer");
+            const toast = document.createElement("div");
+            toast.className = `p-4 rounded-xl shadow-lg border text-sm font-semibold flex items-center justify-between pointer-events-auto transform transition-all duration-300 translate-y-2 opacity-0 ${
+                type === 'success' ? 'bg-emerald-600 text-white border-emerald-500' :
+                type === 'error' ? 'bg-red-600 text-white border-red-500' :
+                type === 'warning' ? 'bg-amber-600 text-white border-amber-500' :
+                'bg-slate-800 text-white border-slate-700'
+            }`;
+            toast.innerHTML = `
+                <div class="flex items-center gap-2">
+                    <span>${type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ'}</span>
+                    <span>${message}</span>
+                </div>
+                <button onclick="this.parentElement.remove()" class="text-white/80 hover:text-white ml-3 text-xs">✕</button>
+            `;
+            container.appendChild(toast);
+            requestAnimationFrame(() => {
+                toast.classList.remove("translate-y-2", "opacity-0");
+            });
+            setTimeout(() => {
+                toast.classList.add("opacity-0", "translate-y-2");
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        // Fullscreen Stream
+        function toggleFullscreenStream() {
+            const container = document.getElementById("videoContainer");
+            if (!document.fullscreenElement) {
+                container.requestFullscreen().catch(err => {
+                    console.warn(`Fullscreen error: ${err.message}`);
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        // Camera Management
         const videoStream = document.getElementById("videoStream");
+        const videoOfflineRadar = document.getElementById("videoOfflineRadar");
         const cameraStatusBadge = document.getElementById("cameraStatusBadge");
         const cameraStatusDot = document.getElementById("cameraStatusDot");
         const cameraStatusText = document.getElementById("cameraStatusText");
-        const switchRoomInput = document.getElementById("switchRoomInput");
-
-        let cameraArmed = false;
 
         function updateCameraUi(armed) {
-            const wasArmed = cameraArmed;
             cameraArmed = armed;
-
             if (armed) {
-                cameraStatusBadge.className = "flex items-center text-xs text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full font-bold uppercase animate-pulse border border-emerald-500/30";
-                cameraStatusDot.className = "w-2 h-2 bg-emerald-400 rounded-full mr-2";
-                cameraStatusText.innerText = "System Armed";
+                cameraStatusBadge.className = "flex items-center text-xs text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full font-bold uppercase border border-emerald-500/30";
+                cameraStatusDot.className = "w-2 h-2 bg-emerald-400 rounded-full mr-1.5 animate-ping";
+                cameraStatusText.innerText = "System Armed (Live)";
 
                 const streamUrl = `/api/v1/exams/${roomNumber}/stream?token=${token}`;
                 if (videoStream.getAttribute("src") !== streamUrl) {
                     videoStream.src = streamUrl;
                 }
+                videoStream.classList.remove("hidden");
+                videoOfflineRadar.classList.add("hidden");
             } else {
-                cameraStatusBadge.className = "flex items-center text-xs text-red-400 bg-red-500/10 px-2.5 py-1 rounded-full font-bold uppercase animate-pulse border border-red-500/30";
-                cameraStatusDot.className = "w-2 h-2 bg-red-400 rounded-full mr-2";
-                cameraStatusText.innerText = "System Disarmed / Offline";
+                cameraStatusBadge.className = "flex items-center text-xs text-red-400 bg-red-500/10 px-2.5 py-0.5 rounded-full font-bold uppercase border border-red-500/30";
+                cameraStatusDot.className = "w-2 h-2 bg-red-400 rounded-full mr-1.5";
+                cameraStatusText.innerText = "Камера Офлайн";
+
                 if (videoStream.getAttribute("src")) {
                     videoStream.src = "";
                     videoStream.removeAttribute("src");
                 }
-                videoStream.alt = "Камерата е изключена или няма активна връзка";
+                videoStream.classList.add("hidden");
+                videoOfflineRadar.classList.remove("hidden");
             }
         }
 
-        function switchRoom() {
-            const nextRoom = switchRoomInput.value.trim();
-
-            if (!nextRoom) {
-                switchRoomInput.focus();
-                return;
-            }
-
-            window.location.href = `/api/v1/exams/${encodeURIComponent(nextRoom)}/monitor`;
-        }
-
-        let offlineCount = 0;
-
-        async function checkCameraStatus() {
+        async function checkCameraStatus(isManual = false) {
             try {
-                const response = await fetch(`/api/v1/exams/${roomNumber}/camera-status`);
-                const data = await response.json();
+                const res = await fetch(`/api/v1/exams/${roomNumber}/camera-status`);
+                const data = await res.json();
                 if (data.armed) {
                     offlineCount = 0;
                     updateCameraUi(true);
+                    if (isManual) showToast("Камерата е онлайн и свързана.", "success");
                 } else {
                     offlineCount++;
                     if (offlineCount >= 2) {
                         updateCameraUi(false);
                     }
+                    if (isManual) showToast("Камерата все още не отговаря.", "warning");
                 }
             } catch (err) {
                 offlineCount++;
                 if (offlineCount >= 2) {
                     updateCameraUi(false);
-                    cameraStatusText.innerText = "Camera Offline";
                 }
             }
         }
 
-        // Стриктна софтуерна защита: ако няма токен, изхвърляме потребителя към login екрана
-        if (!token) {
-            window.location.href = "/login?role=examiner";
-        } else {
-            checkCameraStatus();
+        // Examiner Heartbeat (1-Examiner Lock maintainer)
+        async function sendHeartbeat() {
+            try {
+                const res = await fetch(`/api/v1/examiner/rooms/${encodeURIComponent(roomNumber)}/heartbeat`, {
+                    method: "POST",
+                    headers: { "Authorization": `Bearer ${token}` }
+                });
+                if (res.status === 401 || res.status === 403) {
+                    logoutExaminer();
+                }
+            } catch (err) {
+                console.warn("Heartbeat error:", err);
+            }
         }
 
-        setInterval(checkCameraStatus, 2000);
-
-        let currentDetectedFacNum = "";
-
-        // ФУНКЦИЯ ЗА ПОСТОЯННО СЛЕДЕНЕ НА СТАТУСА (Polling)
-        async function checkStatus() {
+        // Release Room and Navigate Back
+        async function releaseAndLeave(e) {
+            if (e) e.preventDefault();
             try {
-                const response = await fetch(`/api/v1/exams/${roomNumber}/status?token=${token}`);
-                if (response.status === 401) logout();
-                
-                const data = await response.json();
-                
-                // Обновяваме текстовите полета
+                await fetch(`/api/v1/examiner/rooms/${encodeURIComponent(roomNumber)}/release`, {
+                    method: "POST",
+                    headers: { "Authorization": `Bearer ${token}` }
+                });
+            } catch (err) {
+                console.warn("Release room error:", err);
+            }
+            window.location.href = "/examiner/lobby";
+        }
+
+        window.addEventListener("beforeunload", () => {
+            // Освобождаване на залата при затваряне на таба
+            navigator.sendBeacon(`/api/v1/examiner/rooms/${encodeURIComponent(roomNumber)}/release`);
+        });
+
+        // Biometric Real-Time Status Polling
+        let previousStatusType = "idle";
+
+        async function checkBiometricStatus() {
+            try {
+                const res = await fetch(`/api/v1/exams/${roomNumber}/status?token=${token}`);
+                if (res.status === 401) {
+                    logoutExaminer();
+                    return;
+                }
+
+                const data = await res.json();
                 document.getElementById("studentName").innerText = data.student_name || "—";
                 document.getElementById("facultyNumber").innerText = data.faculty_number || "—";
-                document.getElementById("statusText").innerText = data.status_text;
-                
+                document.getElementById("statusText").innerText = data.status_text || "Очакване на студент...";
                 currentDetectedFacNum = data.faculty_number;
 
-                // УПРАВЛЕНИЕ НА ЦВЕТОВЕТЕ НА КАРТАТА СПРЯМО СТАТУСА
                 const card = document.getElementById("statusCard");
                 const alertBox = document.getElementById("statusAlertBox");
-                const forceBtnSection = document.getElementById("forceActionSection");
+                const pill = document.getElementById("biometricStatePill");
 
-                // Изчистваме старите Tailwind класове за цвят
-                card.className = "bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius)] p-6 transition-all duration-300 shadow-[0_2px_8px_hsl(0_0%_20%/0.12)] flex-1 flex flex-col justify-between";
-                alertBox.className = "mt-6 p-4 rounded-[var(--radius)] text-center border font-bold text-lg bg-[var(--muted)]/60 border-[var(--border)] text-[var(--foreground)]";
+                // Звукова сигнализация при преход към нов статус
+                if (data.status_type !== previousStatusType) {
+                    if (data.status_type === "success") {
+                        playSuccessChime();
+                        fetchRoster(); // Обновяваме списъка с допуснати веднага
+                    } else if (data.status_type === "danger") {
+                        playAlertTone();
+                    }
+                    previousStatusType = data.status_type;
+                }
+
+                // Цветово форматиране на картата
+                card.className = "bg-[var(--card)] border rounded-[var(--radius)] p-6 transition-all duration-300 shadow-sm flex flex-col justify-between space-y-5";
 
                 if (data.status_type === "success") {
-                    card.classList.remove("border-[var(--border)]");
-                    card.classList.add("border-emerald-500/50", "shadow-emerald-950/20");
-                    alertBox.className = "mt-6 p-4 rounded-[var(--radius)] text-center border font-bold text-lg bg-emerald-500/20 border-emerald-500 text-emerald-400";
-                    forceBtnSection.classList.add("hidden");
-                } 
-                else if (data.status_type === "danger") {
-                    card.classList.remove("border-[var(--border)]");
-                    card.classList.add("border-red-500/50", "shadow-red-950/20");
-                    alertBox.className = "mt-6 p-4 rounded-[var(--radius)] text-center border font-bold text-lg bg-red-500/20 border-red-500 text-red-400";
-                    // Показваме бутона за записване само ако имаме реален фак. номер на непознат/объркан студент
-                    if (currentDetectedFacNum && currentDetectedFacNum !== "—" && currentDetectedFacNum !== "Непознат обект") {
-                        forceBtnSection.classList.remove("hidden");
-                    } else {
-                        forceBtnSection.classList.add("hidden");
-                    }
-                } 
-                else if (data.status_type === "warning") {
-                    card.classList.remove("border-[var(--border)]");
-                    card.classList.add("border-amber-500/50", "shadow-amber-950/20");
-                    alertBox.className = "mt-6 p-4 rounded-[var(--radius)] text-center border font-bold text-lg bg-amber-500/20 border-amber-500 text-amber-400";
-                    forceBtnSection.classList.add("hidden");
-                } 
-                else {
-                    card.classList.remove("border-[var(--border)]");
+                    card.classList.add("border-emerald-500/60", "shadow-emerald-500/10");
+                    alertBox.className = "p-4 rounded-xl text-center border font-bold text-base bg-emerald-500/20 border-emerald-500 text-emerald-600 dark:text-emerald-400";
+                    pill.className = "text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30";
+                    pill.innerText = "ДОСТЪПЪТ РАЗРЕШЕН";
+                } else if (data.status_type === "danger") {
+                    card.classList.add("border-red-500/60", "shadow-red-500/10");
+                    alertBox.className = "p-4 rounded-xl text-center border font-bold text-base bg-red-500/20 border-red-500 text-red-600 dark:text-red-400";
+                    pill.className = "text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/30";
+                    pill.innerText = "ОТКАЗАН ДОСТЪП";
+                } else if (data.status_type === "warning") {
+                    card.classList.add("border-amber-500/60", "shadow-amber-500/10");
+                    alertBox.className = "p-4 rounded-xl text-center border font-bold text-base bg-amber-500/20 border-amber-500 text-amber-600 dark:text-amber-400";
+                    pill.className = "text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30";
+                    pill.innerText = "ВНИМАНИЕ";
+                } else {
                     card.classList.add("border-[var(--border)]");
-                    alertBox.className = "mt-6 p-4 rounded-[var(--radius)] text-center border font-bold text-lg bg-[var(--muted)]/60 border-[var(--border)] text-[var(--foreground)]";
-                    forceBtnSection.classList.add("hidden");
+                    alertBox.className = "p-4 bg-[var(--input)] border border-[var(--border)] rounded-xl text-center font-bold text-base text-[var(--foreground)]";
+                    pill.className = "text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-[var(--input)] text-[var(--muted-foreground)] border border-[var(--border)]";
+                    pill.innerText = "ОЧАКВАНЕ";
                 }
 
             } catch (err) {
-                console.error("Грешка при комуникация със статуса:", err);
+                console.warn("Biometric status check error:", err);
             }
         }
 
-        // Пускаме софтуерното следене на всеки 400 милисекунди
-        setInterval(checkStatus, 400);
+        // Permitted Students Hall Roster Fetching & Rendering
+        async function fetchRoster() {
+            try {
+                const res = await fetch(`/api/v1/exams/${roomNumber}/roster?token=${token}`);
+                if (res.status === 401 || res.status === 403) {
+                    logoutExaminer();
+                    return;
+                }
 
-        // ФУНКЦИЯ ЗА СПЕШНО ДОПУСКАНЕ
-        async function executeForceAllow() {
-            if (!currentDetectedFacNum || currentDetectedFacNum === "—") return;
+                const data = await res.json();
+                allRosterStudents = data.students || [];
+
+                // Update Exam Subject Header & Examiner Name
+                if (data.exam_info && data.exam_info.subject) {
+                    document.getElementById("topExamSubject").innerText = `${data.exam_info.subject} (${data.exam_info.session_type || 'редовен'}) • ${data.exam_info.lecturer}`;
+                }
+                if (data.assigned_examiner) {
+                    document.getElementById("topExaminerName").innerText = data.assigned_examiner;
+                }
+
+                // Update Metrics & Progress Bar
+                const m = data.metrics || {};
+                const pct = m.admission_ratio_pct || 0;
+                document.getElementById("rosterAdmissionRatio").innerText = `${m.total_admitted || 0} / ${m.total_expected || 0} (${pct}%)`;
+                document.getElementById("rosterProgressBar").style.width = `${pct}%`;
+
+                // Update Filter Badges
+                document.getElementById("tabAllBadge").innerText = m.total_expected || 0;
+                document.getElementById("tabWaitingBadge").innerText = m.total_waiting || 0;
+                document.getElementById("tabAdmittedBadge").innerText = m.total_admitted || 0;
+                document.getElementById("tabProblemBadge").innerText = m.total_unpermitted || 0;
+
+                // Render Timeline
+                renderRecentTimeline(data.recent_admissions || []);
+
+                filterRoster();
+
+            } catch (err) {
+                console.warn("Roster fetch error:", err);
+            }
+        }
+
+        function setRosterTab(tab) {
+            currentRosterTab = tab;
+            const buttons = {
+                'all': document.getElementById('tabAllBtn'),
+                'waiting': document.getElementById('tabWaitingBtn'),
+                'admitted': document.getElementById('tabAdmittedBtn'),
+                'problem': document.getElementById('tabProblemBtn')
+            };
+
+            Object.entries(buttons).forEach(([key, btn]) => {
+                if (key === tab) {
+                    btn.className = "px-2.5 py-1 rounded-md font-bold transition bg-indigo-600 text-white cursor-pointer flex items-center gap-1";
+                } else {
+                    btn.className = "px-2.5 py-1 rounded-md font-bold transition bg-[var(--input)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer flex items-center gap-1";
+                }
+            });
+
+            filterRoster();
+        }
+
+        function filterRoster() {
+            const query = (document.getElementById("rosterSearchInput").value || "").trim().toLowerCase();
             
-            if (confirm(`Сигурни ли сте, че искате служебно да запишете и допуснете студент с Фак. Номер: ${currentDetectedFacNum} в тази зала?`)) {
-                const formData = new FormData();
-                formData.append("student_id_number", currentDetectedFacNum);
+            let filtered = allRosterStudents.filter(st => {
+                const matchesQuery = 
+                    (st.full_name || "").toLowerCase().includes(query) ||
+                    (st.faculty_number || "").toLowerCase().includes(query);
 
-                const response = await fetch(`/api/v1/exams/${roomNumber}/force-register`, {
+                if (!matchesQuery) return false;
+
+                if (currentRosterTab === 'waiting') return st.color_state === 'gray';
+                if (currentRosterTab === 'admitted') return st.color_state === 'green';
+                if (currentRosterTab === 'problem') return st.color_state === 'red';
+
+                return true;
+            });
+
+            renderRosterChips(filtered);
+        }
+
+        function renderRosterChips(students) {
+            const grid = document.getElementById("rosterChipsGrid");
+            const empty = document.getElementById("emptyRosterState");
+
+            if (!students || students.length === 0) {
+                grid.innerHTML = "";
+                empty.classList.remove("hidden");
+                return;
+            }
+
+            empty.classList.add("hidden");
+
+            grid.innerHTML = students.map(st => {
+                // Извличане на инициали
+                const initials = (st.full_name || "С")
+                    .split(" ")
+                    .filter(Boolean)
+                    .map(w => w[0])
+                    .slice(0, 2)
+                    .join("")
+                    .toUpperCase();
+
+                // 3-те живи цвята:
+                // Green: Допуснат в залата
+                // Red: Без право / непълна биометрия
+                // Gray: Одобрен студент, чакащ на входа
+                let chipBgClass = "";
+                let badgeHtml = "";
+
+                if (st.color_state === 'green') {
+                    chipBgClass = "bg-emerald-500/10 border-emerald-500/40 hover:border-emerald-500 text-emerald-900 dark:text-emerald-100";
+                    badgeHtml = `
+                        <span class="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded-md">
+                            <span>✓ Допуснат</span>
+                            ${st.admitted_at ? `<span class="font-mono text-[9px]">(${st.admitted_at})</span>` : ''}
+                        </span>
+                    `;
+                } else if (st.color_state === 'red') {
+                    chipBgClass = "bg-red-500/10 border-red-500/40 hover:border-red-500 text-red-900 dark:text-red-100";
+                    badgeHtml = `
+                        <span class="inline-flex items-center gap-1 text-[10px] font-bold text-red-600 dark:text-red-400 bg-red-500/20 px-2 py-0.5 rounded-md">
+                            <span>✕ Без право</span>
+                        </span>
+                    `;
+                } else {
+                    chipBgClass = "bg-[var(--input)] border-[var(--border)] hover:border-indigo-400 text-[var(--foreground)]";
+                    badgeHtml = `
+                        <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-[var(--muted-foreground)] bg-[var(--card)] px-2 py-0.5 rounded-md border border-[var(--border)]">
+                            <span>⚪ Чакащ</span>
+                        </span>
+                    `;
+                }
+
+                return `
+                    <div 
+                        onclick="openDossierModal('${st.student_id}')"
+                        class="p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2.5 ${chipBgClass}"
+                        title="Натиснете за детайли и ръчен допуск"
+                    >
+                        <div class="flex items-center gap-2.5 min-w-0">
+                            <div class="w-8 h-8 rounded-lg bg-[var(--card)] border border-[var(--border)] flex items-center justify-center font-bold text-xs shrink-0 shadow-sm">
+                                ${initials}
+                            </div>
+                            <div class="min-w-0">
+                                <div class="text-xs font-bold truncate leading-tight">${st.full_name}</div>
+                                <div class="text-[10px] font-mono text-[var(--muted-foreground)] truncate">${st.faculty_number} • гр. ${st.group}</div>
+                            </div>
+                        </div>
+                        <div class="shrink-0">
+                            ${badgeHtml}
+                        </div>
+                    </div>
+                `;
+            }).join("");
+        }
+
+        // Recent Admissions Timeline Rendering
+        function renderRecentTimeline(admissions) {
+            const list = document.getElementById("recentAdmissionsList");
+            const countBadge = document.getElementById("recentAdmissionsCount");
+            countBadge.innerText = `${admissions.length} влезли`;
+
+            if (!admissions || admissions.length === 0) {
+                list.innerHTML = `
+                    <div class="text-xs text-[var(--muted-foreground)] text-center py-4">
+                        Все още няма допуснати студенти за този изпит.
+                    </div>
+                `;
+                return;
+            }
+
+            list.innerHTML = admissions.map(st => `
+                <div class="flex items-center justify-between p-2 rounded-lg bg-[var(--input)] border border-[var(--border)] text-xs">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                        <span class="font-bold text-[var(--foreground)]">${st.full_name}</span>
+                        <span class="font-mono text-[var(--muted-foreground)] text-[10px]">${st.faculty_number}</span>
+                    </div>
+                    <span class="font-mono font-semibold text-emerald-600 dark:text-emerald-400 text-[10px]">
+                        ${st.admitted_at || 'току-що'}
+                    </span>
+                </div>
+            `).join("");
+        }
+
+        // Emergency Admission Modal Logic
+        function openEmergencyAdmitModal() {
+            const modal = document.getElementById("emergencyModal");
+            const input = document.getElementById("emergencyFacNumInput");
+            modal.classList.remove("hidden");
+            
+            // Ако пред камерата има засечен фак. номер, го попълваме предварително
+            if (currentDetectedFacNum && currentDetectedFacNum !== "—" && currentDetectedFacNum !== "Непознат обект") {
+                input.value = currentDetectedFacNum;
+            } else {
+                input.value = "";
+            }
+            input.focus();
+        }
+
+        function closeEmergencyAdmitModal() {
+            document.getElementById("emergencyModal").classList.add("hidden");
+        }
+
+        async function submitEmergencyAdmit() {
+            const input = document.getElementById("emergencyFacNumInput");
+            const facNum = input.value.trim();
+
+            if (!facNum) {
+                showToast("Моля, въведете факултетен номер.", "warning");
+                input.focus();
+                return;
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append("student_id_number", facNum);
+
+                const res = await fetch(`/api/v1/exams/${roomNumber}/force-register`, {
                     method: "POST",
                     headers: { "Authorization": `Bearer ${token}` },
                     body: formData
                 });
 
-                const result = await response.json();
-                alert(result.message);
+                const data = await res.json();
+
+                if (res.ok) {
+                    showToast(data.message || "Студентът е допуснат успешно.", "success");
+                    playSuccessChime();
+                    closeEmergencyAdmitModal();
+                    fetchRoster();
+                } else {
+                    showToast(data.detail || "Грешка при извънредното допускане.", "error");
+                }
+
+            } catch (err) {
+                console.error("Emergency admit error:", err);
+                showToast("Сървърна грешка при допускане.", "error");
             }
         }
 
-        function logout() {
-            localStorage.removeItem("examiner_token");
-            window.location.reload();
+        // Student Dossier Modal Logic
+        function openDossierModal(studentId) {
+            const student = allRosterStudents.find(s => s.student_id === studentId);
+            if (!student) return;
+
+            selectedDossierStudent = student;
+            const modal = document.getElementById("dossierModal");
+
+            document.getElementById("dossierFullName").innerText = student.full_name;
+            document.getElementById("dossierFacNum").innerText = `Фак. № ${student.faculty_number}`;
+            document.getElementById("dossierSpecialty").innerText = student.specialty || "КСИ";
+            document.getElementById("dossierFacultyCourse").innerText = `${student.faculty || 'ФКСУ'} • ${student.course || 1} курс`;
+            document.getElementById("dossierStreamGroup").innerText = `Поток ${student.stream || 1} • Група ${student.group || 1}`;
+
+            const bioSpan = document.getElementById("dossierBiometricStatus");
+            if (student.has_face_embedding && student.biometric_status === 'APPROVED') {
+                bioSpan.className = "font-bold text-emerald-500";
+                bioSpan.innerText = "Одобрен (128D Embedding)";
+            } else {
+                bioSpan.className = "font-bold text-red-500";
+                bioSpan.innerText = student.biometric_status || "Непълна биометрия";
+            }
+
+            const statusBox = document.getElementById("dossierAdmissionStatusBox");
+            const admitBtn = document.getElementById("dossierAdmitActionBtn");
+
+            if (student.is_admitted) {
+                statusBox.className = "p-3 rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold text-center";
+                statusBox.innerHTML = `✓ Допуснат в залата в ${student.admitted_at || 'днескашната сесия'}`;
+                admitBtn.classList.add("hidden");
+            } else {
+                statusBox.className = "p-3 rounded-xl border border-[var(--border)] bg-[var(--input)] text-[var(--muted-foreground)] text-xs font-bold text-center";
+                statusBox.innerHTML = `⚪ Студентът очаква допуск на входа`;
+                admitBtn.classList.remove("hidden");
+            }
+
+            // Инициали
+            const initials = (student.full_name || "С")
+                .split(" ")
+                .filter(Boolean)
+                .map(w => w[0])
+                .slice(0, 2)
+                .join("")
+                .toUpperCase();
+            document.getElementById("dossierAvatar").innerText = initials;
+
+            modal.classList.remove("hidden");
         }
+
+        function closeDossierModal() {
+            document.getElementById("dossierModal").classList.add("hidden");
+            selectedDossierStudent = null;
+        }
+
+        async function executeDossierAdmit() {
+            if (!selectedDossierStudent) return;
+            const studentId = selectedDossierStudent.student_id;
+
+            try {
+                const res = await fetch(`/api/v1/exams/${roomNumber}/admit/${studentId}`, {
+                    method: "POST",
+                    headers: { "Authorization": `Bearer ${token}` }
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    showToast(`Студентът ${data.student_name} беше допуснат!`, "success");
+                    playSuccessChime();
+                    closeDossierModal();
+                    fetchRoster();
+                } else {
+                    showToast(data.detail || "Грешка при допускане.", "error");
+                }
+            } catch (err) {
+                console.error("Dossier admit error:", err);
+                showToast("Сървърна грешка при допускане.", "error");
+            }
+        }
+
+        function logoutExaminer() {
+            localStorage.removeItem("examiner_token");
+            localStorage.removeItem("admin_token");
+            document.cookie = "examiner_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+            document.cookie = "admin_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+            window.location.href = "/login?role=examiner";
+        }
+
+        // Initialize Loops
+        checkCameraStatus();
+        setInterval(checkCameraStatus, 2000);
+
+        checkBiometricStatus();
+        setInterval(checkBiometricStatus, 400);
+
+        fetchRoster();
+        setInterval(fetchRoster, 3000);
+
+        sendHeartbeat();
+        setInterval(sendHeartbeat, 15000);
     </script>
 </body>
 </html>

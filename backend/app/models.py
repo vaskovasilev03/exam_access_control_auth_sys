@@ -132,6 +132,8 @@ class ExamRegistration(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     student_id = Column(UUID(as_uuid=True), ForeignKey("students.id", ondelete="CASCADE"), nullable=False)
     exam_id = Column(UUID(as_uuid=True), ForeignKey("exams.id", ondelete="CASCADE"), nullable=False)
+    is_admitted = Column(Boolean, default=False, nullable=False)
+    admitted_at = Column(DateTime(timezone=True), nullable=True)
 
     student = relationship("Student", back_populates="registrations")
     exam = relationship("Exam", back_populates="registrations")

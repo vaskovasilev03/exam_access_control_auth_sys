@@ -142,6 +142,8 @@ def generate_live_frames(room_number: str, esp32_ip: str):
 
                             # 3. ДОПУСКАНЕ
                             if valid_registration and is_time_valid:
+                                valid_registration.is_admitted = True
+                                valid_registration.admitted_at = current_now
                                 box_color = (0, 255, 0)
                                 status_text = f"ACCESS GRANTED: {student_found.full_name}"
                                 

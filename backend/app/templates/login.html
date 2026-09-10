@@ -67,11 +67,6 @@
                 <input type="password" id="password" required class="w-full bg-[var(--input)] border border-[var(--border)] rounded-[var(--radius)] px-4 py-3 text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] transition">
             </div>
 
-            <div id="roomField">
-                <label class="text-xs text-[var(--muted-foreground)] block uppercase font-bold mb-1 tracking-wider">Номер на зала</label>
-                <input type="text" id="roomNumber" required inputmode="numeric" class="w-full bg-[var(--input)] border border-[var(--border)] rounded-[var(--radius)] px-4 py-3 text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] transition">
-            </div>
-
             <div id="errorMessage" class="hidden text-sm bg-[var(--destructive)]/15 border border-[var(--destructive)] text-[var(--destructive)] p-3 rounded-[var(--radius)] text-center font-semibold"></div>
 
             <button type="submit" class="w-full bg-[var(--primary)] hover:opacity-90 text-[var(--primary-foreground)] font-bold py-3 px-4 rounded-[var(--radius)] shadow-[0_2px_8px_hsl(0_0%_20%/0.12)] transition transform active:scale-95 cursor-pointer mt-2">
@@ -89,8 +84,6 @@
     <script>
         const defaultRole = "{{ default_role|default('examiner') }}";
         const roleSelect = document.getElementById("role");
-        const roomField = document.getElementById("roomField");
-        const roomInput = document.getElementById("roomNumber");
         const loginTitle = document.getElementById("loginTitle");
         const loginSubtitle = document.getElementById("loginSubtitle");
 
@@ -100,13 +93,9 @@
             if (role === "admin") {
                 loginTitle.innerText = "Вход за администратори";
                 loginSubtitle.innerText = "Достъп до администраторския панел";
-                roomField.classList.add("hidden");
-                roomInput.required = false;
             } else {
                 loginTitle.innerText = "Вход за квестори";
                 loginSubtitle.innerText = "Система за биометричен контрол на изпити";
-                roomField.classList.remove("hidden");
-                roomInput.required = true;
             }
         }
 
@@ -133,7 +122,6 @@
                     body: formData
                 });
 
-
                 const data = await response.json();
 
                 if (response.ok) {
@@ -142,16 +130,8 @@
                         window.location.href = window.location.origin + "/admins/dashboard";
                     } else {
                         localStorage.setItem("examiner_token", data.access_token);
-
-                        const roomNumber = roomInput.value.trim();
-                        if (!roomNumber) {
-                            errorDiv.innerText = "Моля, въведете номер на зала.";
-                            errorDiv.classList.remove("hidden");
-                            return;
-                        }
-
-                        // Пренасочваме квестора към монитора на избраната от него зала
-                        window.location.href = window.location.origin + `/api/v1/exams/${encodeURIComponent(roomNumber)}/monitor`;
+                        // Пренасочваме квестора към Examiner Lobby за избор на активна зала
+                        window.location.href = window.location.origin + "/examiner/lobby";
                     }
                 } else {
                     errorDiv.innerText = data.detail || "Грешка при вход в системата.";
