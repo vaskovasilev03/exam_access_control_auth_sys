@@ -294,7 +294,7 @@
                 <div class="flex items-center gap-2 pl-2 border-l border-[var(--border)]">
                     <div class="hidden sm:flex flex-col text-right">
                         <span id="userRoleBadge" class="text-xs font-bold leading-tight">
-                            {% if is_superadmin %}👑 Superadmin{% else %}👤 Администратор{% endif %}
+                            {% if is_superadmin %}Супер-админ{% else %}Администратор{% endif %}
                         </span>
                         <span class="text-[10px] text-[var(--text-muted)]">Control Surface</span>
                     </div>
@@ -524,82 +524,201 @@
             <!-- 2. PANEL: STUDENTS                              -->
             <!-- =============================================== -->
             <div id="panel-students" class="panel space-y-6">
-                <div class="grid grid-cols-1 xl:grid-cols-[380px_1fr] gap-6">
-                    <section class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 sm:p-6 shadow-xs space-y-4">
-                        <div class="border-b border-[var(--border)] pb-3">
-                            <h2 class="text-base font-bold text-[var(--text-main)]">Excel Студентски Импорт</h2>
-                            <p class="text-xs text-[var(--text-muted)] mt-0.5">Качете списък със студенти за избраната група.</p>
-                        </div>
-                        <form id="studentsForm" class="space-y-3.5">
-                            <div>
-                                <label class="text-[11px] uppercase tracking-wider font-bold text-[var(--text-muted)] block mb-1">Факултет</label>
-                                <input type="text" id="studFaculty" required placeholder="напр. ФКСУ" class="w-full bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)] px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500/30 outline-none">
-                            </div>
-                            <div>
-                                <label class="text-[11px] uppercase tracking-wider font-bold text-[var(--text-muted)] block mb-1">Специалност</label>
-                                <input type="text" id="studSpecialty" required placeholder="напр. КСИ" class="w-full bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)] px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500/30 outline-none">
-                            </div>
-                            <div class="grid grid-cols-3 gap-2.5">
-                                <div>
-                                    <label class="text-[11px] uppercase tracking-wider font-bold text-[var(--text-muted)] block mb-1">Курс</label>
-                                    <input type="number" id="studCourse" required placeholder="3" class="w-full bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)] px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500/30 outline-none">
-                                </div>
-                                <div>
-                                    <label class="text-[11px] uppercase tracking-wider font-bold text-[var(--text-muted)] block mb-1">Поток</label>
-                                    <input type="number" id="studStream" required placeholder="1" class="w-full bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)] px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500/30 outline-none">
-                                </div>
-                                <div>
-                                    <label class="text-[11px] uppercase tracking-wider font-bold text-[var(--text-muted)] block mb-1">Група</label>
-                                    <input type="number" id="studGroup" required placeholder="42" class="w-full bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)] px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500/30 outline-none">
+                <!-- MASTER-DETAIL GRID -->
+                <div class="grid grid-cols-1 xl:grid-cols-[400px_1fr] gap-6 items-start">
+                    
+                    <!-- LEFT COLUMN: IMPORT FORM & BATCH HISTORY STACK -->
+                    <div class="space-y-6">
+                        
+                        <!-- CARD 1: EXCEL STUDENT IMPORT -->
+                        <section class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 sm:p-6 shadow-xs space-y-4">
+                            <div class="border-b border-[var(--border)] pb-3 flex items-center justify-between">
+                                <div class="flex items-center gap-2.5">
+                                    <div class="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold shrink-0">
+                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h2 class="text-sm font-bold text-[var(--text-main)]">Excel Студентски Импорт</h2>
+                                        <p class="text-[11px] text-[var(--text-muted)]">Качване на списък по група</p>
+                                    </div>
                                 </div>
                             </div>
-                            <div>
-                                <label class="text-[11px] uppercase tracking-wider font-bold text-[var(--text-muted)] block mb-1">Excel файл (.xlsx, .xls)</label>
-                                <input type="file" id="studFile" accept=".xlsx,.xls" required class="w-full text-xs bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)] p-2 file:mr-3 file:py-1 file:px-3 file:rounded-[var(--radius)] file:border-0 file:bg-blue-600 file:text-white file:text-xs file:font-semibold">
-                            </div>
-                            <div id="studStatus" class="hidden text-xs p-3 rounded-[var(--radius)] border"></div>
-                            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-[var(--radius)] text-xs shadow-md shadow-blue-500/20 transition cursor-pointer">Импортирай Студенти</button>
-                        </form>
-                    </section>
 
-                    <section class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 sm:p-6 shadow-xs flex flex-col justify-between min-h-[500px]">
-                        <div>
-                            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] pb-3 mb-4">
-                                <div>
-                                    <span class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)]">Избрана партида</span>
-                                    <h3 id="studentLogTitle" class="text-base font-bold text-[var(--text-main)]">Изберете лог от списъка</h3>
+                            <form id="studentsForm" class="space-y-3.5">
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)] block mb-1">Факултет</label>
+                                        <input type="text" id="studFaculty" required placeholder="напр. ФКСУ" class="w-full bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)] px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500/30 outline-none text-[var(--text-main)] transition">
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)] block mb-1">Специалност</label>
+                                        <input type="text" id="studSpecialty" required placeholder="напр. КСИ" class="w-full bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)] px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500/30 outline-none text-[var(--text-main)] transition">
+                                    </div>
                                 </div>
+
+                                <div class="grid grid-cols-3 gap-2">
+                                    <div>
+                                        <label class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)] block mb-1">Курс</label>
+                                        <input type="number" id="studCourse" required placeholder="3" min="1" max="6" class="w-full bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)] px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500/30 outline-none text-[var(--text-main)] transition">
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)] block mb-1">Поток</label>
+                                        <input type="number" id="studStream" required placeholder="1" min="1" class="w-full bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)] px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500/30 outline-none text-[var(--text-main)] transition">
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)] block mb-1">Група</label>
+                                        <input type="number" id="studGroup" required placeholder="42" min="1" class="w-full bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)] px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500/30 outline-none text-[var(--text-main)] transition">
+                                    </div>
+                                </div>
+
+                                <!-- DRAG & DROP ZONE -->
+                                <div>
+                                    <label class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)] block mb-1">Excel Файл (.xlsx, .xls)</label>
+                                    <div id="studDropzone" class="border-2 border-dashed border-[var(--border)] rounded-[var(--radius)] p-4 text-center bg-[var(--bg-body)] hover:border-blue-500 transition relative flex flex-col items-center justify-center cursor-pointer group">
+                                        <input type="file" id="studFile" accept=".xlsx,.xls" required class="hidden">
+                                        
+                                        <!-- IDLE STATE -->
+                                        <div id="studDropzoneIdle" class="flex flex-col items-center py-2">
+                                            <div class="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-2 group-hover:scale-110 transition">
+                                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                                </svg>
+                                            </div>
+                                            <p class="text-xs font-semibold text-[var(--text-main)]">Плъзнете Excel файл тук или <span class="text-blue-600 dark:text-blue-400 underline">изберете</span></p>
+                                            <p class="text-[10px] text-[var(--text-muted)] mt-0.5">Формати: .xlsx, .xls (до 10MB)</p>
+                                        </div>
+
+                                        <!-- FILE PREVIEW STATE (HIDDEN INITIALLY) -->
+                                        <div id="studFilePreview" class="hidden w-full flex items-center justify-between p-2.5 rounded-[var(--radius)] bg-[var(--bg-card)] border border-[var(--border)] text-left">
+                                            <div class="flex items-center gap-2.5 min-w-0">
+                                                <div class="w-8 h-8 rounded bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xs shrink-0">XLS</div>
+                                                <div class="min-w-0">
+                                                    <p id="studFileName" class="text-xs font-bold text-[var(--text-main)] truncate max-w-[200px]"></p>
+                                                    <p id="studFileSize" class="text-[10px] text-[var(--text-muted)]"></p>
+                                                </div>
+                                            </div>
+                                            <button type="button" id="studFileClearBtn" class="p-1.5 rounded hover:bg-[var(--border-subtle)] text-[var(--text-muted)] hover:text-rose-500 transition cursor-pointer" title="Премахни файл">
+                                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div id="studStatus" class="hidden text-xs p-3 rounded-[var(--radius)] border"></div>
+
+                                <button type="submit" id="studSubmitBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-[var(--radius)] text-xs shadow-md shadow-blue-500/20 transition cursor-pointer flex items-center justify-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                    </svg>
+                                    <span id="studSubmitText">Импортирай Студенти</span>
+                                </button>
+                            </form>
+                        </section>
+
+                        <!-- CARD 2: BATCH HISTORY MASTER LIST -->
+                        <section class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 shadow-xs flex flex-col">
+                            <div class="flex items-center justify-between border-b border-[var(--border)] pb-3 mb-3">
                                 <div class="flex items-center gap-2">
-                                    <button id="studentSelectAllBtn" class="px-3 py-1.5 rounded-[var(--radius)] border border-[var(--border)] text-xs font-semibold hover:bg-[var(--border-subtle)] transition">Всички</button>
-                                    <button id="studentSendBtn" class="px-3 py-1.5 rounded-[var(--radius)] bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition shadow-sm">Изпрати известия</button>
+                                    <h3 class="text-sm font-bold text-[var(--text-main)]">История на партидите</h3>
+                                    <span id="studentsLogCount" class="text-xs px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold">0</span>
                                 </div>
                             </div>
-                            <p id="studentLogMeta" class="text-xs text-[var(--text-muted)] mb-3"></p>
+                            <!-- Batch Search Box -->
+                            <div class="relative mb-3">
+                                <input type="text" id="batchSearchInput" placeholder="Търси партида по група, спец..." class="w-full bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)] pl-8 pr-3 py-1.5 text-xs text-[var(--text-main)] placeholder-[var(--text-muted)] focus:ring-1 focus:ring-blue-500 outline-none transition">
+                                <svg class="w-3.5 h-3.5 text-[var(--text-muted)] absolute left-2.5 top-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                            </div>
+                            <!-- Scrollable batch items container -->
+                            <div id="studentImportLogList" class="max-h-[420px] overflow-y-auto space-y-2 pr-1"></div>
+                        </section>
+                    </div>
+
+                    <!-- RIGHT COLUMN: INTERACTIVE STUDENT BATCH DIRECTORY & TABLE -->
+                    <section class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 sm:p-6 shadow-xs flex flex-col justify-between min-h-[620px]">
+                        <div>
+                            <!-- BATCH HEADER & ACTIONS -->
+                            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] pb-4 mb-4">
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-2 mb-0.5">
+                                        <span class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)]">Текуща партида</span>
+                                        <span id="batchStatusBadge" class="hidden inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold"></span>
+                                    </div>
+                                    <h3 id="studentLogTitle" class="text-base font-bold text-[var(--text-main)] truncate">Изберете партида от списъка</h3>
+                                    <p id="studentLogMeta" class="text-xs text-[var(--text-muted)] mt-0.5"></p>
+                                </div>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <div class="flex items-center gap-1.5" id="selectActionsGroup">
+                                        <button type="button" id="studentSelectPendingBtn" class="px-3 py-1.5 rounded-[var(--radius)] border border-[var(--border)] text-xs font-semibold hover:bg-[var(--border-subtle)] transition cursor-pointer text-[var(--text-main)]" title="Избира само студентите, които чакат активационен имейл">
+                                            Избери чакащи
+                                        </button>
+                                        <button type="button" id="studentSelectAllBtn" class="px-3 py-1.5 rounded-[var(--radius)] border border-[var(--border)] text-xs font-semibold hover:bg-[var(--border-subtle)] transition cursor-pointer text-[var(--text-main)]">
+                                            Всички
+                                        </button>
+                                    </div>
+                                    <button type="button" id="studentSendBtn" class="px-3.5 py-1.5 rounded-[var(--radius)] bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition shadow-sm cursor-pointer flex items-center gap-1.5">
+                                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                        </svg>
+                                        <span id="studentSendBtnText">Изпрати известия (0)</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- SEARCH & FILTER TOOLBAR -->
+                            <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+                                <div class="relative flex-1 min-w-[220px] max-w-md">
+                                    <input type="text" id="studentSearchInput" placeholder="Търси студент по име, фак. номер или email..." class="w-full bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)] pl-8 pr-8 py-1.5 text-xs text-[var(--text-main)] placeholder-[var(--text-muted)] focus:ring-2 focus:ring-blue-500/20 outline-none transition">
+                                    <svg class="w-3.5 h-3.5 text-[var(--text-muted)] absolute left-2.5 top-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                    </svg>
+                                    <button type="button" id="studentSearchClearBtn" class="hidden absolute right-2.5 top-2 text-[var(--text-muted)] hover:text-[var(--text-main)] cursor-pointer text-xs font-bold">✕</button>
+                                </div>
+
+                                <div class="flex items-center gap-3">
+                                    <span id="studentSelectionSummary" class="text-xs font-semibold text-[var(--text-muted)]">Избрани 0 студента</span>
+                                    <div class="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+                                        <span>Редове:</span>
+                                        <select id="studentPageSizeSelect" class="bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)] px-2 py-1 text-xs text-[var(--text-main)] outline-none cursor-pointer">
+                                            <option value="10">10</option>
+                                            <option value="20" selected>20</option>
+                                            <option value="50">50</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- STUDENT TABLE -->
                             <div class="overflow-x-auto border border-[var(--border)] rounded-[var(--radius)]">
                                 <table class="min-w-full text-xs">
                                     <thead class="bg-[var(--bg-body)] text-left text-[var(--text-muted)] font-bold">
                                         <tr>
-                                            <th class="px-3 py-2.5 w-10"><input type="checkbox" id="studentSelectAllCheckbox"></th>
-                                            <th class="px-3 py-2.5">Име</th>
+                                            <th class="px-3 py-2.5 w-10 text-center">
+                                                <input type="checkbox" id="studentSelectAllCheckbox" class="rounded border-[var(--border)] cursor-pointer">
+                                            </th>
+                                            <th class="px-3 py-2.5">Студент</th>
                                             <th class="px-3 py-2.5">Фак. №</th>
-                                            <th class="px-3 py-2.5">Статус</th>
-                                            <th class="px-3 py-2.5">Email</th>
+                                            <th class="px-3 py-2.5">Биометрия</th>
+                                            <th class="px-3 py-2.5">Email Известие</th>
                                         </tr>
                                     </thead>
                                     <tbody id="studentLogTableBody" class="divide-y divide-[var(--border)]"></tbody>
                                 </table>
                             </div>
                         </div>
+
+                        <!-- PAGINATION FOOTER -->
+                        <div id="studentPagination" class="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-[var(--border)] mt-4">
+                            <span id="studentPaginationInfo" class="text-xs text-[var(--text-muted)]">Показани 0 от 0 студенти</span>
+                            <div id="studentPaginationControls" class="flex items-center gap-1"></div>
+                        </div>
                     </section>
                 </div>
-
-                <aside class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 shadow-xs">
-                    <div class="flex items-center justify-between border-b border-[var(--border)] pb-3 mb-3">
-                        <h3 class="text-sm font-bold text-[var(--text-main)]">История на студентските импорти</h3>
-                        <span id="studentsLogCount" class="text-xs px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold">0</span>
-                    </div>
-                    <div id="studentImportLogList" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3"></div>
-                </aside>
             </div>
 
             <!-- =============================================== -->
@@ -1109,7 +1228,62 @@
             selectedAllocationLog: null,
             pendingQueue: [],
             queueIndex: 0,
+            // Feature 2: Scalable batch & student state
+            selectedStudentIds: new Set(),
+            studentSearch: '',
+            studentPage: 1,
+            studentPageSize: 20,
+            batchSearch: '',
+            selectedFile: null,
         };
+
+        function formatBytes(bytes, decimals = 1) {
+            if (!bytes || bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+        }
+
+        function showToast(title, message = '', type = 'success') {
+            const container = document.getElementById('toastContainer');
+            if (!container) return;
+
+            const toast = document.createElement('div');
+            const icons = {
+                success: `<svg class="w-4 h-4 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>`,
+                warning: `<svg class="w-4 h-4 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>`,
+                error: `<svg class="w-4 h-4 text-rose-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>`
+            };
+
+            toast.className = 'pointer-events-auto flex items-start gap-3 p-3.5 rounded-[var(--radius)] bg-[var(--bg-card)] border border-[var(--border)] shadow-xl text-xs transition-all duration-200 transform translate-y-2 opacity-0';
+            toast.innerHTML = `
+                ${icons[type] || icons.success}
+                <div class="flex-1 min-w-0">
+                    <p class="font-bold text-[var(--text-main)] leading-tight">${escapeHtml(title)}</p>
+                    ${message ? `<p class="text-[11px] text-[var(--text-muted)] mt-0.5 leading-snug">${escapeHtml(message)}</p>` : ''}
+                </div>
+                <button type="button" class="text-[var(--text-muted)] hover:text-[var(--text-main)] p-0.5 rounded cursor-pointer transition">✕</button>
+            `;
+
+            toast.querySelector('button').onclick = () => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 200);
+            };
+
+            container.appendChild(toast);
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            });
+
+            setTimeout(() => {
+                if (toast.parentElement) {
+                    toast.classList.add('opacity-0', 'translate-y-2');
+                    setTimeout(() => toast.remove(), 200);
+                }
+            }, 4500);
+        }
 
         function authFetch(url, options = {}) {
             const headers = new Headers(options.headers || {});
@@ -1507,6 +1681,7 @@
 
             renderActivityFeed(data);
             renderStudentImportLogs();
+            renderSelectedStudentLog();
             renderExamImportLogs();
             renderAllocationLogs();
             renderPendingStudents();
@@ -1580,67 +1755,293 @@
         function statusBadgeHtml(flag) {
             return flag
                 ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">изпратен</span>'
-                : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-[var(--text-muted)]">чакащ</span>';
+                : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400">чакащ</span>';
         }
 
         function renderStudentImportLogs() {
             const list = document.getElementById('studentImportLogList');
-            const logs = state.data?.student_import_logs || [];
+            if (!list) return;
+
+            const allLogs = state.data?.student_import_logs || [];
+            const countElem = document.getElementById('studentsLogCount');
+            if (countElem) countElem.textContent = allLogs.length;
+
+            const query = (state.batchSearch || '').trim().toLowerCase();
+            const logs = query
+                ? allLogs.filter(log => {
+                    const text = `${log.specialty || ''} ${log.group || ''} ${log.parsed_details?.message || ''} ${log.details || ''}`.toLowerCase();
+                    return text.includes(query);
+                })
+                : allLogs;
+
             if (!logs.length) {
-                list.innerHTML = '<div class="text-xs text-[var(--text-muted)] col-span-full">Няма студентски импорти.</div>';
+                list.innerHTML = `<div class="text-xs text-[var(--text-muted)] text-center py-6 border border-dashed border-[var(--border)] rounded-[var(--radius)]">${allLogs.length ? 'Няма намерени партиди по филтъра.' : 'Няма записани студентски импорти.'}</div>`;
                 return;
             }
 
-            list.innerHTML = logs.map((log, index) => `
-                <button class="w-full text-left border rounded-[var(--radius)] p-3 ${state.selectedStudentLog?.id === log.id ? 'border-blue-500 bg-blue-50/20 dark:bg-blue-500/10' : 'border-[var(--border)] bg-[var(--bg-card)]'} hover:border-blue-400 transition" data-index="${index}" data-kind="student">
-                    <div class="flex items-start justify-between gap-2">
-                        <div class="min-w-0">
-                            <p class="font-bold text-xs truncate">${escapeHtml(log.parsed_details?.message || log.details || 'Лог за студентски импорти')}</p>
-                            <p class="text-[11px] text-[var(--text-muted)] mt-0.5">${escapeHtml(log.specialty || '-')}, група ${escapeHtml(log.group || '-')}</p>
-                            <p class="text-[10px] text-[var(--text-muted)] mt-1">${escapeHtml(formatDateTime(log.created_at))}</p>
-                        </div>
-                        ${statusBadgeHtml(log.notification_sent)}
-                    </div>
-                </button>
-            `).join('');
+            list.innerHTML = logs.map((log) => {
+                const isSelected = state.selectedStudentLog?.id === log.id;
+                const students = log.students || [];
+                const activeCount = students.filter(s => Boolean(s.is_active || s.email_sent)).length;
+                const isFullyNotified = Boolean(log.notification_sent || (students.length > 0 && activeCount === students.length));
 
-            list.querySelectorAll('button[data-kind="student"]').forEach((button) => {
-                button.addEventListener('click', () => {
-                    state.selectedStudentLog = logs[Number(button.dataset.index)];
-                    renderSelectedStudentLog();
-                    renderStudentImportLogs();
+                return `
+                    <div class="batch-card w-full text-left border rounded-[var(--radius)] p-3 transition cursor-pointer ${isSelected ? 'border-blue-500 bg-blue-50/20 dark:bg-blue-500/10 ring-1 ring-blue-500/30' : 'border-[var(--border)] bg-[var(--bg-card)] hover:border-blue-400/60'}" data-log-id="${log.id}">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-xs text-[var(--text-main)] truncate">${escapeHtml(log.specialty || 'Специалност')} • гр. ${escapeHtml(log.group || '-')}</span>
+                                </div>
+                                <p class="text-[11px] text-[var(--text-muted)] mt-0.5">${students.length} студента (${activeCount} активни)</p>
+                                <p class="text-[10px] text-[var(--text-muted)] mt-1 flex items-center gap-1">
+                                    <svg class="w-3 h-3 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                    ${escapeHtml(formatDateTime(log.created_at))}
+                                </p>
+                            </div>
+                            <div class="shrink-0">
+                                ${statusBadgeHtml(isFullyNotified)}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            list.querySelectorAll('.batch-card').forEach((card) => {
+                card.addEventListener('click', () => {
+                    const logId = card.dataset.logId;
+                    const log = allLogs.find(l => l.id == logId);
+                    if (log) {
+                        selectBatchLog(log);
+                    }
                 });
             });
 
-            if (!state.selectedStudentLog && logs.length) {
-                state.selectedStudentLog = logs[0];
-                renderSelectedStudentLog();
+            if (state.selectedStudentLog) {
+                const refreshed = allLogs.find(l => l.id == state.selectedStudentLog.id);
+                if (refreshed) {
+                    state.selectedStudentLog = refreshed;
+                } else if (allLogs.length) {
+                    selectBatchLog(allLogs[0]);
+                } else {
+                    state.selectedStudentLog = null;
+                }
+            } else if (allLogs.length) {
+                selectBatchLog(allLogs[0]);
             }
+        }
+
+        function selectBatchLog(log) {
+            state.selectedStudentLog = log;
+            state.studentSearch = '';
+            state.studentPage = 1;
+            
+            // Smart select: select pending students by default
+            state.selectedStudentIds.clear();
+            (log.students || []).forEach(student => {
+                if (!student.is_active && !student.email_sent) {
+                    state.selectedStudentIds.add(student.id);
+                }
+            });
+
+            const searchInput = document.getElementById('studentSearchInput');
+            if (searchInput) searchInput.value = '';
+            const clearBtn = document.getElementById('studentSearchClearBtn');
+            if (clearBtn) clearBtn.classList.add('hidden');
+
+            renderSelectedStudentLog();
+            renderStudentImportLogs();
         }
 
         function renderSelectedStudentLog() {
             const log = state.selectedStudentLog;
-            document.getElementById('studentLogTitle').textContent = log ? (log.parsed_details?.message || 'Лог за студентски импорти') : 'Изберете лог отдолу';
-            document.getElementById('studentLogMeta').textContent = log ? `${log.specialty || '-'} | група ${log.group || '-'} | ${formatDateTime(log.created_at)}` : '';
-
+            const titleElem = document.getElementById('studentLogTitle');
+            const metaElem = document.getElementById('studentLogMeta');
+            const badgeElem = document.getElementById('batchStatusBadge');
             const body = document.getElementById('studentLogTableBody');
-            const students = log?.students || [];
-            if (!students.length) {
-                body.innerHTML = '<tr><td colspan="5" class="px-3 py-4 text-center text-xs text-[var(--text-muted)]">Няма налични студенти за този лог.</td></tr>';
+            const paginationElem = document.getElementById('studentPagination');
+
+            if (!log) {
+                if (titleElem) titleElem.textContent = 'Изберете партида от списъка вляво';
+                if (metaElem) metaElem.textContent = 'Няма избрана активна партида.';
+                if (badgeElem) badgeElem.classList.add('hidden');
+                if (body) body.innerHTML = '<tr><td colspan="5" class="px-4 py-12 text-center text-xs text-[var(--text-muted)]">Изберете партида от историята вляво, за да прегледате списъка със студенти.</td></tr>';
+                if (paginationElem) paginationElem.classList.add('hidden');
+                updateStudentSelectionUi(0, 0);
                 return;
             }
 
-            body.innerHTML = students.map((student) => `
-                <tr class="hover:bg-[var(--border-subtle)] transition">
-                    <td class="px-3 py-2"><input type="checkbox" class="student-row-checkbox" value="${student.id}" checked></td>
-                    <td class="px-3 py-2 font-semibold text-[var(--text-main)]">${escapeHtml(student.full_name)}</td>
-                    <td class="px-3 py-2 font-mono text-[var(--text-muted)]">${escapeHtml(student.student_id_number)}</td>
-                    <td class="px-3 py-2">${student.status === 'REJECTED' ? '<span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-red-50 text-red-600 border border-red-200">REJECTED</span>' : '<span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-50 text-emerald-700">' + escapeHtml(student.status) + '</span>'}</td>
-                    <td class="px-3 py-2 break-all text-[var(--text-muted)]">${escapeHtml(student.email)}</td>
-                </tr>
-            `).join('');
+            if (paginationElem) paginationElem.classList.remove('hidden');
 
-            document.getElementById('studentSelectAllCheckbox').checked = true;
+            const allStudents = log.students || [];
+            const activeCount = allStudents.filter(s => Boolean(s.is_active || s.email_sent)).length;
+            const isFullyNotified = Boolean(log.notification_sent || (allStudents.length > 0 && activeCount === allStudents.length));
+
+            if (titleElem) {
+                titleElem.textContent = `${log.specialty || 'Специалност'} • Курс ${log.students?.[0]?.course || '-'}, Група ${log.group || '-'}`;
+            }
+            if (metaElem) {
+                metaElem.textContent = `Факултет: ${log.students?.[0]?.faculty || '-'} • Поток: ${log.students?.[0]?.stream || '-'} • ${formatDateTime(log.created_at)} • Общо ${allStudents.length} студенти (${activeCount} активни)`;
+            }
+            if (badgeElem) {
+                badgeElem.classList.remove('hidden');
+                badgeElem.className = isFullyNotified
+                    ? 'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                    : 'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400';
+                badgeElem.textContent = isFullyNotified ? 'Всички известени' : 'Чака изпращане';
+            }
+
+            // In-memory instant client-side filtering for 500+ scale
+            const query = (state.studentSearch || '').trim().toLowerCase();
+            const filtered = query
+                ? allStudents.filter(s => 
+                    (s.full_name && s.full_name.toLowerCase().includes(query)) ||
+                    (s.student_id_number && s.student_id_number.toLowerCase().includes(query)) ||
+                    (s.email && s.email.toLowerCase().includes(query))
+                )
+                : allStudents;
+
+            // Pagination calculations
+            const pageSize = Number(state.studentPageSize) || 20;
+            const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+            if (state.studentPage > totalPages) state.studentPage = totalPages;
+            if (state.studentPage < 1) state.studentPage = 1;
+
+            const startIndex = (state.studentPage - 1) * pageSize;
+            const endIndex = Math.min(startIndex + pageSize, filtered.length);
+            const pageSlice = filtered.slice(startIndex, endIndex);
+
+            if (!allStudents.length) {
+                body.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-xs text-[var(--text-muted)]">Няма налични студенти за тази партида.</td></tr>';
+            } else if (!pageSlice.length) {
+                body.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-xs text-[var(--text-muted)]">Няма намерени студенти по зададените критерии за търсене.</td></tr>';
+            } else {
+                body.innerHTML = pageSlice.map((student) => {
+                    const isSelected = state.selectedStudentIds.has(student.id);
+                    const isSent = Boolean(student.is_active || student.email_sent);
+                    const initials = (student.full_name || 'С').split(' ').map(n => n[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
+
+                    let statusBadge = '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400">PENDING</span>';
+                    if (student.status === 'APPROVED') {
+                        statusBadge = '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400">APPROVED</span>';
+                    } else if (student.status === 'REJECTED') {
+                        statusBadge = '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400">REJECTED</span>';
+                    }
+
+                    const emailBadge = isSent
+                        ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400">✓ Изпратен</span>'
+                        : '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400">⏳ Чакащ</span>';
+
+                    return `
+                        <tr class="hover:bg-[var(--border-subtle)] transition cursor-pointer student-row ${isSelected ? 'bg-blue-50/20 dark:bg-blue-500/5' : ''}" data-student-id="${student.id}">
+                            <td class="px-3 py-2.5 text-center" onclick="event.stopPropagation()">
+                                <input type="checkbox" class="student-row-checkbox rounded border-[var(--border)] cursor-pointer" value="${student.id}" ${isSelected ? 'checked' : ''}>
+                            </td>
+                            <td class="px-3 py-2.5">
+                                <div class="flex items-center gap-2.5">
+                                    <div class="w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 flex items-center justify-center font-bold text-[10px] shrink-0">
+                                        ${escapeHtml(initials)}
+                                    </div>
+                                    <div class="min-w-0">
+                                        <p class="font-semibold text-xs text-[var(--text-main)] truncate">${escapeHtml(student.full_name)}</p>
+                                        <p class="text-[11px] text-[var(--text-muted)] truncate">${escapeHtml(student.email)}</p>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-3 py-2.5 font-mono font-bold text-xs text-[var(--text-muted)]">${escapeHtml(student.student_id_number)}</td>
+                            <td class="px-3 py-2.5">${statusBadge}</td>
+                            <td class="px-3 py-2.5">${emailBadge}</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            // Attach row click listeners for row toggling
+            body.querySelectorAll('.student-row').forEach(row => {
+                row.addEventListener('click', () => {
+                    const studentId = row.dataset.studentId;
+                    if (state.selectedStudentIds.has(studentId)) {
+                        state.selectedStudentIds.delete(studentId);
+                    } else {
+                        state.selectedStudentIds.add(studentId);
+                    }
+                    renderSelectedStudentLog();
+                });
+            });
+
+            body.querySelectorAll('.student-row-checkbox').forEach(cb => {
+                cb.addEventListener('change', (e) => {
+                    const studentId = cb.value;
+                    if (e.target.checked) {
+                        state.selectedStudentIds.add(studentId);
+                    } else {
+                        state.selectedStudentIds.delete(studentId);
+                    }
+                    renderSelectedStudentLog();
+                });
+            });
+
+            // Update pagination UI
+            const infoElem = document.getElementById('studentPaginationInfo');
+            if (infoElem) {
+                infoElem.textContent = filtered.length > 0 
+                    ? `Показани ${startIndex + 1} - ${endIndex} от ${filtered.length} студенти`
+                    : `Показани 0 от 0 студенти`;
+            }
+
+            const controlsElem = document.getElementById('studentPaginationControls');
+            if (controlsElem) {
+                if (totalPages <= 1) {
+                    controlsElem.innerHTML = '';
+                } else {
+                    let btns = '';
+                    btns += `<button class="px-2 py-1 rounded-[var(--radius)] border border-[var(--border)] text-[11px] font-semibold hover:bg-[var(--border-subtle)] disabled:opacity-30 disabled:pointer-events-none transition cursor-pointer" data-page="1" ${state.studentPage === 1 ? 'disabled' : ''}>«</button>`;
+                    btns += `<button class="px-2 py-1 rounded-[var(--radius)] border border-[var(--border)] text-[11px] font-semibold hover:bg-[var(--border-subtle)] disabled:opacity-30 disabled:pointer-events-none transition cursor-pointer" data-page="${state.studentPage - 1}" ${state.studentPage === 1 ? 'disabled' : ''}>‹</button>`;
+
+                    const startP = Math.max(1, state.studentPage - 2);
+                    const endP = Math.min(totalPages, state.studentPage + 2);
+                    for (let p = startP; p <= endP; p++) {
+                        btns += `<button class="px-2.5 py-1 rounded-[var(--radius)] text-[11px] font-semibold transition cursor-pointer ${p === state.studentPage ? 'bg-blue-600 text-white font-bold' : 'border border-[var(--border)] hover:bg-[var(--border-subtle)]'}" data-page="${p}">${p}</button>`;
+                    }
+
+                    btns += `<button class="px-2 py-1 rounded-[var(--radius)] border border-[var(--border)] text-[11px] font-semibold hover:bg-[var(--border-subtle)] disabled:opacity-30 disabled:pointer-events-none transition cursor-pointer" data-page="${state.studentPage + 1}" ${state.studentPage === totalPages ? 'disabled' : ''}>›</button>`;
+                    btns += `<button class="px-2 py-1 rounded-[var(--radius)] border border-[var(--border)] text-[11px] font-semibold hover:bg-[var(--border-subtle)] disabled:opacity-30 disabled:pointer-events-none transition cursor-pointer" data-page="${totalPages}" ${state.studentPage === totalPages ? 'disabled' : ''}>»</button>`;
+
+                    controlsElem.innerHTML = btns;
+                    controlsElem.querySelectorAll('button[data-page]').forEach(btn => {
+                        btn.addEventListener('click', () => {
+                            state.studentPage = Number(btn.dataset.page);
+                            renderSelectedStudentLog();
+                        });
+                    });
+                }
+            }
+
+            // Sync select-all checkbox
+            const selectAllCb = document.getElementById('studentSelectAllCheckbox');
+            if (selectAllCb) {
+                if (pageSlice.length > 0) {
+                    const allSliceSelected = pageSlice.every(s => state.selectedStudentIds.has(s.id));
+                    const someSliceSelected = pageSlice.some(s => state.selectedStudentIds.has(s.id));
+                    selectAllCb.checked = allSliceSelected;
+                    selectAllCb.indeterminate = !allSliceSelected && someSliceSelected;
+                } else {
+                    selectAllCb.checked = false;
+                    selectAllCb.indeterminate = false;
+                }
+            }
+
+            updateStudentSelectionUi(state.selectedStudentIds.size, allStudents.length);
+        }
+
+        function updateStudentSelectionUi(selectedCount, totalCount) {
+            const summaryElem = document.getElementById('studentSelectionSummary');
+            if (summaryElem) {
+                summaryElem.textContent = `Избрани ${selectedCount} от ${totalCount} студента`;
+            }
+            const sendBtnText = document.getElementById('studentSendBtnText');
+            if (sendBtnText) {
+                sendBtnText.textContent = `Изпрати известия (${selectedCount})`;
+            }
         }
 
         function renderExamImportLogs() {
@@ -1864,33 +2265,277 @@
         }
 
         // Event listeners
-        document.getElementById('studentSelectAllCheckbox')?.addEventListener('change', (event) => {
-            document.querySelectorAll('.student-row-checkbox').forEach((checkbox) => {
-                checkbox.checked = event.target.checked;
-            });
-        });
+        function initStudentManagementEvents() {
+            // Dropzone & File Upload
+            const dropzone = document.getElementById('studDropzone');
+            const fileInput = document.getElementById('studFile');
+            const idleView = document.getElementById('studDropzoneIdle');
+            const previewView = document.getElementById('studFilePreview');
+            const fileNameElem = document.getElementById('studFileName');
+            const fileSizeElem = document.getElementById('studFileSize');
+            const fileClearBtn = document.getElementById('studFileClearBtn');
 
-        document.getElementById('studentSelectAllBtn')?.addEventListener('click', () => {
-            const nextValue = !document.getElementById('studentSelectAllCheckbox').checked;
-            document.getElementById('studentSelectAllCheckbox').checked = nextValue;
-            document.querySelectorAll('.student-row-checkbox').forEach((checkbox) => {
-                checkbox.checked = nextValue;
-            });
-        });
+            function handleFileSelect(file) {
+                if (!file) return;
+                const name = file.name.toLowerCase();
+                if (!name.endsWith('.xlsx') && !name.endsWith('.xls')) {
+                    showToast('Невалиден формат', 'Моля, качете валиден Excel файл (.xlsx или .xls)', 'warning');
+                    return;
+                }
+                state.selectedFile = file;
+                fileNameElem.textContent = file.name;
+                fileSizeElem.textContent = formatBytes(file.size);
+                idleView.classList.add('hidden');
+                previewView.classList.remove('hidden');
+            }
 
-        document.getElementById('studentSendBtn')?.addEventListener('click', async () => {
-            const log = state.selectedStudentLog;
-            if (!log) return;
-            const studentIds = Array.from(document.querySelectorAll('.student-row-checkbox:checked')).map((checkbox) => checkbox.value);
-            const response = await authFetch(`/admins/notifications/send/${log.id}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ student_ids: studentIds }),
+            if (dropzone && fileInput) {
+                dropzone.addEventListener('click', (e) => {
+                    if (e.target.closest('#studFileClearBtn')) return;
+                    fileInput.click();
+                });
+
+                fileInput.addEventListener('change', (e) => {
+                    if (e.target.files && e.target.files[0]) {
+                        handleFileSelect(e.target.files[0]);
+                    }
+                });
+
+                ['dragenter', 'dragover'].forEach(eventName => {
+                    dropzone.addEventListener(eventName, (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        dropzone.classList.add('border-blue-500', 'bg-blue-50/30', 'dark:bg-blue-500/5');
+                    });
+                });
+
+                ['dragleave', 'drop'].forEach(eventName => {
+                    dropzone.addEventListener(eventName, (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        dropzone.classList.remove('border-blue-500', 'bg-blue-50/30', 'dark:bg-blue-500/5');
+                    });
+                });
+
+                dropzone.addEventListener('drop', (e) => {
+                    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+                        handleFileSelect(e.dataTransfer.files[0]);
+                    }
+                });
+
+                fileClearBtn?.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    state.selectedFile = null;
+                    fileInput.value = '';
+                    previewView.classList.add('hidden');
+                    idleView.classList.remove('hidden');
+                });
+            }
+
+            // Batch Search Filter
+            document.getElementById('batchSearchInput')?.addEventListener('input', (e) => {
+                state.batchSearch = e.target.value;
+                renderStudentImportLogs();
             });
-            const data = await response.json();
-            alert(data.message || data.detail || 'Done');
-            await loadDashboardData();
-        });
+
+            // Student Table Search & Filter
+            const searchInput = document.getElementById('studentSearchInput');
+            const searchClearBtn = document.getElementById('studentSearchClearBtn');
+
+            searchInput?.addEventListener('input', (e) => {
+                state.studentSearch = e.target.value;
+                state.studentPage = 1;
+                if (searchClearBtn) {
+                    searchClearBtn.classList.toggle('hidden', !e.target.value);
+                }
+                renderSelectedStudentLog();
+            });
+
+            searchClearBtn?.addEventListener('click', () => {
+                if (searchInput) searchInput.value = '';
+                searchClearBtn.classList.add('hidden');
+                state.studentSearch = '';
+                state.studentPage = 1;
+                renderSelectedStudentLog();
+            });
+
+            // Page Size Selector
+            document.getElementById('studentPageSizeSelect')?.addEventListener('change', (e) => {
+                state.studentPageSize = Number(e.target.value) || 20;
+                state.studentPage = 1;
+                renderSelectedStudentLog();
+            });
+
+            // Smart Select: Pending Only
+            document.getElementById('studentSelectPendingBtn')?.addEventListener('click', () => {
+                const log = state.selectedStudentLog;
+                if (!log) return;
+                state.selectedStudentIds.clear();
+                (log.students || []).forEach(student => {
+                    if (!student.is_active && !student.email_sent) {
+                        state.selectedStudentIds.add(student.id);
+                    }
+                });
+                renderSelectedStudentLog();
+                showToast('Избор на чакащи', `Избрани са ${state.selectedStudentIds.size} студента, чакащи имейл.`, 'success');
+            });
+
+            // Select All / Deselect All
+            document.getElementById('studentSelectAllBtn')?.addEventListener('click', () => {
+                const log = state.selectedStudentLog;
+                if (!log) return;
+                const allStudents = log.students || [];
+                if (state.selectedStudentIds.size === allStudents.length) {
+                    state.selectedStudentIds.clear();
+                } else {
+                    allStudents.forEach(s => state.selectedStudentIds.add(s.id));
+                }
+                renderSelectedStudentLog();
+            });
+
+            // Header Checkbox (Select all visible in pageSlice)
+            document.getElementById('studentSelectAllCheckbox')?.addEventListener('change', (e) => {
+                const log = state.selectedStudentLog;
+                if (!log) return;
+                const query = (state.studentSearch || '').trim().toLowerCase();
+                const allStudents = log.students || [];
+                const filtered = query
+                    ? allStudents.filter(s => 
+                        (s.full_name && s.full_name.toLowerCase().includes(query)) ||
+                        (s.student_id_number && s.student_id_number.toLowerCase().includes(query)) ||
+                        (s.email && s.email.toLowerCase().includes(query))
+                    )
+                    : allStudents;
+
+                const pageSize = Number(state.studentPageSize) || 20;
+                const startIndex = (state.studentPage - 1) * pageSize;
+                const pageSlice = filtered.slice(startIndex, startIndex + pageSize);
+
+                if (e.target.checked) {
+                    pageSlice.forEach(s => state.selectedStudentIds.add(s.id));
+                } else {
+                    pageSlice.forEach(s => state.selectedStudentIds.delete(s.id));
+                }
+                renderSelectedStudentLog();
+            });
+
+            // Send Notifications Button
+            document.getElementById('studentSendBtn')?.addEventListener('click', async () => {
+                const log = state.selectedStudentLog;
+                if (!log) {
+                    showToast('Грешка', 'Моля, изберете партида.', 'warning');
+                    return;
+                }
+
+                const selectedIds = Array.from(state.selectedStudentIds);
+                if (selectedIds.length === 0) {
+                    showToast('Няма избрани студенти', 'Моля, маркирайте поне един студент за изпращане на имейл.', 'warning');
+                    return;
+                }
+
+                const btn = document.getElementById('studentSendBtn');
+                const originalContent = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = `<span class="inline-block animate-spin mr-1">⏳</span> Изпращане...`;
+
+                try {
+                    const response = await authFetch(`/admins/notifications/send/${log.id}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ student_ids: selectedIds }),
+                    });
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        showToast('Успешно изпратени имейли', data.message || `Изпратени са известия до ${selectedIds.length} студента.`, 'success');
+                        const curLogId = log.id;
+                        await loadDashboardData();
+                        if (state.data?.student_import_logs) {
+                            state.selectedStudentLog = state.data.student_import_logs.find(l => l.id == curLogId) || state.selectedStudentLog;
+                        }
+                        renderStudentImportLogs();
+                        renderSelectedStudentLog();
+                    } else {
+                        showToast('Грешка при изпращане', data.detail || 'Възникна проблем при изпращането на имейлите.', 'error');
+                    }
+                } catch (err) {
+                    showToast('Мрежова грешка', 'Липсва връзка със сървъра.', 'error');
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = originalContent;
+                }
+            });
+
+            // Students Form Submit Handler
+            document.getElementById('studentsForm')?.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const file = state.selectedFile || document.getElementById('studFile').files[0];
+                if (!file) {
+                    showToast('Липсва файл', 'Моля, изберете или плъзнете Excel файл за качване.', 'warning');
+                    return;
+                }
+
+                const submitBtn = document.getElementById('studSubmitBtn');
+                const submitText = document.getElementById('studSubmitText');
+                submitBtn.disabled = true;
+                const originalText = submitText.textContent;
+                submitText.textContent = 'Импортиране на студенти...';
+
+                const statusDiv = document.getElementById('studStatus');
+                statusDiv.className = 'text-xs p-3 rounded-[var(--radius)] border bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 font-semibold text-center';
+                statusDiv.textContent = '🔄 Обработка на Excel таблицата...';
+                statusDiv.classList.remove('hidden');
+
+                const formData = new FormData();
+                formData.append("faculty", document.getElementById("studFaculty").value);
+                formData.append("specialty", document.getElementById("studSpecialty").value);
+                formData.append("course", document.getElementById("studCourse").value);
+                formData.append("stream", document.getElementById("studStream").value);
+                formData.append("group", document.getElementById("studGroup").value);
+                formData.append("file", file);
+
+                try {
+                    const response = await authFetch('/admins/upload/students', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        statusDiv.className = 'text-xs p-3 rounded-[var(--radius)] border bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-bold text-center';
+                        statusDiv.textContent = `✅ Успех: ${data.message}`;
+                        showToast('Успешен импорт', data.message, 'success');
+                        
+                        document.getElementById('studentsForm').reset();
+                        state.selectedFile = null;
+                        document.getElementById('studFile').value = '';
+                        document.getElementById('studFilePreview')?.classList.add('hidden');
+                        document.getElementById('studDropzoneIdle')?.classList.remove('hidden');
+                        
+                        await loadDashboardData();
+                        if (data.admin_log_id && state.data?.student_import_logs) {
+                            state.selectedStudentLog = state.data.student_import_logs.find(l => l.id == data.admin_log_id) || state.data.student_import_logs[0];
+                        }
+                        renderStudentImportLogs();
+                        renderSelectedStudentLog();
+                        
+                        setTimeout(() => statusDiv.classList.add('hidden'), 5000);
+                    } else {
+                        statusDiv.className = 'text-xs p-3 rounded-[var(--radius)] border bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 font-semibold text-center';
+                        statusDiv.textContent = `❌ Грешка: ${data.detail || 'Възникна проблем при импорта.'}`;
+                        showToast('Грешка при импорт', data.detail || 'Възникна проблем при импорта.', 'error');
+                    }
+                } catch (err) {
+                    statusDiv.className = 'text-xs p-3 rounded-[var(--radius)] border bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 font-semibold text-center';
+                    statusDiv.textContent = '❌ Критична грешка: Липсва връзка със сървъра.';
+                    showToast('Грешка', 'Критична грешка: Липсва връзка със сървъра.', 'error');
+                } finally {
+                    submitBtn.disabled = false;
+                    submitText.textContent = originalText;
+                }
+            });
+        }
+        initStudentManagementEvents();
 
         document.getElementById('allocationSendBtn')?.addEventListener('click', async () => {
             const log = state.selectedAllocationLog;
@@ -2019,42 +2664,6 @@
             }
         });
 
-        document.getElementById('studentsForm')?.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const statusDiv = document.getElementById('studStatus');
-            statusDiv.className = 'text-xs p-3 rounded-[var(--radius)] border bg-blue-50 text-blue-700 font-semibold text-center';
-            statusDiv.textContent = '🔄 Обработка на Excel таблицата...';
-            statusDiv.classList.remove('hidden');
-
-            const formData = new FormData();
-            formData.append("faculty", document.getElementById("studFaculty").value);
-            formData.append("specialty", document.getElementById("studSpecialty").value);
-            formData.append("course", document.getElementById("studCourse").value);
-            formData.append("stream", document.getElementById("studStream").value);
-            formData.append("group", document.getElementById("studGroup").value);
-            formData.append("file", document.getElementById("studFile").files[0]);
-
-            try {
-                const response = await authFetch('/admins/upload/students', {
-                    method: 'POST',
-                    body: formData
-                });
-                const data = await response.json();
-
-                if (response.ok) {
-                    statusDiv.className = 'text-xs p-3 rounded-[var(--radius)] border bg-emerald-50 text-emerald-700 font-bold text-center';
-                    statusDiv.textContent = `✅ Успех: ${data.message}`;
-                    document.getElementById('studentsForm').reset();
-                    await loadDashboardData();
-                } else {
-                    statusDiv.className = 'text-xs p-3 rounded-[var(--radius)] border bg-red-50 text-red-700 font-semibold text-center';
-                    statusDiv.textContent = `❌ Грешка: ${data.detail || 'Възникна проблем при импорта.'}`;
-                }
-            } catch (err) {
-                statusDiv.className = 'text-xs p-3 rounded-[var(--radius)] border bg-red-50 text-red-700 font-semibold text-center';
-                statusDiv.textContent = '❌ Критична грешка: Липсва връзка със сървъра.';
-            }
-        });
 
         document.getElementById('examsForm')?.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -2412,5 +3021,7 @@
             setStatus('Възникна грешка при зареждане на панела.', true);
         });
     </script>
+    <!-- ADMINATOR TOAST NOTIFICATION CONTAINER -->
+    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none max-w-sm w-full"></div>
 </body>
 </html>

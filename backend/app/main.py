@@ -71,6 +71,8 @@ def _student_payload(student: Student) -> dict:
         "stream": student.stream,
         "group": student.group,
         "status": student.status,
+        "is_active": bool(student.is_active),
+        "email_sent": bool(student.is_active or (student.hashed_password and student.hashed_password != "LOCKED_UNTIL_EMAIL_SENT")),
         "photo_path": student.photo_path,
         "photo_url": f"/admins/students/{student.id}/photo" if student.photo_path else None,
         "created_at": student.created_at.isoformat() if student.created_at else None,
@@ -245,7 +247,8 @@ async def upload_students_excel(
                 course=course,
                 stream=stream,
                 group=group,
-                status="PENDING" 
+                status="PENDING",
+                is_active=False
             )
             db.add(new_student)
             imported_count += 1
@@ -318,6 +321,7 @@ def send_bulk_student_emails(log_id: str, payload: dict | None = Body(default=No
             )
             if email_delivered:
                 student.must_change_password = True
+                student.is_active = True
                 success_sent_count += 1
             continue
 
@@ -352,13 +356,18 @@ def send_bulk_student_emails(log_id: str, payload: dict | None = Body(default=No
     selected_set = set(selected_student_ids)
     all_ids = {str(student.id) for student in all_log_students}
 
-    if log.action_type == "STUDENT_IMPORT" and (not selected_student_ids or selected_set == all_ids):
-        log.notification_sent = True
+    if log.action_type == "STUDENT_IMPORT":
+        all_active = all(bool(s.is_active) for s in all_log_students)
+        if all_active or (not selected_student_ids or selected_set == all_ids):
+            log.notification_sent = True
     elif log.action_type.startswith("ALLOCATION_EXECUTION") and (not selected_student_ids or selected_set == all_ids):
         log.notification_sent = True
 
     db.commit()
-    return {"message": f"Успешно изпратени {success_sent_count} имейл известия."}
+    return {
+        "message": f"Успешно изпратени {success_sent_count} имейл известия.",
+        "sent_count": success_sent_count
+    }
 
 @app.post("/students/enroll")
 async def enroll_student(
