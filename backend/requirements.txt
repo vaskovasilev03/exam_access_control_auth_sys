@@ -26,5 +26,8 @@ opencv-python-headless
 torch --index-url https://download.pytorch.org/whl/cpu
 torchvision --index-url https://download.pytorch.org/whl/cpu
 
-# S3/MinIO облачна архутектура
+# S3/MinIO облачна архитектура
 boto3
+
+# --- Тестване & Качество на кода ---
+pytest
