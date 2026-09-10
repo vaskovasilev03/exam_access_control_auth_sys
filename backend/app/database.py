@@ -24,6 +24,7 @@ def init_db():
     # 3. Ensure the single superadmin partial unique index exists
     with engine.connect() as conn:
         conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_single_superadmin ON admins (is_superadmin) WHERE is_superadmin = true"))
+        conn.execute(text("ALTER TABLE students ADD COLUMN IF NOT EXISTS student_book_photo_path VARCHAR"))
         conn.commit()
 
 

@@ -1087,47 +1087,221 @@
             <!-- =============================================== -->
             <!-- 5. PANEL: APPROVALS                             -->
             <!-- =============================================== -->
+            <!-- =============================================== -->
+            <!-- 5. PANEL: APPROVALS (Dual-Photo Dossier Queue)   -->
+            <!-- =============================================== -->
             <div id="panel-approval" class="panel space-y-6">
-                <div class="grid grid-cols-1 xl:grid-cols-[340px_1fr] gap-6">
-                    <aside class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 shadow-xs max-h-[75vh] overflow-y-auto space-y-3">
-                        <div class="flex items-center justify-between border-b border-[var(--border)] pb-3">
-                            <h3 class="text-sm font-bold text-[var(--text-main)]">Очакващи биометрия</h3>
-                            <span id="pendingCountBadge" class="text-xs px-2.5 py-0.5 rounded-full bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold">0</span>
+                <!-- TOP HUB HEADER -->
+                <div class="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--border)] pb-4">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Biometric Verification Queue</span>
+                            <span id="approvalQueueStatusBadge" class="text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-bold">Активна опашка</span>
                         </div>
-                        <button id="startApprovalBtn" class="w-full px-3 py-2 rounded-[var(--radius)] bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition cursor-pointer">Старт на одобрения, чакащи: 0</button>
-                        <div id="pendingStudentList" class="space-y-2.5"></div>
+                        <h2 class="text-xl font-bold text-[var(--text-main)] mt-0.5">Одобрение на биометрични досиета</h2>
+                        <p class="text-xs text-[var(--text-muted)]">Двуснимково сравнение: верифицирайте студентската книжка срещу биометричния профил преди генериране на 128D AI вектор.</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button id="shortcutsInfoBtn" type="button" class="px-3 py-2 border border-[var(--border)] rounded-[var(--radius)] text-xs font-semibold hover:bg-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer flex items-center gap-1.5" title="Клавиатурни комбинации">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+                            <span>Шорткъти</span>
+                            <kbd class="px-1 text-[10px] bg-[var(--bg-card)] border border-[var(--border)] rounded font-mono">?</kbd>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- MAIN WORKSPACE: MASTER QUEUE + DUAL-PHOTO DOSSIER -->
+                <div class="grid grid-cols-1 xl:grid-cols-[360px_1fr] gap-6 items-start">
+                    <!-- LEFT ASIDE: QUEUE LIST -->
+                    <aside class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-4 sm:p-5 shadow-xs flex flex-col space-y-3.5">
+                        <div class="flex items-center justify-between border-b border-[var(--border)] pb-3">
+                            <div>
+                                <h3 class="text-sm font-bold text-[var(--text-main)]">Чакащи студенти</h3>
+                                <p class="text-[11px] text-[var(--text-muted)]">Хронологичен ред на подаване</p>
+                            </div>
+                            <span id="pendingCountBadge" class="text-xs px-2.5 py-0.5 rounded-full bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold border border-rose-500/20">0</span>
+                        </div>
+
+                        <!-- SEARCH INPUT FOR QUEUE -->
+                        <div class="relative">
+                            <input id="pendingSearchInput" type="text" placeholder="Търсене по име, фак. №, спец..." class="w-full bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)] pl-8 pr-3 py-2 text-xs focus:ring-2 focus:ring-blue-500/30 outline-none">
+                            <svg class="w-3.5 h-3.5 text-[var(--text-muted)] absolute left-2.5 top-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                        </div>
+
+                        <!-- START / STOP QUEUE BUTTON -->
+                        <button id="startApprovalBtn" class="w-full px-3 py-2.5 rounded-[var(--radius)] bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition cursor-pointer flex items-center justify-center gap-2 shadow-sm shadow-blue-500/20">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            <span>Старт на одобрения, чакащи: 0</span>
+                        </button>
+
+                        <!-- PENDING LIST SCROLLER -->
+                        <div id="pendingStudentList" class="space-y-2 max-h-[62vh] overflow-y-auto pr-1"></div>
                     </aside>
 
-                    <section class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 sm:p-6 shadow-xs flex flex-col justify-between min-h-[500px]">
-                        <div>
-                            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] pb-3 mb-4">
-                                <div>
-                                    <span class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)]">Текущ студент</span>
-                                    <h3 id="approvalTitle" class="text-base font-bold text-[var(--text-main)]">Натиснете старт, за да започнете преглед</h3>
+                    <!-- RIGHT SECTION: DUAL-PHOTO DOSSIER VIEWPORT -->
+                    <section id="approvalDossierSection" class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] p-5 sm:p-6 shadow-xs flex flex-col space-y-5">
+                        <!-- DOSSIER HEADER WITH QUEUE PROGRESS & ACTIONS -->
+                        <div class="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--border)] pb-4">
+                            <div class="space-y-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)]">Досие на студент</span>
+                                    <span id="approvalQueueCounterBadge" class="text-[10px] px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[var(--text-muted)] font-mono font-bold">Студент <span id="queueCurrentIndex">0</span> от <span id="queueTotalCount">0</span></span>
+                                    <span id="approvalFacBadge" class="hidden text-[10px] px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 font-mono font-bold border border-blue-500/20"></span>
                                 </div>
-                                <div id="approvalActions" class="flex flex-wrap gap-2 hidden">
-                                    <button id="approveBtn" class="px-4 py-2 rounded-[var(--radius)] bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition cursor-pointer">Одобри (AI Embedding)</button>
-                                    <button id="rejectBtn" class="px-4 py-2 rounded-[var(--radius)] bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition cursor-pointer">Отхвърли</button>
-                                </div>
+                                <h3 id="approvalTitle" class="text-lg font-bold text-[var(--text-main)]">Натиснете старт, за да започнете преглед</h3>
+                                <p id="approvalMeta" class="text-xs text-[var(--text-muted)]"></p>
                             </div>
 
-                            <p id="approvalMeta" class="text-xs text-[var(--text-muted)] mb-4"></p>
-                            <div class="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-4">
-                                <div class="space-y-3">
-                                    <div class="grid grid-cols-2 gap-3 text-xs">
-                                        <div class="border border-[var(--border)] rounded-[var(--radius)] p-3"><p class="text-[10px] uppercase text-[var(--text-muted)] font-bold">Факултетен №</p><p id="approvalStudentNumber" class="font-bold text-sm mt-0.5">-</p></div>
-                                        <div class="border border-[var(--border)] rounded-[var(--radius)] p-3"><p class="text-[10px] uppercase text-[var(--text-muted)] font-bold">Email</p><p id="approvalStudentEmail" class="font-bold text-xs mt-0.5 break-all">-</p></div>
-                                        <div class="border border-[var(--border)] rounded-[var(--radius)] p-3"><p class="text-[10px] uppercase text-[var(--text-muted)] font-bold">Специалност</p><p id="approvalStudentSpecialty" class="font-bold text-xs mt-0.5">-</p></div>
-                                        <div class="border border-[var(--border)] rounded-[var(--radius)] p-3"><p class="text-[10px] uppercase text-[var(--text-muted)] font-bold">Група</p><p id="approvalStudentGroup" class="font-bold text-xs mt-0.5">-</p></div>
-                                    </div>
-                                    <textarea id="rejectionReason" class="w-full min-h-[100px] bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)] p-3 text-xs focus:ring-2 focus:ring-blue-500/30 outline-none" placeholder="Въведете причина за отхвърляне..."></textarea>
+                            <!-- ACTION CONTROLS -->
+                            <div id="approvalActions" class="flex flex-wrap items-center gap-2 hidden">
+                                <!-- QUEUE PREV/NEXT BUTTONS -->
+                                <div class="flex items-center border border-[var(--border)] rounded-[var(--radius)] overflow-hidden">
+                                    <button id="prevStudentBtn" type="button" class="p-2 bg-[var(--bg-body)] hover:bg-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer border-r border-[var(--border)]" title="Предишен студент [←]">
+                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                                    </button>
+                                    <button id="nextStudentBtn" type="button" class="p-2 bg-[var(--bg-body)] hover:bg-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer" title="Следващ студент [→]">
+                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                    </button>
                                 </div>
-                                <div class="border border-[var(--border)] rounded-[var(--radius)] p-3 bg-[var(--bg-body)] flex flex-col items-center justify-center">
-                                    <p class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)] mb-2 self-start">Снимка за биометрия</p>
-                                    <img id="approvalPhoto" alt="Преглед на студент" class="w-full max-w-[220px] aspect-[4/5] object-cover rounded-[var(--radius)] border border-[var(--border)] bg-white shadow-xs">
-                                </div>
+
+                                <!-- ZOOM MODAL TRIGGER -->
+                                <button id="openZoomModalBtn" type="button" class="px-3 py-2 rounded-[var(--radius)] border border-blue-500/30 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 text-xs font-bold hover:bg-blue-100 dark:hover:bg-blue-500/20 transition cursor-pointer flex items-center gap-1.5" title="Сравнителна инспекция на цял екран [Z]">
+                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
+                                    <span>Zoom Инспекция</span>
+                                    <kbd class="px-1 text-[10px] bg-blue-500/20 rounded font-mono">Z</kbd>
+                                </button>
+
+                                <!-- REJECT BUTTON -->
+                                <button id="rejectBtn" type="button" class="px-4 py-2 rounded-[var(--radius)] bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-sm shadow-red-500/20" title="Отхвърли студент [R]">
+                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                    <span>Отхвърли</span>
+                                    <kbd class="px-1 text-[10px] bg-red-700/50 rounded font-mono">R</kbd>
+                                </button>
+
+                                <!-- APPROVE BUTTON -->
+                                <button id="approveBtn" type="button" class="px-4 py-2 rounded-[var(--radius)] bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-sm shadow-emerald-500/20" title="Одобри и извлечи биометричен вектор [A]">
+                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    <span>Одобри (AI Embedding)</span>
+                                    <kbd class="px-1 text-[10px] bg-emerald-700/50 rounded font-mono">A</kbd>
+                                </button>
                             </div>
                         </div>
+
+                        <!-- STUDENT ACADEMIC METADATA BAR -->
+                        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
+                            <div class="border border-[var(--border)] rounded-[var(--radius)] p-2.5 bg-[var(--bg-body)]">
+                                <p class="text-[10px] uppercase text-[var(--text-muted)] font-bold">Факултетен №</p>
+                                <p id="approvalStudentNumber" class="font-bold text-xs mt-0.5 font-mono text-[var(--text-main)]">-</p>
+                            </div>
+                            <div class="border border-[var(--border)] rounded-[var(--radius)] p-2.5 bg-[var(--bg-body)]">
+                                <p class="text-[10px] uppercase text-[var(--text-muted)] font-bold">Факултет</p>
+                                <p id="approvalStudentFaculty" class="font-bold text-xs mt-0.5 text-[var(--text-main)] truncate">-</p>
+                            </div>
+                            <div class="border border-[var(--border)] rounded-[var(--radius)] p-2.5 bg-[var(--bg-body)]">
+                                <p class="text-[10px] uppercase text-[var(--text-muted)] font-bold">Специалност</p>
+                                <p id="approvalStudentSpecialty" class="font-bold text-xs mt-0.5 text-[var(--text-main)] truncate">-</p>
+                            </div>
+                            <div class="border border-[var(--border)] rounded-[var(--radius)] p-2.5 bg-[var(--bg-body)]">
+                                <p class="text-[10px] uppercase text-[var(--text-muted)] font-bold">Курс & Поток</p>
+                                <p id="approvalStudentCourseStream" class="font-bold text-xs mt-0.5 text-[var(--text-main)]">-</p>
+                            </div>
+                            <div class="border border-[var(--border)] rounded-[var(--radius)] p-2.5 bg-[var(--bg-body)]">
+                                <p class="text-[10px] uppercase text-[var(--text-muted)] font-bold">Група</p>
+                                <p id="approvalStudentGroup" class="font-bold text-xs mt-0.5 text-[var(--text-main)] font-mono">-</p>
+                            </div>
+                            <div class="border border-[var(--border)] rounded-[var(--radius)] p-2.5 bg-[var(--bg-body)]">
+                                <p class="text-[10px] uppercase text-[var(--text-muted)] font-bold">Документ</p>
+                                <span id="approvalBookStatusBadge" class="inline-block font-bold text-[10px] px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[var(--text-muted)] mt-0.5">-</span>
+                            </div>
+                        </div>
+
+                        <!-- DUAL-PHOTO DOSSIER VIEWPORT -->
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+                            <!-- CARD 1: STUDENT BOOK (OFFICIAL DOCUMENT) -->
+                            <div class="border border-[var(--border)] rounded-[var(--radius)] p-3.5 bg-[var(--bg-body)] flex flex-col space-y-2.5">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-2">
+                                        <svg class="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                                        <span class="text-xs font-bold text-[var(--text-main)]">1. Студентска книжка (1-ва стр.)</span>
+                                    </div>
+                                    <div class="flex items-center gap-1.5">
+                                        <button id="rotateBookBtn" type="button" class="p-1 rounded hover:bg-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer" title="Завърти на 90°">
+                                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                                        </button>
+                                        <span class="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">Официален документ</span>
+                                    </div>
+                                </div>
+
+                                <!-- PHOTO CONTAINER WITH HOVER MAGNIFIER -->
+                                <div id="bookPhotoContainer" class="relative group w-full min-h-[340px] rounded-[var(--radius)] border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden flex items-center justify-center cursor-crosshair select-none">
+                                    <!-- HOVER MAGNIFIER LOUPE LENS -->
+                                    <div id="bookLoupeLens" class="pointer-events-none absolute hidden w-36 h-36 rounded-full border-2 border-blue-500 shadow-2xl bg-no-repeat z-30 ring-4 ring-black/30" style="display: none;"></div>
+
+                                    <!-- FALLBACK EMPTY -->
+                                    <div id="bookPhotoEmptyNotice" class="hidden text-center p-6 space-y-2 text-xs text-[var(--text-muted)] py-12">
+                                        <svg class="w-8 h-8 mx-auto opacity-40 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                                        <p class="font-bold text-amber-700 dark:text-amber-400">Няма качена студентска книжка</p>
+                                        <p class="text-[11px] max-w-xs mx-auto">Студентът е регистриран преди въвеждането на двуснимковата верификация.</p>
+                                    </div>
+
+                                    <!-- MAIN BOOK IMAGE -->
+                                    <img id="approvalBookPhoto" alt="Студентска книжка" class="w-full h-auto object-contain max-h-[620px] transition-transform duration-200 cursor-pointer block rounded-[var(--radius)]" title="Задръжте мишката за лупа / Кликнете за пълен Zoom">
+
+                                    <!-- FLOATING HOVER BADGE HINT -->
+                                    <div class="absolute bottom-2 left-2 pointer-events-none opacity-80 group-hover:opacity-100 transition text-[10px] bg-slate-900/80 text-white px-2 py-0.5 rounded backdrop-blur-xs flex items-center gap-1">
+                                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                        <span>Лупа при посочване • Клик за Zoom</span>
+                                    </div>
+                                </div>
+                                <p class="text-[11px] text-[var(--text-muted)] leading-tight">Проверете печата на деканата, факултетния номер и снимката на документа.</p>
+                            </div>
+
+                            <!-- CARD 2: BIOMETRIC FACE PHOTO (SELFIE) -->
+                            <div class="border border-[var(--border)] rounded-[var(--radius)] p-3.5 bg-[var(--bg-body)] flex flex-col space-y-2.5">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-2">
+                                        <svg class="w-4 h-4 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                        <span class="text-xs font-bold text-[var(--text-main)]">2. Биометрична лицева снимка</span>
+                                    </div>
+                                    <span class="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">Биометричен профил</span>
+                                </div>
+
+                                <!-- PHOTO CONTAINER -->
+                                <div id="facePhotoContainer" class="relative group w-full min-h-[340px] rounded-[var(--radius)] border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden flex items-center justify-center select-none">
+                                    <!-- MAIN FACE IMAGE -->
+                                    <img id="approvalPhoto" alt="Преглед на студент" class="w-full h-auto object-cover max-h-[620px] cursor-pointer transition-transform duration-200 block rounded-[var(--radius)]" title="Кликнете за пълен Zoom">
+
+                                    <!-- FLOATING HOVER BADGE HINT -->
+                                    <div class="absolute bottom-2 left-2 pointer-events-none opacity-80 group-hover:opacity-100 transition text-[10px] bg-slate-900/80 text-white px-2 py-0.5 rounded backdrop-blur-xs flex items-center gap-1">
+                                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                        <span>Клик за Zoom инспекция</span>
+                                    </div>
+                                </div>
+                                <p class="text-[11px] text-[var(--text-muted)] leading-tight">Фронтално селфи без слънчеви очила и шапки за AI лицево разпознаване.</p>
+                            </div>
+                        </div>
+
+                        <!-- CROSS-VERIFICATION CHECKLIST BAR -->
+                        <div class="border border-[var(--border)] rounded-[var(--radius)] p-3.5 bg-[var(--bg-body)] flex flex-wrap items-center justify-between gap-3 text-xs">
+                            <span class="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Контролен списък за проверка:</span>
+                            <div class="flex flex-wrap items-center gap-4">
+                                <label class="flex items-center gap-2 cursor-pointer select-none">
+                                    <input type="checkbox" id="checkNamesMatch" class="rounded border-[var(--border)] text-emerald-600 focus:ring-emerald-500">
+                                    <span class="text-xs text-[var(--text-main)]">Имената и фак. № съвпадат</span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer select-none">
+                                    <input type="checkbox" id="checkFacesMatch" class="rounded border-[var(--border)] text-emerald-600 focus:ring-emerald-500">
+                                    <span class="text-xs text-[var(--text-main)]">Лицето от книжката съответства на селфито</span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer select-none">
+                                    <input type="checkbox" id="checkStampValid" class="rounded border-[var(--border)] text-emerald-600 focus:ring-emerald-500">
+                                    <span class="text-xs text-[var(--text-main)]">Печатът на ТУ е легитимен</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- HIDDEN COMPATIBILITY ELEMENT FOR OLD TEST HOOKS -->
+                        <textarea id="rejectionReason" class="hidden" placeholder="Причина за отхвърляне"></textarea>
                     </section>
                 </div>
             </div>
@@ -1467,6 +1641,216 @@
                     </button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- =============================================== -->
+    <!-- DUAL PHOTO COMPARATIVE ZOOM & INSPECTION MODAL   -->
+    <!-- =============================================== -->
+    <div id="photoZoomModal" class="hidden fixed inset-0 bg-slate-950/85 backdrop-blur-md flex flex-col z-50 transition-opacity select-none">
+        <!-- MODAL TOP BAR -->
+        <div class="flex items-center justify-between px-5 py-3 border-b border-white/10 bg-slate-900/80 text-white shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-7 h-7 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                            <span id="zoomModalStudentName">Сравнителна инспекция</span>
+                            <span id="zoomModalStudentFac" class="text-xs font-mono font-normal text-slate-400"></span>
+                        </h3>
+                        <!-- QUEUE POSITION & ARROWS -->
+                        <div class="flex items-center gap-1 ml-2 bg-slate-800 border border-white/10 rounded px-1.5 py-0.5">
+                            <button id="zoomModalPrevBtn" type="button" class="p-1 hover:bg-white/10 rounded text-slate-300 hover:text-white disabled:opacity-30 disabled:pointer-events-none cursor-pointer" title="Предишен студент [←]">
+                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                            </button>
+                            <span id="zoomModalQueueCounter" class="text-[11px] font-mono text-slate-300 px-1 font-semibold">Студент 1 от 1</span>
+                            <button id="zoomModalNextBtn" type="button" class="p-1 hover:bg-white/10 rounded text-slate-300 hover:text-white disabled:opacity-30 disabled:pointer-events-none cursor-pointer" title="Следващ студент [→]">
+                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-slate-400">Сравнение в реално време: Студентска книжка vs. Биометрично лице</p>
+                </div>
+            </div>
+
+            <!-- ZOOM CONTROLS TOOLBAR -->
+            <div class="flex items-center gap-1.5 bg-slate-800/80 border border-white/10 rounded-lg p-1">
+                <button id="zoomOutBtn" type="button" class="p-1.5 hover:bg-white/10 rounded text-slate-300 hover:text-white transition cursor-pointer" title="Намали [-]">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/></svg>
+                </button>
+                <span id="zoomLevelBadge" class="text-xs font-mono font-bold px-2 text-slate-200">100%</span>
+                <button id="zoomInBtn" type="button" class="p-1.5 hover:bg-white/10 rounded text-slate-300 hover:text-white transition cursor-pointer" title="Увеличи [+/=]">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                </button>
+                <button id="zoomResetBtn" type="button" class="px-2 py-1 hover:bg-white/10 rounded text-xs text-slate-300 hover:text-white transition cursor-pointer font-semibold" title="Възстанови [0]">
+                    Reset
+                </button>
+                <div class="w-px h-4 bg-white/10 mx-1"></div>
+                <button id="zoomRotateBtn" type="button" class="p-1.5 hover:bg-white/10 rounded text-slate-300 hover:text-white transition cursor-pointer flex items-center gap-1 text-xs" title="Завърти книжката на 90°">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    <span>90°</span>
+                </button>
+                <button id="zoomContrastBtn" type="button" class="px-2 py-1 hover:bg-white/10 rounded text-xs text-slate-300 hover:text-white transition cursor-pointer flex items-center gap-1 font-semibold" title="Превключи висок контраст (за бледи печати)">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                    <span>Контраст</span>
+                </button>
+            </div>
+
+            <!-- CLOSE BUTTON -->
+            <button id="closeZoomModalBtn" type="button" class="p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition cursor-pointer" title="Затвори [Esc]">
+                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+
+        <!-- MODAL BODY: SIDE-BY-SIDE DUAL VIEW -->
+        <div class="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 p-4 overflow-hidden">
+            <!-- LEFT: STUDENT BOOK -->
+            <div class="relative bg-black/50 border border-white/10 rounded-xl overflow-hidden flex flex-col">
+                <div class="absolute top-3 left-3 z-10 bg-slate-900/80 text-white text-xs px-2.5 py-1 rounded backdrop-blur-xs border border-white/10 flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-blue-400"></span>
+                    <span class="font-bold">Студентска книжка</span>
+                </div>
+                <div id="zoomBookViewport" class="flex-1 w-full h-full overflow-hidden flex items-center justify-center p-4">
+                    <!-- EMPTY STATE FOR LEGACY STUDENTS -->
+                    <div id="zoomBookEmptyNotice" class="hidden text-center p-6 space-y-2 text-slate-400">
+                        <svg class="w-12 h-12 mx-auto text-amber-400/60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                        <p class="font-bold text-sm text-amber-400">Няма качена студентска книжка</p>
+                        <p class="text-xs text-slate-400 max-w-xs mx-auto">Студентът е регистриран преди въвеждането на двуснимковата верификация.</p>
+                    </div>
+                    <img id="zoomBookImg" alt="Студентска книжка (Zoom)" class="max-w-full max-h-full object-contain transition-transform duration-75 origin-center">
+                </div>
+            </div>
+
+            <!-- RIGHT: FACE PHOTO -->
+            <div class="relative bg-black/50 border border-white/10 rounded-xl overflow-hidden flex flex-col">
+                <div class="absolute top-3 left-3 z-10 bg-slate-900/80 text-white text-xs px-2.5 py-1 rounded backdrop-blur-xs border border-white/10 flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                    <span class="font-bold">Биометрично селфи</span>
+                </div>
+                <div id="zoomFaceViewport" class="flex-1 w-full h-full overflow-hidden flex items-center justify-center p-4">
+                    <img id="zoomFaceImg" alt="Биометрично селфи (Zoom)" class="max-w-full max-h-full object-contain transition-transform duration-75 origin-center">
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL FOOTER HINT -->
+        <div class="px-5 py-2.5 border-t border-white/10 bg-slate-900/80 text-slate-400 text-xs flex items-center justify-between shrink-0">
+            <div class="flex items-center gap-3 text-[11px]">
+                <span>Шорткъти: <kbd class="px-1 py-0.5 bg-slate-800 rounded border border-white/10 font-mono text-white">A</kbd> за Одобри • <kbd class="px-1 py-0.5 bg-slate-800 rounded border border-white/10 font-mono text-white">R</kbd> за Отхвърли • <kbd class="px-1 py-0.5 bg-slate-800 rounded border border-white/10 font-mono text-white">←</kbd> / <kbd class="px-1 py-0.5 bg-slate-800 rounded border border-white/10 font-mono text-white">→</kbd> Навигация • <kbd class="px-1 py-0.5 bg-slate-800 rounded border border-white/10 font-mono text-white">+</kbd> / <kbd class="px-1 py-0.5 bg-slate-800 rounded border border-white/10 font-mono text-white">-</kbd> Zoom • <kbd class="px-1 py-0.5 bg-slate-800 rounded border border-white/10 font-mono text-white">Esc</kbd> за изход</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <button id="zoomModalRejectBtn" type="button" class="px-3 py-1.5 rounded bg-red-600/90 hover:bg-red-700 text-white text-xs font-bold transition cursor-pointer flex items-center gap-1 shadow-sm" title="Отхвърли този студент [R]">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    <span>Отхвърли [R]</span>
+                </button>
+                <button id="zoomModalApproveBtn" type="button" class="px-3.5 py-1.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition cursor-pointer flex items-center gap-1 shadow-sm" title="Одобри и премини към следващия [A]">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    <span>Одобри & Следващ [A]</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- =============================================== -->
+    <!-- REJECTION REASON MODAL DIALOG                   -->
+    <!-- =============================================== -->
+    <div id="rejectionModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 transition-opacity">
+        <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] max-w-lg w-full p-5 sm:p-6 shadow-2xl space-y-4 flex flex-col">
+            <div class="flex items-start justify-between gap-4 border-b border-[var(--border)] pb-3">
+                <div class="space-y-0.5">
+                    <h3 class="text-base font-bold text-red-600 dark:text-red-400 flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                        <span>Отхвърляне на верификация</span>
+                    </h3>
+                    <p class="text-xs text-[var(--text-muted)]">Студент: <strong id="rejectModalStudentName" class="text-[var(--text-main)]">-</strong></p>
+                </div>
+                <button id="closeRejectionModalBtn" class="text-[var(--text-muted)] hover:text-[var(--text-main)] p-1 rounded-md transition cursor-pointer">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <!-- QUICK PRESET CHIPS -->
+            <div class="space-y-1.5">
+                <label class="text-[11px] uppercase tracking-wider font-bold text-[var(--text-muted)] block">Често срещани причини:</label>
+                <div class="flex flex-wrap gap-1.5">
+                    <button type="button" class="reject-preset-chip text-[11px] px-2.5 py-1 rounded-full border border-[var(--border)] bg-[var(--bg-body)] hover:bg-red-50 dark:hover:bg-red-500/10 hover:border-red-500/30 text-[var(--text-main)] transition cursor-pointer" data-reason="Нечетлив печат или факултетен номер в студентската книжка.">Нечетлив печат / фак. №</button>
+                    <button type="button" class="reject-preset-chip text-[11px] px-2.5 py-1 rounded-full border border-[var(--border)] bg-[var(--bg-body)] hover:bg-red-50 dark:hover:bg-red-500/10 hover:border-red-500/30 text-[var(--text-main)] transition cursor-pointer" data-reason="Лицето от селфито не съответства на снимката от студентската книжка.">Лицето не съвпада</button>
+                    <button type="button" class="reject-preset-chip text-[11px] px-2.5 py-1 rounded-full border border-[var(--border)] bg-[var(--bg-body)] hover:bg-red-50 dark:hover:bg-red-500/10 hover:border-red-500/30 text-[var(--text-main)] transition cursor-pointer" data-reason="Некачествена, замъглена или твърде тъмна биометрична снимка.">Замъглена / тъмна снимка</button>
+                    <button type="button" class="reject-preset-chip text-[11px] px-2.5 py-1 rounded-full border border-[var(--border)] bg-[var(--bg-body)] hover:bg-red-50 dark:hover:bg-red-500/10 hover:border-red-500/30 text-[var(--text-main)] transition cursor-pointer" data-reason="Липсва или е невалидна първа страница от студентската книжка.">Липсва студентска книжка</button>
+                </div>
+            </div>
+
+            <!-- REASON TEXTAREA -->
+            <div class="space-y-1">
+                <label class="text-[11px] uppercase tracking-wider font-bold text-[var(--text-muted)] block">Детайлно обяснение за студента:</label>
+                <textarea id="rejectionModalReasonInput" rows="3" class="w-full bg-[var(--bg-body)] border border-[var(--border)] rounded-[var(--radius)] p-3 text-xs focus:ring-2 focus:ring-red-500/30 outline-none" placeholder="Въведете точна причина за отхвърлянето..."></textarea>
+            </div>
+
+            <!-- FOOTER ACTIONS -->
+            <div class="flex items-center justify-end gap-2 border-t border-[var(--border)] pt-3">
+                <button id="cancelRejectModalBtn" type="button" class="px-4 py-2 border border-[var(--border)] rounded-[var(--radius)] text-xs font-semibold hover:bg-[var(--border-subtle)] transition cursor-pointer">
+                    Отказ
+                </button>
+                <button id="confirmRejectModalBtn" type="button" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-[var(--radius)] text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-sm shadow-red-500/20">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    <span>Потвърди отхвърлянето</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- =============================================== -->
+    <!-- KEYBOARD SHORTCUTS CHEAT SHEET MODAL            -->
+    <!-- =============================================== -->
+    <div id="shortcutsModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 transition-opacity">
+        <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius)] max-w-md w-full p-5 sm:p-6 shadow-2xl space-y-4 flex flex-col">
+            <div class="flex items-center justify-between border-b border-[var(--border)] pb-3">
+                <div class="flex items-center gap-2">
+                    <div class="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold">
+                        ⌨️
+                    </div>
+                    <h3 class="text-sm font-bold text-[var(--text-main)]">Клавиатурни комбинации (Шорткъти)</h3>
+                </div>
+                <button id="closeShortcutsModalBtn" class="text-[var(--text-muted)] hover:text-[var(--text-main)] p-1 rounded-md transition cursor-pointer">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <div class="space-y-2.5 text-xs">
+                <div class="flex items-center justify-between p-2 rounded bg-[var(--bg-body)] border border-[var(--border)]">
+                    <span class="font-medium text-[var(--text-main)]">Одобряване на студент</span>
+                    <kbd class="px-2 py-1 rounded bg-[var(--bg-card)] border border-[var(--border)] font-mono font-bold text-emerald-600 dark:text-emerald-400">A</kbd>
+                </div>
+                <div class="flex items-center justify-between p-2 rounded bg-[var(--bg-body)] border border-[var(--border)]">
+                    <span class="font-medium text-[var(--text-main)]">Отхвърляне с модал</span>
+                    <kbd class="px-2 py-1 rounded bg-[var(--bg-card)] border border-[var(--border)] font-mono font-bold text-red-600 dark:text-red-400">R</kbd>
+                </div>
+                <div class="flex items-center justify-between p-2 rounded bg-[var(--bg-body)] border border-[var(--border)]">
+                    <span class="font-medium text-[var(--text-main)]">Предишен / Следващ студент</span>
+                    <div class="flex items-center gap-1">
+                        <kbd class="px-2 py-1 rounded bg-[var(--bg-card)] border border-[var(--border)] font-mono font-bold text-[var(--text-main)]">←</kbd>
+                        <kbd class="px-2 py-1 rounded bg-[var(--bg-card)] border border-[var(--border)] font-mono font-bold text-[var(--text-main)]">→</kbd>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between p-2 rounded bg-[var(--bg-body)] border border-[var(--border)]">
+                    <span class="font-medium text-[var(--text-main)]">Zoom / Инспекция на цял екран</span>
+                    <div class="flex items-center gap-1">
+                        <kbd class="px-2 py-1 rounded bg-[var(--bg-card)] border border-[var(--border)] font-mono font-bold text-[var(--text-main)]">Z</kbd>
+                        <span class="text-[var(--text-muted)]">или</span>
+                        <kbd class="px-2 py-1 rounded bg-[var(--bg-card)] border border-[var(--border)] font-mono font-bold text-[var(--text-main)]">Space</kbd>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between p-2 rounded bg-[var(--bg-body)] border border-[var(--border)]">
+                    <span class="font-medium text-[var(--text-main)]">Затвори модал / Спри преглед</span>
+                    <kbd class="px-2 py-1 rounded bg-[var(--bg-card)] border border-[var(--border)] font-mono font-bold text-[var(--text-main)]">Esc</kbd>
+                </div>
+            </div>
+
+            <button id="dismissShortcutsBtn" type="button" class="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-[var(--radius)] text-xs font-bold transition cursor-pointer">
+                Разбрах
+            </button>
         </div>
     </div>
 
@@ -2968,36 +3352,89 @@
         }
 
         function renderPendingStudents() {
-            const students = state.data?.pending_students || [];
+            const allPending = state.data?.pending_students || [];
+            const query = (state.approvalSearchQuery || '').trim().toLowerCase();
+            const students = query
+                ? allPending.filter(s => {
+                    const text = `${s.full_name || ''} ${s.student_id_number || ''} ${s.specialty || ''} ${s.faculty || ''} ${s.email || ''}`.toLowerCase();
+                    return text.includes(query);
+                })
+                : allPending;
+
             state.pendingQueue = students.slice();
             
             const btn = document.getElementById('startApprovalBtn');
+            const totalCount = allPending.length;
+            const badge = document.getElementById('pendingCountBadge');
+            const navBadge = document.getElementById('pendingCountBadgeNav');
+            
+            if (badge) badge.textContent = totalCount;
+            if (navBadge) {
+                navBadge.textContent = totalCount;
+                navBadge.classList.toggle('hidden', totalCount === 0);
+            }
+
             if (students.length === 0) {
                 btn.dataset.mode = "idle";
-                btn.className = "w-full px-3 py-2 rounded-[var(--radius)] bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition";
-                btn.textContent = `Старт на одобрения, чакащи: 0`;
+                btn.className = "w-full px-3 py-2.5 rounded-[var(--radius)] bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition cursor-pointer flex items-center justify-center gap-2 shadow-sm shadow-blue-500/20";
+                btn.innerHTML = `
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span>Старт на одобрения, чакащи: 0</span>
+                `;
                 state.queueIndex = 0;
             } else if (btn.dataset.mode !== "reviewing") {
                 state.queueIndex = 0;
-                btn.textContent = `Старт на одобрения, чакащи: ${students.length}`;
+                btn.innerHTML = `
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span>Старт на одобрения, чакащи: ${students.length}</span>
+                `;
             } else {
-                btn.textContent = "Спри прегледа (Изход)";
-                btn.className = "w-full px-3 py-2 rounded-[var(--radius)] bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition cursor-pointer";
+                btn.innerHTML = `
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    <span>Спри прегледа (Изход)</span>
+                `;
+                btn.className = "w-full px-3 py-2.5 rounded-[var(--radius)] bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition cursor-pointer flex items-center justify-center gap-2 shadow-sm shadow-red-500/20";
             }
 
             const list = document.getElementById('pendingStudentList');
             if (!students.length) {
-                list.innerHTML = '<div class="text-xs text-[var(--text-muted)]">Няма чакащи за одобрение студенти.</div>';
+                list.innerHTML = `<div class="text-xs text-[var(--text-muted)] text-center py-6 border border-dashed border-[var(--border)] rounded-[var(--radius)]">${query ? 'Няма намерени чакащи студенти.' : 'Няма чакащи за одобрение студенти.'}</div>`;
                 renderCurrentApprovalItem();
                 return;
             }
 
-            list.innerHTML = students.map((student, index) => `
-                <div class="border rounded-[var(--radius)] p-2.5 bg-[var(--bg-body)] ${index === state.queueIndex && btn.dataset.mode === 'reviewing' ? 'border-blue-500 ring-1 ring-blue-500/20' : 'border-[var(--border)]'}">
-                    <p class="font-bold text-xs text-[var(--text-main)]">${escapeHtml(student.full_name)}</p>
-                    <p class="text-[11px] text-[var(--text-muted)] mt-0.5 font-mono">${escapeHtml(student.student_id_number)} | ${escapeHtml(student.specialty)} | гр. ${escapeHtml(student.group)}</p>
-                </div>
-            `).join('');
+            list.innerHTML = students.map((student, index) => {
+                const initials = (student.full_name || 'С').split(' ').map(n => n[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
+                const isSelected = index === state.queueIndex;
+                const isReviewing = btn.dataset.mode === 'reviewing';
+                const hasBook = Boolean(student.student_book_photo_url || student.student_book_photo_path);
+
+                return `
+                    <div class="pending-student-card border rounded-[var(--radius)] p-2.5 bg-[var(--bg-card)] transition cursor-pointer ${isSelected && isReviewing ? 'border-blue-500 ring-2 ring-blue-500/30 bg-blue-50/20 dark:bg-blue-500/10' : isSelected ? 'border-blue-500/70 bg-blue-50/10' : 'border-[var(--border)] hover:border-blue-400/50'}" data-index="${index}">
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-7 h-7 rounded-full ${isSelected && isReviewing ? 'bg-blue-600 text-white' : 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400'} font-bold text-[10px] flex items-center justify-center shrink-0 border border-blue-500/20">
+                                ${escapeHtml(initials)}
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center justify-between gap-1">
+                                    <p class="font-bold text-xs text-[var(--text-main)] truncate">${escapeHtml(student.full_name)}</p>
+                                    ${hasBook ? '<span class="text-[9px] text-blue-600 dark:text-blue-400 font-bold px-1 bg-blue-50 dark:bg-blue-500/10 rounded" title="Прикачена студентска книжка">📖 2/2</span>' : '<span class="text-[9px] text-amber-600 font-bold px-1 bg-amber-50 rounded" title="Липсва книжка (legacy)">1/2</span>'}
+                                </div>
+                                <p class="text-[11px] text-[var(--text-muted)] mt-0.5 font-mono truncate">${escapeHtml(student.student_id_number)} • ${escapeHtml(student.specialty || '')} • гр. ${escapeHtml(student.group || '')}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            list.querySelectorAll('.pending-student-card').forEach((card) => {
+                card.addEventListener('click', () => {
+                    const idx = Number(card.dataset.index);
+                    state.queueIndex = idx;
+                    renderPendingStudents();
+                    renderCurrentApprovalItem();
+                });
+            });
 
             renderCurrentApprovalItem();
         }
@@ -3005,17 +3442,39 @@
         function renderCurrentApprovalItem() {
             const student = state.pendingQueue[state.queueIndex];
             const approvalPhoto = document.getElementById('approvalPhoto');
+            const approvalBookPhoto = document.getElementById('approvalBookPhoto');
+            const bookEmptyNotice = document.getElementById('bookPhotoEmptyNotice');
             const actionsDiv = document.getElementById('approvalActions');
             const startBtn = document.getElementById('startApprovalBtn');
+            const facBadge = document.getElementById('approvalFacBadge');
+            const bookBadge = document.getElementById('approvalBookStatusBadge');
+            const prevBtn = document.getElementById('prevStudentBtn');
+            const nextBtn = document.getElementById('nextStudentBtn');
+            const curIdxElem = document.getElementById('queueCurrentIndex');
+            const totalCountElem = document.getElementById('queueTotalCount');
 
             if (!student) {
                 document.getElementById('approvalTitle').textContent = 'Няма повече студенти в опашката';
                 document.getElementById('approvalMeta').textContent = 'Опашката е празна.';
                 document.getElementById('approvalStudentNumber').textContent = '-';
-                document.getElementById('approvalStudentEmail').textContent = '-';
+                document.getElementById('approvalStudentFaculty').textContent = '-';
                 document.getElementById('approvalStudentSpecialty').textContent = '-';
+                document.getElementById('approvalStudentCourseStream').textContent = '-';
                 document.getElementById('approvalStudentGroup').textContent = '-';
-                approvalPhoto.removeAttribute('src');
+                if (facBadge) facBadge.classList.add('hidden');
+                if (bookBadge) {
+                    bookBadge.textContent = '-';
+                    bookBadge.className = 'inline-block font-bold text-[10px] px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[var(--text-muted)] mt-0.5';
+                }
+                if (curIdxElem) curIdxElem.textContent = '0';
+                if (totalCountElem) totalCountElem.textContent = '0';
+                
+                if (approvalPhoto) approvalPhoto.removeAttribute('src');
+                if (approvalBookPhoto) {
+                    approvalBookPhoto.removeAttribute('src');
+                    approvalBookPhoto.classList.add('hidden');
+                }
+                if (bookEmptyNotice) bookEmptyNotice.classList.add('hidden');
 
                 if (actionsDiv) actionsDiv.classList.add('hidden');
                 setStatus('База данни: Свързана');
@@ -3028,13 +3487,58 @@
                 if (actionsDiv) actionsDiv.classList.add('hidden');
             }
 
+            // Student identity & academic details
             document.getElementById('approvalTitle').textContent = student.full_name;
-            document.getElementById('approvalMeta').textContent = `${student.student_id_number} | ${student.faculty} | ${formatDateTime(student.created_at)}`;
+            document.getElementById('approvalMeta').textContent = `Подадено на: ${formatDateTime(student.created_at)} • Email: ${student.email || '-'}`;
             document.getElementById('approvalStudentNumber').textContent = student.student_id_number;
-            document.getElementById('approvalStudentEmail').textContent = student.email;
-            document.getElementById('approvalStudentSpecialty').textContent = student.specialty;
-            document.getElementById('approvalStudentGroup').textContent = student.group;
+            document.getElementById('approvalStudentFaculty').textContent = student.faculty || '-';
+            document.getElementById('approvalStudentSpecialty').textContent = student.specialty || '-';
+            document.getElementById('approvalStudentCourseStream').textContent = `Курс ${student.course || '-'}, Поток ${student.stream || '-'}`;
+            document.getElementById('approvalStudentGroup').textContent = student.group || '-';
+            
+            if (facBadge) {
+                facBadge.textContent = `Фак. № ${student.student_id_number}`;
+                facBadge.classList.remove('hidden');
+            }
+
+            // Queue progress
+            if (curIdxElem) curIdxElem.textContent = state.queueIndex + 1;
+            if (totalCountElem) totalCountElem.textContent = state.pendingQueue.length;
+
+            if (prevBtn) prevBtn.disabled = state.queueIndex <= 0;
+            if (nextBtn) nextBtn.disabled = state.queueIndex >= state.pendingQueue.length - 1;
+
+            // Photos binding
             approvalPhoto.src = student.photo_url ? `${student.photo_url}?token=${adminToken}` : '';
+
+            state.approvalBookRotation = 0;
+            if (approvalBookPhoto) approvalBookPhoto.style.transform = 'rotate(0deg)';
+
+            if (student.student_book_photo_url) {
+                approvalBookPhoto.src = `${student.student_book_photo_url}?token=${adminToken}`;
+                approvalBookPhoto.classList.remove('hidden');
+                if (bookEmptyNotice) bookEmptyNotice.classList.add('hidden');
+                if (bookBadge) {
+                    bookBadge.textContent = 'Наличен документ';
+                    bookBadge.className = 'inline-block font-bold text-[10px] px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 mt-0.5';
+                }
+            } else {
+                approvalBookPhoto.removeAttribute('src');
+                approvalBookPhoto.classList.add('hidden');
+                if (bookEmptyNotice) bookEmptyNotice.classList.remove('hidden');
+                if (bookBadge) {
+                    bookBadge.textContent = 'Липсва книжка (Legacy)';
+                    bookBadge.className = 'inline-block font-bold text-[10px] px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 mt-0.5';
+                }
+            }
+
+            // Reset checklist checkboxes
+            const chk1 = document.getElementById('checkNamesMatch');
+            const chk2 = document.getElementById('checkFacesMatch');
+            const chk3 = document.getElementById('checkStampValid');
+            if (chk1) chk1.checked = false;
+            if (chk2) chk2.checked = false;
+            if (chk3) chk3.checked = false;
         }
 
         function renderExaminers() {
@@ -3934,85 +4438,605 @@
             
             if (btn.dataset.mode === "reviewing") {
                 btn.dataset.mode = "idle";
-                btn.className = "w-full px-3 py-2 rounded-[var(--radius)] bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition";
+                btn.className = "w-full px-3 py-2.5 rounded-[var(--radius)] bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition cursor-pointer flex items-center justify-center gap-2 shadow-sm shadow-blue-500/20";
+                btn.innerHTML = `
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span>Старт на одобрения, чакащи: ${state.pendingQueue?.length || 0}</span>
+                `;
                 if (actionsDiv) actionsDiv.classList.add('hidden');
                 state.queueIndex = 0;
                 setStatus('База данни: Свързана');
-                loadDashboardData();
+                renderCurrentApprovalItem();
                 return;
             }
 
             if (!state.pendingQueue || state.pendingQueue.length === 0) {
-                alert("Няма чакащи студенти за одобрение.");
+                showToast('Няма чакащи студенти за одобрение в опашката.', 'info');
                 setStatus('База данни: Свързана');
                 return;
             }
             
             btn.dataset.mode = "reviewing";
-            btn.textContent = "Спри прегледа (Изход)";
-            btn.className = "w-full px-3 py-2 rounded-[var(--radius)] bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition cursor-pointer";
+            btn.innerHTML = `
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                <span>Спри прегледа (Изход)</span>
+            `;
+            btn.className = "w-full px-3 py-2.5 rounded-[var(--radius)] bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition cursor-pointer flex items-center justify-center gap-2 shadow-sm shadow-red-500/20";
             
             state.queueIndex = 0;
+            renderPendingStudents();
             renderCurrentApprovalItem();
-            setStatus(`Започна опашка с ${state.pendingQueue.length} студенти`);
+            setStatus(`Започна преглед на опашка с ${state.pendingQueue.length} студенти`);
         });
 
-        document.getElementById('approveBtn')?.addEventListener('click', async () => {
-            const btn = document.getElementById('approveBtn');
+        // ===============================================
+        // APPROVAL WORKFLOW: APPROVE / REJECT / ZOOM
+        // ===============================================
+
+        async function executeStudentApproval() {
             const student = state.pendingQueue[state.queueIndex];
             if (!student) return;
 
-            const originalContent = btn.innerHTML;
-            btn.disabled = true;
-            btn.classList.add('opacity-60', 'pointer-events-none');
+            const btn = document.getElementById('approveBtn');
+            const zoomBtn = document.getElementById('zoomModalApproveBtn');
+            const zoomModal = document.getElementById('photoZoomModal');
+            const isZoomOpen = zoomModal && !zoomModal.classList.contains('hidden');
             
-            btn.innerHTML = `
-                <svg class="animate-spin -ml-1 mr-2 h-3.5 w-3.5 text-current inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg> Анализиране...
-            `;
+            if (btn) {
+                btn.disabled = true;
+                btn.classList.add('opacity-60', 'pointer-events-none');
+                btn.innerHTML = `
+                    <svg class="animate-spin h-3.5 w-3.5 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Анализиране...</span>
+                `;
+            }
+            if (zoomBtn) {
+                zoomBtn.disabled = true;
+                zoomBtn.classList.add('opacity-60', 'pointer-events-none');
+                zoomBtn.innerHTML = `
+                    <svg class="animate-spin h-3.5 w-3.5 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Одобряване...</span>
+                `;
+            }
 
             try {
                 const response = await authFetch(`/admins/approve-student/${student.id}`, { method: 'POST' });
                 const data = await response.json();
                 
                 if (response.ok) {
-                    alert(data.message || 'Студентът е одобрен успешно.');
-                    state.queueIndex += 1;
+                    showToast(data.message || `Студент ${student.full_name} е одобрен успешно! Генериран е биометричен 128D вектор.`, 'success');
+                    
                     await loadDashboardData();
+                    const remaining = state.data?.pending_students?.length || 0;
+
+                    if (remaining === 0) {
+                        closePhotoZoomModal();
+                        state.queueIndex = 0;
+                        renderPendingStudents();
+                        renderCurrentApprovalItem();
+                        showToast('Всички чакащи студенти са обработени успешно!', 'info');
+                        return;
+                    }
+
+                    if (state.queueIndex >= remaining) {
+                        state.queueIndex = Math.max(0, remaining - 1);
+                    }
+                    renderPendingStudents();
+                    renderCurrentApprovalItem();
+
+                    if (isZoomOpen) {
+                        updatePhotoZoomModalContent();
+                    }
                 } else {
-                    alert(`Грешка: ${data.detail || 'Неуспешно одобрение.'}`);
+                    showToast(`Грешка при одобрение: ${data.detail || 'Неуспешен биометричен анализ.'}`, 'error');
                 }
             } catch (err) {
                 console.error("Грешка при биометричен анализ:", err);
-                alert('Критична грешка при връзка със сървъра.');
+                showToast('Критична грешка при връзка със сървъра.', 'error');
             } finally {
-                btn.disabled = false;
-                btn.classList.remove('opacity-60', 'pointer-events-none');
-                btn.innerHTML = originalContent;
+                if (btn) {
+                    btn.disabled = false;
+                    btn.classList.remove('opacity-60', 'pointer-events-none');
+                    btn.innerHTML = `
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        <span>Одобри (AI Embedding)</span>
+                        <kbd class="px-1 text-[10px] bg-emerald-700/50 rounded font-mono">A</kbd>
+                    `;
+                }
+                if (zoomBtn) {
+                    zoomBtn.disabled = false;
+                    zoomBtn.classList.remove('opacity-60', 'pointer-events-none');
+                    zoomBtn.innerHTML = `
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        <span>Одобри & Следващ [A]</span>
+                    `;
+                }
+            }
+        }
+
+        async function executeStudentRejection(reason) {
+            const student = state.pendingQueue[state.queueIndex];
+            if (!student) return;
+
+            const trimmed = (reason || '').trim();
+            if (trimmed.length < 3) {
+                showToast('Моля, въведете конкретна причина за отхвърляне (поне 3 символа).', 'error');
+                return;
+            }
+
+            const confirmBtn = document.getElementById('confirmRejectModalBtn');
+            const zoomModal = document.getElementById('photoZoomModal');
+            const isZoomOpen = zoomModal && !zoomModal.classList.contains('hidden');
+
+            if (confirmBtn) {
+                confirmBtn.disabled = true;
+                confirmBtn.classList.add('opacity-60', 'pointer-events-none');
+            }
+
+            try {
+                const response = await authFetch(`/admins/reject-student/${student.id}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reason: trimmed }),
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showToast(data.message || `Студент ${student.full_name} (${student.student_id_number}) е отхвърлен.`, 'success');
+                    closeRejectionModal();
+                    
+                    const legacyInput = document.getElementById('rejectionReason');
+                    if (legacyInput) legacyInput.value = '';
+
+                    await loadDashboardData();
+                    const remaining = state.data?.pending_students?.length || 0;
+
+                    if (remaining === 0) {
+                        closePhotoZoomModal();
+                        state.queueIndex = 0;
+                        renderPendingStudents();
+                        renderCurrentApprovalItem();
+                        showToast('Всички чакащи студенти са обработени!', 'info');
+                        return;
+                    }
+
+                    if (state.queueIndex >= remaining) {
+                        state.queueIndex = Math.max(0, remaining - 1);
+                    }
+                    renderPendingStudents();
+                    renderCurrentApprovalItem();
+
+                    if (isZoomOpen) {
+                        updatePhotoZoomModalContent();
+                    }
+                } else {
+                    showToast(`Грешка при отхвърляне: ${data.detail || 'Неуспешна операция.'}`, 'error');
+                }
+            } catch (err) {
+                console.error("Грешка при отхвърляне:", err);
+                showToast('Критична грешка при връзка със сървъра.', 'error');
+            } finally {
+                if (confirmBtn) {
+                    confirmBtn.disabled = false;
+                    confirmBtn.classList.remove('opacity-60', 'pointer-events-none');
+                }
+            }
+        }
+
+        // ===============================================
+        // ZOOM / INSPECTION MODAL & HOVER LOUPE ENGINE
+        // ===============================================
+
+        function initBookHoverMagnifier() {
+            const container = document.getElementById('bookPhotoContainer');
+            const img = document.getElementById('approvalBookPhoto');
+            const lens = document.getElementById('bookLoupeLens');
+            if (!container || !img || !lens) return;
+
+            container.addEventListener('mouseenter', () => {
+                if (!img.src || img.classList.contains('hidden')) return;
+                lens.style.display = 'block';
+                lens.style.backgroundImage = `url("${img.src}")`;
+            });
+
+            container.addEventListener('mouseleave', () => {
+                lens.style.display = 'none';
+            });
+
+            container.addEventListener('mousemove', (e) => {
+                if (!img.src || img.classList.contains('hidden') || lens.style.display === 'none') return;
+                
+                const rect = img.getBoundingClientRect();
+                const containerRect = container.getBoundingClientRect();
+                
+                const lensWidth = lens.offsetWidth || 144;
+                const lensHeight = lens.offsetHeight || 144;
+                
+                let mouseX = e.clientX - containerRect.left;
+                let mouseY = e.clientY - containerRect.top;
+                
+                let lensLeft = mouseX - lensWidth / 2;
+                let lensTop = mouseY - lensHeight / 2;
+                
+                lens.style.left = `${lensLeft}px`;
+                lens.style.top = `${lensTop}px`;
+                
+                const imgX = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+                const imgY = Math.max(0, Math.min(e.clientY - rect.top, rect.height));
+                
+                const zoomFactor = 2.6;
+                lens.style.backgroundSize = `${rect.width * zoomFactor}px ${rect.height * zoomFactor}px`;
+                const bgX = (imgX * zoomFactor) - (lensWidth / 2);
+                const bgY = (imgY * zoomFactor) - (lensHeight / 2);
+                lens.style.backgroundPosition = `-${bgX}px -${bgY}px`;
+            });
+        }
+
+        function updatePhotoZoomModalContent() {
+            const student = state.pendingQueue[state.queueIndex];
+            if (!student) {
+                closePhotoZoomModal();
+                return;
+            }
+
+            const nameElem = document.getElementById('zoomModalStudentName');
+            const facElem = document.getElementById('zoomModalStudentFac');
+            const bookImg = document.getElementById('zoomBookImg');
+            const faceImg = document.getElementById('zoomFaceImg');
+            const emptyNotice = document.getElementById('zoomBookEmptyNotice');
+            const counter = document.getElementById('zoomModalQueueCounter');
+            const prevBtn = document.getElementById('zoomModalPrevBtn');
+            const nextBtn = document.getElementById('zoomModalNextBtn');
+
+            if (nameElem) nameElem.textContent = student.full_name;
+            if (facElem) facElem.textContent = `(Фак. № ${student.student_id_number})`;
+            if (counter) counter.textContent = `Студент ${state.queueIndex + 1} от ${state.pendingQueue.length}`;
+            if (prevBtn) prevBtn.disabled = state.queueIndex <= 0;
+            if (nextBtn) nextBtn.disabled = state.queueIndex >= state.pendingQueue.length - 1;
+
+            if (student.student_book_photo_url) {
+                if (bookImg) {
+                    bookImg.src = `${student.student_book_photo_url}?token=${adminToken}`;
+                    bookImg.classList.remove('hidden');
+                }
+                if (emptyNotice) emptyNotice.classList.add('hidden');
+            } else {
+                if (bookImg) {
+                    bookImg.src = '';
+                    bookImg.classList.add('hidden');
+                }
+                if (emptyNotice) emptyNotice.classList.remove('hidden');
+            }
+
+            if (faceImg) {
+                faceImg.src = student.photo_url ? `${student.photo_url}?token=${adminToken}` : '';
+            }
+
+            updateZoomTransform();
+        }
+
+        function openPhotoZoomModal() {
+            const student = state.pendingQueue[state.queueIndex];
+            if (!student) return;
+
+            const modal = document.getElementById('photoZoomModal');
+            state.approvalZoomLevel = 1.0;
+            state.approvalBookRotation = 0;
+            state.approvalHighContrast = false;
+            
+            updatePhotoZoomModalContent();
+
+            if (modal) modal.classList.remove('hidden');
+        }
+
+        function closePhotoZoomModal() {
+            const modal = document.getElementById('photoZoomModal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function updateZoomTransform() {
+            const bookImg = document.getElementById('zoomBookImg');
+            const faceImg = document.getElementById('zoomFaceImg');
+            const badge = document.getElementById('zoomLevelBadge');
+            
+            if (badge) badge.textContent = `${Math.round(state.approvalZoomLevel * 100)}%`;
+            
+            const contrastFilter = state.approvalHighContrast ? 'contrast(190%) brightness(90%) saturate(120%)' : 'none';
+            
+            if (bookImg) {
+                bookImg.style.transform = `scale(${state.approvalZoomLevel}) rotate(${state.approvalBookRotation}deg)`;
+                bookImg.style.filter = contrastFilter;
+            }
+            if (faceImg) {
+                faceImg.style.transform = `scale(${state.approvalZoomLevel})`;
+                faceImg.style.filter = contrastFilter;
+            }
+        }
+
+        function openRejectionModal() {
+            const student = state.pendingQueue[state.queueIndex];
+            if (!student) return;
+
+            const modal = document.getElementById('rejectionModal');
+            const nameElem = document.getElementById('rejectModalStudentName');
+            const input = document.getElementById('rejectionModalReasonInput');
+            const legacyInput = document.getElementById('rejectionReason');
+
+            if (nameElem) nameElem.textContent = `${student.full_name} (Фак. № ${student.student_id_number})`;
+            if (input) {
+                input.value = legacyInput ? legacyInput.value : '';
+                setTimeout(() => input.focus(), 60);
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        function closeRejectionModal() {
+            const modal = document.getElementById('rejectionModal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function initApprovalKeyboardShortcuts() {
+            window.addEventListener('keydown', (e) => {
+                const approvalPanel = document.getElementById('panel-approval');
+                if (!approvalPanel || approvalPanel.classList.contains('hidden')) return;
+
+                const activeTag = document.activeElement ? document.activeElement.tagName.toUpperCase() : '';
+                const isTyping = activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT';
+
+                const zoomModal = document.getElementById('photoZoomModal');
+                const isZoomOpen = zoomModal && !zoomModal.classList.contains('hidden');
+
+                const rejectModal = document.getElementById('rejectionModal');
+                const isRejectOpen = rejectModal && !rejectModal.classList.contains('hidden');
+
+                const shortcutsModal = document.getElementById('shortcutsModal');
+                const isShortcutsOpen = shortcutsModal && !shortcutsModal.classList.contains('hidden');
+
+                // Universal Escape key
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    if (isZoomOpen) { closePhotoZoomModal(); return; }
+                    if (isRejectOpen) { closeRejectionModal(); return; }
+                    if (isShortcutsOpen) { shortcutsModal.classList.add('hidden'); return; }
+                    const startBtn = document.getElementById('startApprovalBtn');
+                    if (startBtn && startBtn.dataset.mode === 'reviewing') {
+                        startBtn.click();
+                    }
+                    return;
+                }
+
+                // If user is actively typing in a form input
+                if (isTyping) {
+                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && isRejectOpen) {
+                        e.preventDefault();
+                        const reason = document.getElementById('rejectionModalReasonInput')?.value;
+                        executeStudentRejection(reason);
+                    }
+                    return;
+                }
+
+                // Modal-specific hotkeys
+                if (isZoomOpen) {
+                    if (e.key === '+' || e.key === '=') {
+                        e.preventDefault();
+                        state.approvalZoomLevel = Math.min(3.5, state.approvalZoomLevel + 0.25);
+                        updateZoomTransform();
+                    } else if (e.key === '-' || e.key === '_') {
+                        e.preventDefault();
+                        state.approvalZoomLevel = Math.max(0.5, state.approvalZoomLevel - 0.25);
+                        updateZoomTransform();
+                    } else if (e.key === '0') {
+                        e.preventDefault();
+                        state.approvalZoomLevel = 1.0;
+                        updateZoomTransform();
+                    } else if (e.key.toLowerCase() === 'r') {
+                        e.preventDefault();
+                        openRejectionModal();
+                    } else if (e.key.toLowerCase() === 'c') {
+                        e.preventDefault();
+                        state.approvalHighContrast = !state.approvalHighContrast;
+                        updateZoomTransform();
+                    } else if (e.key.toLowerCase() === 'w' || e.key.toLowerCase() === 't') {
+                        e.preventDefault();
+                        state.approvalBookRotation = (state.approvalBookRotation + 90) % 360;
+                        updateZoomTransform();
+                    } else if (e.key.toLowerCase() === 'a' || e.key === 'Enter') {
+                        e.preventDefault();
+                        executeStudentApproval();
+                    } else if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'j') {
+                        e.preventDefault();
+                        if (state.queueIndex > 0) {
+                            state.queueIndex -= 1;
+                            renderCurrentApprovalItem();
+                            renderPendingStudents();
+                            updatePhotoZoomModalContent();
+                        }
+                    } else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'k') {
+                        e.preventDefault();
+                        if (state.queueIndex < (state.pendingQueue?.length || 0) - 1) {
+                            state.queueIndex += 1;
+                            renderCurrentApprovalItem();
+                            renderPendingStudents();
+                            updatePhotoZoomModalContent();
+                        }
+                    }
+                    return;
+                }
+
+                if (isRejectOpen) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const reason = document.getElementById('rejectionModalReasonInput')?.value;
+                        executeStudentRejection(reason);
+                    }
+                    return;
+                }
+
+                // Main approval panel shortcuts
+                if (e.key.toLowerCase() === 'a' || e.key === 'Enter') {
+                    e.preventDefault();
+                    executeStudentApproval();
+                } else if (e.key.toLowerCase() === 'r') {
+                    e.preventDefault();
+                    openRejectionModal();
+                } else if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'j') {
+                    e.preventDefault();
+                    if (state.queueIndex > 0) {
+                        state.queueIndex -= 1;
+                        renderCurrentApprovalItem();
+                        renderPendingStudents();
+                    }
+                } else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'k') {
+                    e.preventDefault();
+                    if (state.queueIndex < (state.pendingQueue?.length || 0) - 1) {
+                        state.queueIndex += 1;
+                        renderCurrentApprovalItem();
+                        renderPendingStudents();
+                    }
+                } else if (e.key.toLowerCase() === 'z' || e.key === ' ') {
+                    e.preventDefault();
+                    openPhotoZoomModal();
+                } else if (e.key === '?') {
+                    e.preventDefault();
+                    if (shortcutsModal) shortcutsModal.classList.toggle('hidden');
+                }
+            });
+        }
+
+        // ===============================================
+        // WIRE APPROVAL EVENTS
+        // ===============================================
+        document.getElementById('approveBtn')?.addEventListener('click', executeStudentApproval);
+        document.getElementById('zoomModalApproveBtn')?.addEventListener('click', executeStudentApproval);
+        document.getElementById('zoomModalRejectBtn')?.addEventListener('click', openRejectionModal);
+        document.getElementById('zoomModalPrevBtn')?.addEventListener('click', () => {
+            if (state.queueIndex > 0) {
+                state.queueIndex -= 1;
+                renderCurrentApprovalItem();
+                renderPendingStudents();
+                updatePhotoZoomModalContent();
+            }
+        });
+        document.getElementById('zoomModalNextBtn')?.addEventListener('click', () => {
+            if (state.queueIndex < (state.pendingQueue?.length || 0) - 1) {
+                state.queueIndex += 1;
+                renderCurrentApprovalItem();
+                renderPendingStudents();
+                updatePhotoZoomModalContent();
             }
         });
 
-        document.getElementById('rejectBtn')?.addEventListener('click', async () => {
-            const student = state.pendingQueue[state.queueIndex];
-            if (!student) return;
-            const reason = document.getElementById('rejectionReason').value.trim();
-            if (reason.length < 3) {
-                alert('Моля, въведете причина за отхвърляне.');
-                return;
+        // Reject trigger
+        document.getElementById('rejectBtn')?.addEventListener('click', () => {
+            const legacyInput = document.getElementById('rejectionReason');
+            // If legacy input was already filled (e.g. by unit test), execute immediately
+            if (legacyInput && legacyInput.value.trim().length >= 3) {
+                executeStudentRejection(legacyInput.value.trim());
+            } else {
+                openRejectionModal();
             }
-            const response = await authFetch(`/admins/reject-student/${student.id}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ reason }),
-            });
-            const data = await response.json();
-            alert(data.message || data.detail || 'Rejected');
-            document.getElementById('rejectionReason').value = '';
-            state.queueIndex += 1;
-            await loadDashboardData();
         });
+
+        // Rejection Modal events
+        document.getElementById('closeRejectionModalBtn')?.addEventListener('click', closeRejectionModal);
+        document.getElementById('cancelRejectModalBtn')?.addEventListener('click', closeRejectionModal);
+        document.getElementById('confirmRejectModalBtn')?.addEventListener('click', () => {
+            const reason = document.getElementById('rejectionModalReasonInput')?.value;
+            executeStudentRejection(reason);
+        });
+
+        // Quick Preset Chips
+        document.querySelectorAll('.reject-preset-chip').forEach((chip) => {
+            chip.addEventListener('click', () => {
+                const input = document.getElementById('rejectionModalReasonInput');
+                if (input) {
+                    input.value = chip.dataset.reason || chip.textContent;
+                    input.focus();
+                }
+            });
+        });
+
+        // Zoom Modal & Photo clicks
+        document.getElementById('openZoomModalBtn')?.addEventListener('click', openPhotoZoomModal);
+        document.getElementById('approvalBookPhoto')?.addEventListener('click', openPhotoZoomModal);
+        document.getElementById('approvalPhoto')?.addEventListener('click', openPhotoZoomModal);
+        document.getElementById('closeZoomModalBtn')?.addEventListener('click', closePhotoZoomModal);
+
+        document.getElementById('zoomInBtn')?.addEventListener('click', () => {
+            state.approvalZoomLevel = Math.min(3.5, state.approvalZoomLevel + 0.25);
+            updateZoomTransform();
+        });
+        document.getElementById('zoomOutBtn')?.addEventListener('click', () => {
+            state.approvalZoomLevel = Math.max(0.5, state.approvalZoomLevel - 0.25);
+            updateZoomTransform();
+        });
+        document.getElementById('zoomResetBtn')?.addEventListener('click', () => {
+            state.approvalZoomLevel = 1.0;
+            state.approvalBookRotation = 0;
+            updateZoomTransform();
+        });
+        document.getElementById('zoomRotateBtn')?.addEventListener('click', () => {
+            state.approvalBookRotation = (state.approvalBookRotation + 90) % 360;
+            updateZoomTransform();
+        });
+        document.getElementById('zoomContrastBtn')?.addEventListener('click', () => {
+            state.approvalHighContrast = !state.approvalHighContrast;
+            updateZoomTransform();
+        });
+
+        // Rotate book in main card
+        document.getElementById('rotateBookBtn')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            state.approvalBookRotation = (state.approvalBookRotation + 90) % 360;
+            const bookImg = document.getElementById('approvalBookPhoto');
+            if (bookImg) bookImg.style.transform = `rotate(${state.approvalBookRotation}deg)`;
+        });
+
+        // Prev / Next queue navigation
+        document.getElementById('prevStudentBtn')?.addEventListener('click', () => {
+            if (state.queueIndex > 0) {
+                state.queueIndex -= 1;
+                renderCurrentApprovalItem();
+                renderPendingStudents();
+            }
+        });
+        document.getElementById('nextStudentBtn')?.addEventListener('click', () => {
+            if (state.queueIndex < (state.pendingQueue?.length || 0) - 1) {
+                state.queueIndex += 1;
+                renderCurrentApprovalItem();
+                renderPendingStudents();
+            }
+        });
+
+        // Search input for queue
+        document.getElementById('pendingSearchInput')?.addEventListener('input', (e) => {
+            state.approvalSearchQuery = e.target.value;
+            state.queueIndex = 0;
+            renderPendingStudents();
+            renderCurrentApprovalItem();
+        });
+
+        // Shortcuts modal
+        document.getElementById('shortcutsInfoBtn')?.addEventListener('click', () => {
+            document.getElementById('shortcutsModal')?.classList.remove('hidden');
+        });
+        document.getElementById('closeShortcutsModalBtn')?.addEventListener('click', () => {
+            document.getElementById('shortcutsModal')?.classList.add('hidden');
+        });
+        document.getElementById('dismissShortcutsBtn')?.addEventListener('click', () => {
+            document.getElementById('shortcutsModal')?.classList.add('hidden');
+        });
+
+        // Initialize features
+        initBookHoverMagnifier();
+        initApprovalKeyboardShortcuts();
 
         document.getElementById('examinerForm')?.addEventListener('submit', async (event) => {
             event.preventDefault();

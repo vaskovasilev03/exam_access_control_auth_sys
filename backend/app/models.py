@@ -77,6 +77,7 @@ class Student(Base):
     status = Column(String, default="PENDING") # PENDING, APPROVED, PENDING_APPROVAL, REJECTED
     must_change_password = Column(Boolean, default=True, nullable=False)
     photo_path = Column(String, nullable=True)
+    student_book_photo_path = Column(String, nullable=True) # Път в MinIO към 1-ва страница на студентската книжка
     is_active = Column(Boolean, default=True)      # Активен/Прекъснал
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

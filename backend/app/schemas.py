@@ -160,6 +160,8 @@ class StudentProfileSchema(BaseModel):
     status: str
     has_face_embedding: bool
     rejection_reason: Optional[str] = None
+    photo_url: Optional[str] = None
+    student_book_photo_url: Optional[str] = None
     is_superadmin: Optional[bool] = False
     is_impersonating: Optional[bool] = False
 
@@ -174,3 +176,5 @@ class StudentSummarySchema(BaseModel):
     group: int
     status: str
     has_face_embedding: bool
+    photo_url: Optional[str] = None
+    student_book_photo_url: Optional[str] = None

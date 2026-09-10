@@ -76,6 +76,8 @@ def _student_payload(student: Student) -> dict:
         "email_sent": bool(student.is_active or (student.hashed_password and student.hashed_password != "LOCKED_UNTIL_EMAIL_SENT")),
         "photo_path": student.photo_path,
         "photo_url": f"/admins/students/{student.id}/photo" if student.photo_path else None,
+        "student_book_photo_path": student.student_book_photo_path,
+        "student_book_photo_url": f"/admins/students/{student.id}/student-book-photo" if student.student_book_photo_path else None,
         "created_at": student.created_at.isoformat() if student.created_at else None,
     }
 
@@ -229,6 +231,11 @@ def _photo_url_for_student(student: Student) -> Optional[str]:
     if not student.photo_path:
         return None
     return f"/admins/students/{student.id}/photo"
+
+def _student_book_photo_url_for_student(student: Student) -> Optional[str]:
+    if not student.student_book_photo_path:
+        return None
+    return f"/admins/students/{student.id}/student-book-photo"
 
 @app.on_event("startup")
 def on_startup():
@@ -754,6 +761,7 @@ def get_admin_dashboard_data(db: Session = Depends(get_db), current_admin: dict 
             {
                 **_student_payload(student),
                 "photo_url": _photo_url_for_student(student),
+                "student_book_photo_url": _student_book_photo_url_for_student(student),
             }
             for student in pending_students
         ],
@@ -778,6 +786,8 @@ def get_student_photo(student_id: str, token: str = Query(...), db: Session = De
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         if payload.get("role") not in ("admin", "superadmin") and not is_superadmin_user(payload):
             raise HTTPException(status_code=403, detail="Достъпът е отказан. Изискват се админ права.")
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(status_code=401, detail="Невалиден или изтекъл администраторски токен.")
 
@@ -791,6 +801,32 @@ def get_student_photo(student_id: str, token: str = Query(...), db: Session = De
         object_name = student.photo_path[len(prefix):]
     else:
         object_name = student.photo_path.lstrip("/")
+
+    file_data = get_photo_from_cloud(object_name)
+    content_type, _ = mimetypes.guess_type(object_name)
+    return StreamingResponse(io.BytesIO(file_data), media_type=content_type or "image/jpeg")
+
+
+@app.get("/admins/students/{student_id}/student-book-photo")
+def get_student_book_photo(student_id: str, token: str = Query(...), db: Session = Depends(get_db)):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("role") not in ("admin", "superadmin") and not is_superadmin_user(payload):
+            raise HTTPException(status_code=403, detail="Достъпът е отказан. Изискват се админ права.")
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=401, detail="Невалиден или изтекъл администраторски токен.")
+
+    student = db.query(Student).filter(Student.id == student_id).first()
+    if not student or not student.student_book_photo_path:
+        raise HTTPException(status_code=404, detail="Student book photo not found.")
+
+    prefix = f"/{BUCKET_NAME}/"
+    if student.student_book_photo_path.startswith(prefix):
+        object_name = student.student_book_photo_path[len(prefix):]
+    else:
+        object_name = student.student_book_photo_path.lstrip("/")
 
     file_data = get_photo_from_cloud(object_name)
     content_type, _ = mimetypes.guess_type(object_name)
@@ -1518,6 +1554,8 @@ def get_student_profile(
             "status": target_student.status or "PENDING",
             "has_face_embedding": target_student.face_embedding is not None,
             "rejection_reason": rejection_reason,
+            "photo_url": _photo_url_for_student(target_student),
+            "student_book_photo_url": _student_book_photo_url_for_student(target_student),
             "is_superadmin": True,
             "is_impersonating": True,
         }
@@ -1542,6 +1580,8 @@ def get_student_profile(
                 "status": "APPROVED",
                 "has_face_embedding": True,
                 "rejection_reason": None,
+                "photo_url": None,
+                "student_book_photo_url": None,
                 "is_superadmin": True,
                 "is_impersonating": False,
             }
@@ -1577,6 +1617,8 @@ def get_student_profile(
         "status": student.status or "PENDING",
         "has_face_embedding": student.face_embedding is not None,
         "rejection_reason": rejection_reason,
+        "photo_url": _photo_url_for_student(student),
+        "student_book_photo_url": _student_book_photo_url_for_student(student),
         "is_superadmin": is_superadmin_user(current_user),
         "is_impersonating": False,
     }
@@ -1989,12 +2031,13 @@ def force_register_student_to_exam(
 async def student_submit_for_verification(
     status: str = Form(...),
     file: UploadFile = File(...),
+    student_book_file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Мобилен ендпоинт: Приема снимката след Liveness проверка, 
-    записва я в MinIO и слага студента в опашката за одобрение от администратор.
+    Мобилен ендпоинт: Приема снимката след Liveness проверка (и опционално студентска книжка),
+    записва ги в MinIO и слага студента в опашката за одобрение от администратор.
     """
 
     ALLOWED_EXTENSIONS = ["image/jpeg", "image/png", "image/jpg", "image/webp"]
@@ -2009,6 +2052,11 @@ async def student_submit_for_verification(
         raise HTTPException(
             status_code=400, 
             detail=f"Invalid file type! Only images are allowed: {', '.join(ALLOWED_EXTENSIONS)}"
+        )
+    if student_book_file and student_book_file.content_type not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid student book image format! Only images are allowed: {', '.join(ALLOWED_EXTENSIONS)}"
         )
 
     student_id = current_user.get("sub")
@@ -2042,13 +2090,22 @@ async def student_submit_for_verification(
 
     try:
         contents = await file.read()
-        file_size = len(contents)
-        
+        ts = int(time.time())
         photo_url = upload_photo_to_cloud(
             file_data=contents,
-            object_name=f"{student.student_id_number}_{int(time.time())}{os.path.splitext(file.filename)[1]}",
+            object_name=f"{student.student_id_number}_{ts}{os.path.splitext(file.filename)[1]}",
             content_type=file.content_type
         )
+
+        book_photo_url = None
+        if student_book_file:
+            book_contents = await student_book_file.read()
+            book_photo_url = upload_photo_to_cloud(
+                file_data=book_contents,
+                object_name=f"{student.student_id_number}_book_{ts}{os.path.splitext(student_book_file.filename or '.jpg')[1]}",
+                content_type=student_book_file.content_type or "image/jpeg"
+            )
+            student.student_book_photo_path = book_photo_url
 
         # 3. Обновяване на статуса в базата данни
         student.status = "PENDING_APPROVAL" 
@@ -2058,11 +2115,80 @@ async def student_submit_for_verification(
         return {
             "status": "success",
             "message": "Image uploaded successfully. Your profile is now pending admin approval.",
+            "photo_url": photo_url,
+            "student_book_photo_url": book_photo_url
         }
 
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Грешка при запис в системата: {str(e)}")
+
+
+@app.post("/students/upload-verification-docs")
+async def student_upload_verification_docs(
+    face_photo: UploadFile = File(...),
+    student_book_photo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Двуснимково качване на верификационни документи:
+    1. Лицево биометрично селфи
+    2. Първа страница от студентската книжка (официален документ с печат)
+    """
+    ALLOWED_EXTENSIONS = ["image/jpeg", "image/png", "image/jpg", "image/webp"]
+
+    if current_user.get("role") not in ("student", "superadmin") and not is_superadmin_user(current_user):
+        raise HTTPException(status_code=403, detail="Access denied.")
+
+    for uploaded_file, label in [(face_photo, "Биометрична лицева снимка"), (student_book_photo, "Студентска книжка")]:
+        if uploaded_file.content_type not in ALLOWED_EXTENSIONS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Невалиден файлов формат за {label}! Разрешени формати: {', '.join(ALLOWED_EXTENSIONS)}"
+            )
+
+    student_id = current_user.get("sub")
+    student = db.query(Student).filter(Student.id == student_id).first()
+
+    if not student:
+        if is_superadmin_user(current_user):
+            return {"status": "already_approved", "message": "Superadmin profile is permanently verified."}
+        raise HTTPException(status_code=404, detail="Student not found.")
+
+    if student.status == "APPROVED":
+        return {"status": "already_approved", "message": "Profile is already approved and verified."}
+
+    try:
+        ts = int(time.time())
+        face_contents = await face_photo.read()
+        book_contents = await student_book_photo.read()
+
+        face_url = upload_photo_to_cloud(
+            file_data=face_contents,
+            object_name=f"{student.student_id_number}_face_{ts}{os.path.splitext(face_photo.filename or '.jpg')[1]}",
+            content_type=face_photo.content_type or "image/jpeg"
+        )
+        book_url = upload_photo_to_cloud(
+            file_data=book_contents,
+            object_name=f"{student.student_id_number}_book_{ts}{os.path.splitext(student_book_photo.filename or '.jpg')[1]}",
+            content_type=student_book_photo.content_type or "image/jpeg"
+        )
+
+        student.status = "PENDING_APPROVAL"
+        student.photo_path = face_url
+        student.student_book_photo_path = book_url
+        db.commit()
+
+        return {
+            "status": "success",
+            "message": "Документите са качени успешно и очакват преглед от администратор.",
+            "photo_url": face_url,
+            "student_book_photo_url": book_url
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Грешка при качване на документите: {str(e)}")
 
 
 @app.post("/admins/approve-student/{student_id}")
