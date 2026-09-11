@@ -23,7 +23,7 @@ from sqlalchemy import func
 from datetime import datetime, timedelta
 
 from pydantic import ValidationError
-from typing import Optional
+from typing import Optional, Tuple
 from zoneinfo import ZoneInfo
 from collections import defaultdict
 
@@ -41,6 +41,7 @@ from .auth import (
     get_password_hash, validate_secure_key, SECRET_KEY, ALGORITHM
 )
 from .seed import seed_superadmin
+from .liveness import LivenessDetector, get_liveness_detector
 from .stream_esp32 import (
     generate_from_memory, fetch_frames_from_esp32, stop_camera_stream,
     ACTIVE_CAMERAS, CAMERA_TASKS, AI_ROOM_STATES, CAMERA_HEALTH,
@@ -101,6 +102,10 @@ def _student_payload(student: Student) -> dict:
         "photo_url": f"/admins/students/{student.id}/photo" if student.photo_path else None,
         "student_book_photo_path": student.student_book_photo_path,
         "student_book_photo_url": f"/admins/students/{student.id}/student-book-photo" if student.student_book_photo_path else None,
+        "is_twin_exception": bool(student.is_twin_exception),
+        "duplicate_flagged_student_id": str(student.duplicate_flagged_student_id) if student.duplicate_flagged_student_id else None,
+        "duplicate_similarity_distance": float(student.duplicate_similarity_distance) if student.duplicate_similarity_distance is not None else None,
+        "gdpr_consent_given": bool(student.gdpr_consent_given),
         "created_at": student.created_at.isoformat() if student.created_at else None,
     }
 
@@ -1845,6 +1850,9 @@ def get_student_profile(
             "rejection_reason": rejection_reason,
             "photo_url": _photo_url_for_student(target_student),
             "student_book_photo_url": _student_book_photo_url_for_student(target_student),
+            "is_twin_exception": bool(target_student.is_twin_exception),
+            "duplicate_flagged_student_id": str(target_student.duplicate_flagged_student_id) if target_student.duplicate_flagged_student_id else None,
+            "gdpr_consent_given": bool(target_student.gdpr_consent_given),
             "is_superadmin": True,
             "is_impersonating": True,
         }
@@ -1908,6 +1916,9 @@ def get_student_profile(
         "rejection_reason": rejection_reason,
         "photo_url": _photo_url_for_student(student),
         "student_book_photo_url": _student_book_photo_url_for_student(student),
+        "is_twin_exception": bool(student.is_twin_exception),
+        "duplicate_flagged_student_id": str(student.duplicate_flagged_student_id) if student.duplicate_flagged_student_id else None,
+        "gdpr_consent_given": bool(student.gdpr_consent_given),
         "is_superadmin": is_superadmin_user(current_user),
         "is_impersonating": False,
     }
@@ -2906,6 +2917,76 @@ def force_register_student_to_exam(
     print(f"[Спешен Допуск] Квесторът записа студент {student.full_name} за изпит в зала {room_number}")
     return {"status": "success", "message": f"Успешно извънредно записване на {student.full_name} за дисциплина: {current_exam.subject}."}
 
+def verify_selfie_liveness_and_uniqueness(
+    face_bytes: bytes,
+    student_id: Optional[str],
+    db: Session
+) -> Tuple[bool, float, Optional[Student], Optional[float]]:
+    """
+    Валидира:
+    1. Декодиране на изображението (OpenCV)
+    2. Откриване на точно едно лице (face_recognition)
+    3. Проверка за жив човек (Anti-Spoofing MiniFASNet, score >= 0.85)
+    4. 1:N векторна проверка за съвпадение (pgvector, distance < 0.42)
+    Връща: (is_real, liveness_score, closest_duplicate_student, duplicate_distance)
+    """
+    if not face_bytes:
+        raise HTTPException(status_code=400, detail="Липсва съдържание на снимката.")
+
+    nparr = np.frombuffer(face_bytes, np.uint8)
+    frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    if frame is None or frame.size == 0:
+        raise HTTPException(status_code=400, detail="Невалидно изображение или повредени файлови данни.")
+
+    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    face_locations = face_recognition.face_locations(rgb_frame)
+    if not face_locations:
+        raise HTTPException(
+            status_code=400,
+            detail="Не е открито лице в предоставената снимка! Моля, застанете на светло място и центрирайте лицето си."
+        )
+    if len(face_locations) > 1:
+        raise HTTPException(
+            status_code=400,
+            detail="В кадъра са открити няколко лица! Снимката трябва да съдържа само вашето лице."
+        )
+
+    face_box = face_locations[0] # (top, right, bottom, left)
+    detector = get_liveness_detector()
+    is_real, liveness_score = detector.check(frame, face_box)
+    if not is_real:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Неуспешна проверка за автентичност (Liveness Failed: {liveness_score:.2f})! Снимката изглежда заснета от екран, хартия или маска. Моля, направете снимка на живо."
+        )
+
+    # 1:N collision check against approved students
+    closest_duplicate = None
+    min_distance = None
+    encodings = face_recognition.face_encodings(rgb_frame, [face_box])
+    if encodings and student_id:
+        candidate_encoding = encodings[0]
+        # Query closest approved student with existing embedding (excluding self)
+        closest_row = (
+            db.query(
+                Student,
+                Student.face_embedding.l2_distance(candidate_encoding).label("dist")
+            )
+            .filter(
+                Student.face_embedding != None,
+                Student.id != student_id,
+                Student.status == "APPROVED"
+            )
+            .order_by("dist")
+            .first()
+        )
+        if closest_row and closest_row.dist is not None:
+            closest_duplicate = closest_row[0]
+            min_distance = float(closest_row[1])
+
+    return is_real, liveness_score, closest_duplicate, min_distance
+
+
 @app.post("/students/validate")
 async def student_submit_for_verification(
     status: str = Form(...),
@@ -2916,7 +2997,7 @@ async def student_submit_for_verification(
 ):
     """
     Мобилен ендпоинт: Приема снимката след Liveness проверка (и опционално студентска книжка),
-    записва ги в MinIO и слага студента в опашката за одобрение от администратор.
+    изпълнява сървърна MiniFASNet проверка, записва ги в MinIO и слага студента в опашката.
     """
 
     ALLOWED_EXTENSIONS = ["image/jpeg", "image/png", "image/jpg", "image/webp"]
@@ -2944,6 +3025,7 @@ async def student_submit_for_verification(
     if not student:
         if is_superadmin_user(current_user):
             contents = await file.read()
+            verify_selfie_liveness_and_uniqueness(contents, None, db)
             photo_url = upload_photo_to_cloud(
                 file_data=contents,
                 object_name=f"superadmin_{int(time.time())}{os.path.splitext(file.filename)[1]}",
@@ -2963,12 +3045,17 @@ async def student_submit_for_verification(
             return {"status": "already_approved", "message": "Superadmin profile is permanently verified."}
         raise HTTPException(status_code=404, detail="Student not found.")
 
-        
     if student.status == "APPROVED":
         return {"status": "already_approved", "message": "Profile is already approved and verified."}
 
     try:
         contents = await file.read()
+        is_real, liveness_score, closest_duplicate, min_dist = verify_selfie_liveness_and_uniqueness(
+            face_bytes=contents,
+            student_id=str(student.id) if student else None,
+            db=db
+        )
+
         ts = int(time.time())
         photo_url = upload_photo_to_cloud(
             file_data=contents,
@@ -2986,18 +3073,35 @@ async def student_submit_for_verification(
             )
             student.student_book_photo_path = book_photo_url
 
-        # 3. Обновяване на статуса в базата данни
-        student.status = "PENDING_APPROVAL" 
+        # Collision handling: Twin / Impersonation quarantine
+        is_duplicate = bool(closest_duplicate and min_dist is not None and min_dist < 0.42)
+        if is_duplicate:
+            student.status = "PENDING_DUPLICATE_REVIEW"
+            student.duplicate_flagged_student_id = closest_duplicate.id
+            student.duplicate_similarity_distance = min_dist
+            message = "Снимката премина успешно проверка за автентичност, но бе отчетено биометрично сходство с друг студент. Акаунтът е изпратен за допълнителен административен преглед."
+        else:
+            student.status = "PENDING_APPROVAL"
+            student.duplicate_flagged_student_id = None
+            student.duplicate_similarity_distance = None
+            message = "Image uploaded successfully. Your profile is now pending admin approval."
+
         student.photo_path = photo_url
+        student.gdpr_consent_given = True
+        student.gdpr_consent_timestamp = datetime.now(ZoneInfo("Europe/Sofia"))
         db.commit()
 
         return {
             "status": "success",
-            "message": "Image uploaded successfully. Your profile is now pending admin approval.",
+            "message": message,
             "photo_url": photo_url,
-            "student_book_photo_url": book_photo_url
+            "student_book_photo_url": book_photo_url,
+            "liveness_score": liveness_score,
+            "duplicate_detected": is_duplicate
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Грешка при запис в системата: {str(e)}")
@@ -3012,7 +3116,7 @@ async def student_upload_verification_docs(
 ):
     """
     Двуснимково качване на верификационни документи:
-    1. Лицево биометрично селфи
+    1. Лицево биометрично селфи (сървърна MiniFASNet проверка)
     2. Първа страница от студентската книжка (официален документ с печат)
     """
     ALLOWED_EXTENSIONS = ["image/jpeg", "image/png", "image/jpg", "image/webp"]
@@ -3039,10 +3143,16 @@ async def student_upload_verification_docs(
         return {"status": "already_approved", "message": "Profile is already approved and verified."}
 
     try:
-        ts = int(time.time())
         face_contents = await face_photo.read()
         book_contents = await student_book_photo.read()
 
+        is_real, liveness_score, closest_duplicate, min_dist = verify_selfie_liveness_and_uniqueness(
+            face_bytes=face_contents,
+            student_id=str(student.id) if student else None,
+            db=db
+        )
+
+        ts = int(time.time())
         face_url = upload_photo_to_cloud(
             file_data=face_contents,
             object_name=f"{student.student_id_number}_face_{ts}{os.path.splitext(face_photo.filename or '.jpg')[1]}",
@@ -3054,17 +3164,34 @@ async def student_upload_verification_docs(
             content_type=student_book_photo.content_type or "image/jpeg"
         )
 
-        student.status = "PENDING_APPROVAL"
+        is_duplicate = bool(closest_duplicate and min_dist is not None and min_dist < 0.42)
+        if is_duplicate:
+            student.status = "PENDING_DUPLICATE_REVIEW"
+            student.duplicate_flagged_student_id = closest_duplicate.id
+            student.duplicate_similarity_distance = min_dist
+            message = "Документите са получени успешно (Liveness Passed). Отчетено е сходство с друг профил и акаунтът е изпратен за допълнителен административен преглед."
+        else:
+            student.status = "PENDING_APPROVAL"
+            student.duplicate_flagged_student_id = None
+            student.duplicate_similarity_distance = None
+            message = "Документите са качени успешно и очакват преглед от администратор."
+
         student.photo_path = face_url
         student.student_book_photo_path = book_url
+        student.gdpr_consent_given = True
+        student.gdpr_consent_timestamp = datetime.now(ZoneInfo("Europe/Sofia"))
         db.commit()
 
         return {
             "status": "success",
-            "message": "Документите са качени успешно и очакват преглед от администратор.",
+            "message": message,
             "photo_url": face_url,
-            "student_book_photo_url": book_url
+            "student_book_photo_url": book_url,
+            "liveness_score": liveness_score,
+            "duplicate_detected": is_duplicate
         }
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Грешка при качване на документите: {str(e)}")

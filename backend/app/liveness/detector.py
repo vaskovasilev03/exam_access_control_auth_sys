@@ -1,73 +1,96 @@
-import sys
 import os
+import logging
+from typing import Tuple, Union, List
 import numpy as np
 import cv2
+import torch
+from .core.predictor import AntiSpoofPredict
+from .core.cropper import CropImage
 
-current_dir = os.path.dirname(os.path.abspath(__file__)) # .../server
-liveness_path = os.path.join(current_dir, 'liveness')    # .../server/liveness
+logger = logging.getLogger("liveness")
 
-if liveness_path not in sys.path:
-    sys.path.append(liveness_path)
+_GLOBAL_LIVENESS_DETECTOR = None
 
-try:
-    from src.anti_spoof_predict import AntiSpoofPredict
-    from src.generate_patches import CropImage
-except ImportError as e:
-    print("ERROR: Could not import liveness modules.")
-    raise e
 
 class LivenessDetector:
-    def __init__(self, threshold=0.85):
+    def __init__(self, threshold: float = 0.85, device_id: Union[int, str, None] = "cpu"):
         self.threshold = threshold
-        device = 0 if cv2.cuda.getCudaEnabledDeviceCount() > 0 else "cpu"
+        device = device_id if device_id is not None else ("cuda:0" if torch.cuda.is_available() else "cpu")
         self.model = AntiSpoofPredict(device)
         self.cropper = CropImage()
-        
-        # Absolute path to the model file
-        self.model_path = os.path.join(liveness_path, "resources/anti_spoof_models/2.7_80x80_MiniFASNetV2.pth")
-        
-        if not os.path.exists(self.model_path):
-            print(f"[ERROR] Model file not found at: {self.model_path}")
-            
-        print(f"[Liveness] Model loaded. Threshold: {self.threshold}")
 
-    def check(self, frame, face_box):
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        self.model_path = os.path.join(current_dir, "models", "2.7_80x80_MiniFASNetV2.pth")
+
+        if not os.path.exists(self.model_path):
+            logger.error(f"[Liveness] Model file not found at: {self.model_path}")
+        else:
+            # Warm up / pre-load model into memory
+            try:
+                self.model._load_model(self.model_path)
+                logger.info(f"[Liveness] MiniFASNetV2 loaded successfully (threshold={self.threshold})")
+            except Exception as e:
+                logger.error(f"[Liveness] Failed to preload model: {e}")
+
+    def check(self, frame: np.ndarray, face_box: Union[Tuple[int, int, int, int], List[int]]) -> Tuple[bool, float]:
         """
-        Returns: (is_real, score)
-        """
-        # Convert (top, right, bottom, left) -> (x, y, w, h)
-        top, right, bottom, left = face_box
-        x = left
-        y = top
-        w = right - left
-        h = bottom - top
-        image_bbox = [x, y, w, h]
+        Evaluate whether the face bounding box in frame is a live human or a spoof (flat photo, replay screen).
         
+        face_box format:
+          - Can be (top, right, bottom, left) from face_recognition
+          - Or (x, y, w, h)
+        
+        Returns:
+          (is_real: bool, real_score: float)
+        """
+        if frame is None or frame.size == 0:
+            return False, 0.0
+
+        # Disambiguate box format
+        if len(face_box) == 4:
+            v0, v1, v2, v3 = face_box
+            # If top, right, bottom, left format (typical face_recognition box):
+            if v2 > v0 and v1 > v3:
+                top, right, bottom, left = v0, v1, v2, v3
+                x = left
+                y = top
+                w = right - left
+                h = bottom - top
+            else:
+                x, y, w, h = v0, v1, v2, v3
+        else:
+            return False, 0.0
+
+        if w <= 0 or h <= 0:
+            return False, 0.0
+
+        image_bbox = [int(x), int(y), int(w), int(h)]
+
         try:
-            # 1. CROP THE FACE
-            # The model requires the image to be cropped to the face and resized to 80x80
-            # We use the 'cropper' tool from the repo to do this scaling correctly
             param = {
                 "org_img": frame,
                 "bbox": image_bbox,
-                "scale": 2.7,      # The model expects a 2.7x scale crop
-                "out_w": 80,       # Model input width
-                "out_h": 80,       # Model input height
+                "scale": 2.7,
+                "out_w": 80,
+                "out_h": 80,
                 "crop": True,
             }
             cropped_img = self.cropper.crop(**param)
-            
-            # 2. PREDICT
-            # We pass the CROPPED image and the MODEL PATH
+            if cropped_img is None or cropped_img.size == 0:
+                return False, 0.0
+
             prediction = self.model.predict(cropped_img, self.model_path)
-            
-            # 3. ANALYZE SCORE
-            # prediction output is [[Spoof_Score, Real_Score]]
-            real_score = prediction[0][1]
-            
-            is_real = real_score > self.threshold
+            real_score = float(prediction[0][1])
+            is_real = bool(real_score >= self.threshold)
             return is_real, real_score
 
         except Exception as e:
-            print(f"Liveness Check Error: {e}")
+            logger.error(f"[Liveness] Error during liveness inference: {e}")
             return False, 0.0
+
+
+def get_liveness_detector(threshold: float = 0.85) -> LivenessDetector:
+    global _GLOBAL_LIVENESS_DETECTOR
+    if _GLOBAL_LIVENESS_DETECTOR is None:
+        _GLOBAL_LIVENESS_DETECTOR = LivenessDetector(threshold=threshold)
+    return _GLOBAL_LIVENESS_DETECTOR

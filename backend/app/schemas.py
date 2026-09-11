@@ -162,6 +162,9 @@ class StudentProfileSchema(BaseModel):
     rejection_reason: Optional[str] = None
     photo_url: Optional[str] = None
     student_book_photo_url: Optional[str] = None
+    is_twin_exception: Optional[bool] = False
+    duplicate_flagged_student_id: Optional[str] = None
+    gdpr_consent_given: Optional[bool] = False
     is_superadmin: Optional[bool] = False
     is_impersonating: Optional[bool] = False
 
@@ -178,3 +181,6 @@ class StudentSummarySchema(BaseModel):
     has_face_embedding: bool
     photo_url: Optional[str] = None
     student_book_photo_url: Optional[str] = None
+    is_twin_exception: Optional[bool] = False
+    duplicate_flagged_student_id: Optional[str] = None
+    gdpr_consent_given: Optional[bool] = False

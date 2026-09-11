@@ -1,6 +1,6 @@
 import uuid
 import enum
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, text, Enum, Index, event
+from sqlalchemy import Column, Integer, String, Boolean, Float, DateTime, ForeignKey, text, Enum, Index, event
 from sqlalchemy.dialects.postgresql import UUID, ARRAY
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
@@ -74,10 +74,19 @@ class Student(Base):
     # 128-измерният биометричен вектор от face_recognition
     face_embedding = Column(Vector(128), nullable=True) 
 
-    status = Column(String, default="PENDING") # PENDING, APPROVED, PENDING_APPROVAL, REJECTED
+    status = Column(String, default="PENDING") # PENDING, APPROVED, PENDING_APPROVAL, PENDING_DUPLICATE_REVIEW, REJECTED
     must_change_password = Column(Boolean, default=True, nullable=False)
     photo_path = Column(String, nullable=True)
     student_book_photo_path = Column(String, nullable=True) # Път в MinIO към 1-ва страница на студентската книжка
+    
+    # GDPR & Twin Governance
+    gdpr_consent_given = Column(Boolean, default=False, nullable=False)
+    gdpr_consent_timestamp = Column(DateTime(timezone=True), nullable=True)
+    gdpr_policy_version = Column(String, default="1.0", nullable=True)
+    is_twin_exception = Column(Boolean, default=False, nullable=False)
+    duplicate_flagged_student_id = Column(UUID(as_uuid=True), ForeignKey("students.id", ondelete="SET NULL"), nullable=True)
+    duplicate_similarity_distance = Column(Float, nullable=True)
+
     is_active = Column(Boolean, default=True)      # Активен/Прекъснал
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

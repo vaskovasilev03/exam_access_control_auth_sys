@@ -61,5 +61,7 @@ class CropImage:
 
             img = org_img[left_top_y: right_bottom_y+1,
                           left_top_x: right_bottom_x+1]
+            if img is None or img.size == 0:
+                return None
             dst_img = cv2.resize(img, (out_w, out_h))
         return dst_img

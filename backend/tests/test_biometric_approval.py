@@ -143,8 +143,9 @@ class BiometricApprovalTestCase(unittest.TestCase):
         res_none = client.get(f"/admins/students/{student.id}/student-book-photo?token={self.admin_token}")
         self.assertEqual(res_none.status_code, 404)
 
+    @patch("app.main.verify_selfie_liveness_and_uniqueness", return_value=(True, 0.98, None, None))
     @patch("app.main.upload_photo_to_cloud")
-    def test_03_dual_photo_upload_verification_docs(self, mock_upload):
+    def test_03_dual_photo_upload_verification_docs(self, mock_upload, mock_liveness):
         """Тества двуснимковото качване през POST /students/upload-verification-docs."""
         mock_upload.side_effect = lambda file_data, object_name, content_type: f"/access-control-bucket/{object_name}"
 
@@ -170,8 +171,9 @@ class BiometricApprovalTestCase(unittest.TestCase):
         self.assertTrue(student.student_book_photo_path.startswith("/access-control-bucket/"))
         self.assertIn("book", student.student_book_photo_path)
 
+    @patch("app.main.verify_selfie_liveness_and_uniqueness", return_value=(True, 0.98, None, None))
     @patch("app.main.upload_photo_to_cloud")
-    def test_04_validate_endpoint_backward_compatibility(self, mock_upload):
+    def test_04_validate_endpoint_backward_compatibility(self, mock_upload, mock_liveness):
         """Тества съвместимостта на /students/validate при подаване на student_book_file."""
         mock_upload.side_effect = lambda file_data, object_name, content_type: f"/access-control-bucket/{object_name}"
 
