@@ -18,7 +18,7 @@ import fastapi
 from fastapi import FastAPI, Depends, Response, File, UploadFile, HTTPException, Form, APIRouter, BackgroundTasks, Query, Body
 from fastapi.responses import StreamingResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 from sqlalchemy import func
 from datetime import datetime, timedelta
 
@@ -84,7 +84,37 @@ def _parse_admin_log_details(details: Optional[str]) -> dict:
     return {"raw": details}
 
 
-def _student_payload(student: Student) -> dict:
+def _student_payload(student: Student, students_by_id_map: Optional[dict] = None) -> dict:
+    flagged_student_data = None
+    if student.duplicate_flagged_student_id:
+        flagged = None
+        if students_by_id_map is not None:
+            flagged = students_by_id_map.get(student.duplicate_flagged_student_id) or students_by_id_map.get(str(student.duplicate_flagged_student_id))
+        if not flagged:
+            try:
+                db_session = object_session(student)
+                if db_session:
+                    flagged = db_session.query(Student).filter(Student.id == student.duplicate_flagged_student_id).first()
+            except Exception:
+                pass
+
+        if flagged:
+            flagged_student_data = {
+                "id": str(flagged.id),
+                "full_name": flagged.full_name,
+                "student_id_number": flagged.student_id_number,
+                "faculty": flagged.faculty,
+                "specialty": flagged.specialty,
+                "course": flagged.course,
+                "stream": flagged.stream,
+                "group": flagged.group,
+                "status": flagged.status,
+                "photo_path": flagged.photo_path,
+                "photo_url": f"/admins/students/{flagged.id}/photo" if flagged.photo_path else None,
+                "student_book_photo_path": flagged.student_book_photo_path,
+                "student_book_photo_url": f"/admins/students/{flagged.id}/student-book-photo" if flagged.student_book_photo_path else None,
+            }
+
     return {
         "id": str(student.id),
         "full_name": student.full_name,
@@ -105,6 +135,7 @@ def _student_payload(student: Student) -> dict:
         "is_twin_exception": bool(student.is_twin_exception),
         "duplicate_flagged_student_id": str(student.duplicate_flagged_student_id) if student.duplicate_flagged_student_id else None,
         "duplicate_similarity_distance": float(student.duplicate_similarity_distance) if student.duplicate_similarity_distance is not None else None,
+        "duplicate_flagged_student": flagged_student_data,
         "gdpr_consent_given": bool(student.gdpr_consent_given),
         "created_at": student.created_at.isoformat() if student.created_at else None,
     }
@@ -796,7 +827,8 @@ def get_admin_dashboard_data(db: Session = Depends(get_db), current_admin: dict 
     allocation_logs = db.query(AdminLog).filter(AdminLog.action_type.in_(["ALLOCATION_EXECUTION", "ALLOCATION_EXECUTION_NO_NEW"])).order_by(AdminLog.created_at.desc()).limit(30).all()
 
     all_students = db.query(Student).order_by(Student.created_at.asc()).all()
-    pending_students = [s for s in all_students if s.status == "PENDING_APPROVAL"]
+    students_by_id_map = {s.id: s for s in all_students}
+    pending_students = [s for s in all_students if s.status in ["PENDING_APPROVAL", "PENDING_DUPLICATE_REVIEW"]]
     examiners = db.query(Examiner).order_by(Examiner.created_at.desc()).all()
     exams = db.query(Exam).order_by(Exam.date_time.asc()).all()
 
@@ -1005,7 +1037,7 @@ def get_admin_dashboard_data(db: Session = Depends(get_db), current_admin: dict 
                 **_admin_log_payload(log),
                 "students": [
                     {
-                        **_student_payload(student),
+                        **_student_payload(student, students_by_id_map=students_by_id_map),
                         "photo_url": _photo_url_for_student(student),
                     }
                     for student in _resolve_log_students(
@@ -1035,7 +1067,7 @@ def get_admin_dashboard_data(db: Session = Depends(get_db), current_admin: dict 
         "allocation_logs": allocation_payloads,
         "pending_students": [
             {
-                **_student_payload(student),
+                **_student_payload(student, students_by_id_map=students_by_id_map),
                 "photo_url": _photo_url_for_student(student),
                 "student_book_photo_url": _student_book_photo_url_for_student(student),
             }
@@ -3212,7 +3244,7 @@ async def approve_student_biometrics(
     if not student:
         raise HTTPException(status_code=404, detail="Студентът не е намерен.")
     
-    if student.status != "PENDING_APPROVAL":
+    if student.status not in ["PENDING_APPROVAL", "PENDING_DUPLICATE_REVIEW"]:
         raise HTTPException(status_code=400, detail="Този студент не чака одобрение на биометрия.")
 
     # 2. Извличаме чистия object name (Key) от записания URL
@@ -3283,7 +3315,7 @@ def reject_student_biometrics(
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
         raise HTTPException(status_code=404, detail="Студентът не е намерен.")
-    if student.status != "PENDING_APPROVAL":
+    if student.status not in ["PENDING_APPROVAL", "PENDING_DUPLICATE_REVIEW"]:
         raise HTTPException(status_code=400, detail="Този студент не чака одобрение на биометрия.")
 
     student.status = "REJECTED"
@@ -3298,6 +3330,109 @@ def reject_student_biometrics(
     db.commit()
 
     return {"status": "success", "message": f"Student {student.student_id_number} rejected successfully."}
+
+
+@app.post("/admins/approve-twin/{student_id}")
+async def approve_twin_biometrics(
+    student_id: str,
+    db: Session = Depends(get_db),
+    current_admin: dict = Depends(require_admin)
+):
+    """
+    Администраторски ендпоинт: Одобрява студент при биометрично съвпадение (близнак) съгласно чл. 22 GDPR.
+    Извлича 128D AI вектор, маркира is_twin_exception = True и записва одитна следа в AdminLog.
+    """
+    student = db.query(Student).filter(Student.id == student_id).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Студентът не е намерен.")
+
+    if student.status not in ["PENDING_APPROVAL", "PENDING_DUPLICATE_REVIEW"]:
+        raise HTTPException(status_code=400, detail="Този студент не чака одобрение на биометрия.")
+
+    prefix = f"/{BUCKET_NAME}/"
+    if student.photo_path.startswith(prefix):
+        object_name = student.photo_path[len(prefix):]
+    else:
+        object_name = student.photo_path.lstrip("/")
+
+    try:
+        file_data = get_photo_from_cloud(object_name)
+        image = face_recognition.load_image_file(io.BytesIO(file_data))
+        face_encodings = face_recognition.face_encodings(image)
+
+        if len(face_encodings) == 0:
+            raise HTTPException(status_code=400, detail="No face detected in the image.")
+
+        student_embedding = face_encodings[0].tolist()
+        student.face_embedding = student_embedding
+        student.status = "APPROVED"
+        student.is_twin_exception = True
+
+        flagged_info = ""
+        if student.duplicate_flagged_student_id:
+            flagged_info = f" Съвпадение със студент ID: {student.duplicate_flagged_student_id}"
+            if student.duplicate_similarity_distance is not None:
+                flagged_info += f" (дистанция: {float(student.duplicate_similarity_distance):.3f})"
+
+        new_log = AdminLog(
+            admin_id=current_admin['sub'],
+            action_type="STUDENT_APPROVE_TWIN",
+            details=f"Одобрен студент близнак с фак. номер {student.student_id_number} (изключение по чл. 22 GDPR).{flagged_info} Генериран face_embedding.",
+            notification_sent=False
+        )
+        db.add(new_log)
+        db.commit()
+
+        return {
+            "status": "success",
+            "message": f"Студент {student.student_id_number} е одобрен успешно като близнак (активирано изключение)."
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Twin approval failed: {str(e)}")
+
+
+@app.post("/admins/reject-duplicate/{student_id}")
+def reject_duplicate_biometrics(
+    student_id: str,
+    payload: Optional[dict] = Body(None),
+    db: Session = Depends(get_db),
+    current_admin: dict = Depends(require_admin)
+):
+    """
+    Администраторски ендпоинт: Отхвърля нелегитимен/дублиращ опит за регистрация.
+    """
+    admin = db.query(Admin).filter(Admin.id == current_admin['sub']).first()
+    if not admin or not admin.is_verified:
+        raise HTTPException(status_code=403, detail="Unauthorized access. Admin privileges required.")
+
+    student = db.query(Student).filter(Student.id == student_id).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Студентът не е намерен.")
+
+    if student.status not in ["PENDING_APPROVAL", "PENDING_DUPLICATE_REVIEW"]:
+        raise HTTPException(status_code=400, detail="Този студент не чака одобрение на биометрия.")
+
+    raw_reason = (payload or {}).get("reason", "") if isinstance(payload, dict) else ""
+    reason = raw_reason.strip() if raw_reason else "Отхвърлена дублираща/нелегитимна регистрация (засечено лицево съвпадение с друг студент)."
+
+    student.status = "REJECTED"
+    student.face_embedding = None
+
+    db.add(AdminLog(
+        admin_id=admin.id,
+        action_type="STUDENT_REJECT_DUPLICATE",
+        details=f"Отхвърлен дублиращ студент {student.student_id_number}. Причина: {reason}",
+        notification_sent=False,
+    ))
+    db.commit()
+
+    return {
+        "status": "success",
+        "message": f"Студент {student.student_id_number} е отхвърлен като дубликат."
+    }
 
 @app.post("/api/v1/exams/register-camera")
 async def register_camera(data: CameraRegisterSchema):

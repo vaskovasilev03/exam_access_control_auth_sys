@@ -1396,20 +1396,76 @@
                             </div>
                         </div>
 
-                        <!-- DUAL-PHOTO DOSSIER VIEWPORT -->
+                        <!-- TWIN CONFLICT CARD / BANNER (HIDDEN BY DEFAULT, SHOWN ONLY WHEN isConflict IS TRUE) -->
+                        <div id="twinConflictCard" class="hidden border border-purple-500/40 bg-purple-50/50 dark:bg-purple-950/30 rounded-[var(--radius)] p-4 space-y-3.5 transition-all">
+                            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-purple-500/20 pb-3">
+                                <div class="flex items-center gap-2.5">
+                                    <div class="w-8 h-8 rounded-lg bg-purple-500/20 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
+                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h4 class="text-xs font-bold uppercase tracking-wider text-purple-800 dark:text-purple-200">
+                                            Засечено биометрично съвпадение / Потенциален близнак
+                                        </h4>
+                                        <p class="text-[11px] text-purple-700/80 dark:text-purple-300/80 mt-0.5">
+                                            Системата откри високо лицево сходство с вече регистриран студент.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span id="twinConflictDistanceBadge" class="text-xs px-2.5 py-1 rounded-full bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 font-mono font-bold border border-purple-500/30 shadow-xs">L2 Разстояние: -</span>
+                                </div>
+                            </div>
+
+                            <!-- COMPARISON CONTROLS & RESOLUTION ACTIONS -->
+                            <div class="flex flex-wrap items-center justify-between gap-3 pt-0.5">
+                                <!-- 2-BUTTON TOGGLE FOR MAIN VIEWPORT -->
+                                <div class="flex items-center gap-1.5 p-1 bg-[var(--bg-body)] rounded-[var(--radius)] border border-purple-500/30">
+                                    <span class="text-[10px] uppercase font-bold text-purple-700 dark:text-purple-300 px-2">Сравнение:</span>
+                                    <button id="twinCompareSelfiesBtn" type="button" class="px-3 py-1.5 rounded-[calc(var(--radius)-2px)] text-xs font-bold transition cursor-pointer flex items-center gap-1.5 bg-purple-600 text-white shadow-sm shadow-purple-500/30 border border-purple-500">
+                                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                        <span>Сравнение на селфита</span>
+                                    </button>
+                                    <button id="twinCompareBooksBtn" type="button" class="px-3 py-1.5 rounded-[calc(var(--radius)-2px)] text-xs font-bold transition cursor-pointer flex items-center gap-1.5 bg-[var(--bg-card)] hover:bg-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border)] font-semibold">
+                                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                                        <span>Сравнение на книжки</span>
+                                    </button>
+                                </div>
+
+                                <!-- RESOLUTION ACTION BUTTONS -->
+                                <div class="flex items-center gap-2">
+                                    <button id="rejectDuplicateBtn" type="button" class="px-3.5 py-2 rounded-[var(--radius)] bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-sm shadow-rose-500/20" title="Отхвърли дублиращата регистрация [R]">
+                                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                                        </svg>
+                                        <span>Отхвърли като дубликат</span>
+                                    </button>
+                                    <button id="approveTwinBtn" type="button" class="px-4 py-2 rounded-[var(--radius)] bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-sm shadow-purple-500/20" title="Потвърди независим профил за близнак [A]">
+                                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                                        </svg>
+                                        <span>Одобри като близнак</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- MAIN DUAL COMPARISON VIEWPORT (ADAPTS DYNAMICALLY TO NORMAL VS TWIN MODES) -->
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
-                            <!-- CARD 1: STUDENT BOOK (OFFICIAL DOCUMENT) -->
-                            <div class="border border-[var(--border)] rounded-[var(--radius)] p-3.5 bg-[var(--bg-body)] flex flex-col space-y-2.5">
+                            <!-- CARD 1: LEFT -->
+                            <div id="approvalCard1" class="border border-[var(--border)] rounded-[var(--radius)] p-3.5 bg-[var(--bg-body)] flex flex-col space-y-2.5">
                                 <div class="flex items-center justify-between">
                                     <div class="flex items-center gap-2">
-                                        <svg class="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
-                                        <span class="text-xs font-bold text-[var(--text-main)]">1. Студентска книжка (1-ва стр.)</span>
+                                        <svg id="approvalCard1Icon" class="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                                        <span id="approvalCard1Title" class="text-xs font-bold text-[var(--text-main)] truncate">1. Студентска книжка (1-ва стр.)</span>
                                     </div>
-                                    <div class="flex items-center gap-1.5">
+                                    <div class="flex items-center gap-1.5 shrink-0">
                                         <button id="rotateBookBtn" type="button" class="p-1 rounded hover:bg-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer" title="Завърти на 90°">
                                             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                                         </button>
-                                        <span class="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">Официален документ</span>
+                                        <span id="approvalCard1Badge" class="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">Официален документ</span>
                                     </div>
                                 </div>
 
@@ -1425,7 +1481,7 @@
                                         <p class="text-[11px] max-w-xs mx-auto">Студентът е регистриран преди въвеждането на двуснимковата верификация.</p>
                                     </div>
 
-                                    <!-- MAIN BOOK IMAGE -->
+                                    <!-- MAIN CARD 1 IMAGE -->
                                     <img id="approvalBookPhoto" alt="Студентска книжка" class="w-full h-auto object-contain max-h-[620px] transition-transform duration-200 cursor-pointer block rounded-[var(--radius)]" title="Задръжте мишката за лупа / Кликнете за пълен Zoom">
 
                                     <!-- FLOATING HOVER BADGE HINT -->
@@ -1434,31 +1490,46 @@
                                         <span>Лупа при посочване • Клик за Zoom</span>
                                     </div>
                                 </div>
-                                <p class="text-[11px] text-[var(--text-muted)] leading-tight">Проверете печата на деканата, факултетния номер и снимката на документа.</p>
+                                <p id="approvalCard1Caption" class="text-[11px] text-[var(--text-muted)] leading-tight">Проверете печата на деканата, факултетния номер и снимката на документа.</p>
                             </div>
 
-                            <!-- CARD 2: BIOMETRIC FACE PHOTO (SELFIE) -->
-                            <div class="border border-[var(--border)] rounded-[var(--radius)] p-3.5 bg-[var(--bg-body)] flex flex-col space-y-2.5">
+                            <!-- CARD 2: RIGHT -->
+                            <div id="approvalCard2" class="border border-[var(--border)] rounded-[var(--radius)] p-3.5 bg-[var(--bg-body)] flex flex-col space-y-2.5">
                                 <div class="flex items-center justify-between">
                                     <div class="flex items-center gap-2">
-                                        <svg class="w-4 h-4 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                        <span class="text-xs font-bold text-[var(--text-main)]">2. Биометрична лицева снимка</span>
+                                        <svg id="approvalCard2Icon" class="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                        <span id="approvalCard2Title" class="text-xs font-bold text-[var(--text-main)] truncate">2. Биометрична лицева снимка</span>
                                     </div>
-                                    <span class="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">Биометричен профил</span>
+                                    <div class="flex items-center gap-1.5 shrink-0">
+                                        <button id="rotateFaceBtn" type="button" class="p-1 rounded hover:bg-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer" title="Завърти на 90°">
+                                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                                        </button>
+                                        <span id="approvalCard2Badge" class="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">Биометричен профил</span>
+                                    </div>
                                 </div>
 
-                                <!-- PHOTO CONTAINER -->
-                                <div id="facePhotoContainer" class="relative group w-full min-h-[340px] rounded-[var(--radius)] border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden flex items-center justify-center select-none">
-                                    <!-- MAIN FACE IMAGE -->
-                                    <img id="approvalPhoto" alt="Преглед на студент" class="w-full h-auto object-cover max-h-[620px] cursor-pointer transition-transform duration-200 block rounded-[var(--radius)]" title="Кликнете за пълен Zoom">
+                                <!-- PHOTO CONTAINER WITH HOVER MAGNIFIER -->
+                                <div id="facePhotoContainer" class="relative group w-full min-h-[340px] rounded-[var(--radius)] border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden flex items-center justify-center cursor-crosshair select-none">
+                                    <!-- HOVER MAGNIFIER LOUPE LENS -->
+                                    <div id="faceLoupeLens" class="pointer-events-none absolute hidden w-36 h-36 rounded-full border-2 border-emerald-500 shadow-2xl bg-no-repeat z-30 ring-4 ring-black/30" style="display: none;"></div>
+
+                                    <!-- FALLBACK EMPTY -->
+                                    <div id="facePhotoEmptyNotice" class="hidden text-center p-6 space-y-2 text-xs text-[var(--text-muted)] py-12">
+                                        <svg class="w-8 h-8 mx-auto opacity-40 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                                        <p class="font-bold text-amber-700 dark:text-amber-400">Няма качена снимка</p>
+                                        <p class="text-[11px] max-w-xs mx-auto">Липсва изображение за този профил.</p>
+                                    </div>
+
+                                    <!-- MAIN CARD 2 IMAGE -->
+                                    <img id="approvalPhoto" alt="Преглед на студент" class="w-full h-auto object-contain max-h-[620px] cursor-pointer transition-transform duration-200 block rounded-[var(--radius)]" title="Задръжте мишката за лупа / Кликнете за пълен Zoom">
 
                                     <!-- FLOATING HOVER BADGE HINT -->
                                     <div class="absolute bottom-2 left-2 pointer-events-none opacity-80 group-hover:opacity-100 transition text-[10px] bg-slate-900/80 text-white px-2 py-0.5 rounded backdrop-blur-xs flex items-center gap-1">
                                         <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                                        <span>Клик за Zoom инспекция</span>
+                                        <span>Лупа при посочване • Клик за Zoom</span>
                                     </div>
                                 </div>
-                                <p class="text-[11px] text-[var(--text-muted)] leading-tight">Фронтално селфи без слънчеви очила и шапки за AI лицево разпознаване.</p>
+                                <p id="approvalCard2Caption" class="text-[11px] text-[var(--text-muted)] leading-tight">Фронтално селфи без слънчеви очила и шапки за AI лицево разпознаване.</p>
                             </div>
                         </div>
 
@@ -1468,15 +1539,15 @@
                             <div class="flex flex-wrap items-center gap-4">
                                 <label class="flex items-center gap-2 cursor-pointer select-none">
                                     <input type="checkbox" id="checkNamesMatch" class="rounded border-[var(--border)] text-emerald-600 focus:ring-emerald-500">
-                                    <span class="text-xs text-[var(--text-main)]">Имената и фак. № съвпадат</span>
+                                    <span id="checkNamesMatchLabel" class="text-xs text-[var(--text-main)]">Имената и фак. № съвпадат</span>
                                 </label>
                                 <label class="flex items-center gap-2 cursor-pointer select-none">
                                     <input type="checkbox" id="checkFacesMatch" class="rounded border-[var(--border)] text-emerald-600 focus:ring-emerald-500">
-                                    <span class="text-xs text-[var(--text-main)]">Лицето от книжката съответства на селфито</span>
+                                    <span id="checkFacesMatchLabel" class="text-xs text-[var(--text-main)]">Лицето от книжката съответства на селфито</span>
                                 </label>
                                 <label class="flex items-center gap-2 cursor-pointer select-none">
                                     <input type="checkbox" id="checkStampValid" class="rounded border-[var(--border)] text-emerald-600 focus:ring-emerald-500">
-                                    <span class="text-xs text-[var(--text-main)]">Печатът на ТУ е легитимен</span>
+                                    <span id="checkStampValidLabel" class="text-xs text-[var(--text-main)]">Печатът на ТУ е легитимен</span>
                                 </label>
                             </div>
                         </div>
@@ -2014,7 +2085,7 @@
                             </button>
                         </div>
                     </div>
-                    <p class="text-[11px] text-slate-400">Сравнение в реално време: Студентска книжка vs. Биометрично лице</p>
+                    <p id="zoomModalSubtitle" class="text-[11px] text-slate-400">Сравнение в реално време: Студентска книжка vs. Биометрично лице</p>
                 </div>
             </div>
 
@@ -2053,7 +2124,7 @@
             <div class="relative bg-black/50 border border-white/10 rounded-xl overflow-hidden flex flex-col">
                 <div class="absolute top-3 left-3 z-10 bg-slate-900/80 text-white text-xs px-2.5 py-1 rounded backdrop-blur-xs border border-white/10 flex items-center gap-1.5">
                     <span class="w-2 h-2 rounded-full bg-blue-400"></span>
-                    <span class="font-bold">Студентска книжка</span>
+                    <span id="zoomBookLabel" class="font-bold">Студентска книжка</span>
                 </div>
                 <div id="zoomBookViewport" class="flex-1 w-full h-full overflow-hidden flex items-center justify-center p-4">
                     <!-- EMPTY STATE FOR LEGACY STUDENTS -->
@@ -2070,7 +2141,7 @@
             <div class="relative bg-black/50 border border-white/10 rounded-xl overflow-hidden flex flex-col">
                 <div class="absolute top-3 left-3 z-10 bg-slate-900/80 text-white text-xs px-2.5 py-1 rounded backdrop-blur-xs border border-white/10 flex items-center gap-1.5">
                     <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-                    <span class="font-bold">Биометрично селфи</span>
+                    <span id="zoomFaceLabel" class="font-bold">Биометрично селфи</span>
                 </div>
                 <div id="zoomFaceViewport" class="flex-1 w-full h-full overflow-hidden flex items-center justify-center p-4">
                     <img id="zoomFaceImg" alt="Биометрично селфи (Zoom)" class="max-w-full max-h-full object-contain transition-transform duration-75 origin-center">
@@ -2086,11 +2157,11 @@
             <div class="flex items-center gap-2">
                 <button id="zoomModalRejectBtn" type="button" class="px-3 py-1.5 rounded bg-red-600/90 hover:bg-red-700 text-white text-xs font-bold transition cursor-pointer flex items-center gap-1 shadow-sm" title="Отхвърли този студент [R]">
                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                    <span>Отхвърли [R]</span>
+                    <span id="zoomModalRejectText">Отхвърли [R]</span>
                 </button>
                 <button id="zoomModalApproveBtn" type="button" class="px-3.5 py-1.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition cursor-pointer flex items-center gap-1 shadow-sm" title="Одобри и премини към следващия [A]">
                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                    <span>Одобри & Следващ [A]</span>
+                    <span id="zoomModalApproveText">Одобри & Следващ [A]</span>
                 </button>
             </div>
         </div>
@@ -2183,6 +2254,13 @@
                         <kbd class="px-2 py-1 rounded bg-[var(--bg-card)] border border-[var(--border)] font-mono font-bold text-[var(--text-main)]">Z</kbd>
                         <span class="text-[var(--text-muted)]">или</span>
                         <kbd class="px-2 py-1 rounded bg-[var(--bg-card)] border border-[var(--border)] font-mono font-bold text-[var(--text-main)]">Space</kbd>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between p-2 rounded bg-purple-500/10 border border-purple-500/30">
+                    <span class="font-medium text-purple-700 dark:text-purple-300">При конфликт: Селфита / Книжки</span>
+                    <div class="flex items-center gap-1">
+                        <kbd class="px-2 py-1 rounded bg-[var(--bg-card)] border border-purple-500/30 font-mono font-bold text-purple-600 dark:text-purple-400">S</kbd>
+                        <kbd class="px-2 py-1 rounded bg-[var(--bg-card)] border border-purple-500/30 font-mono font-bold text-purple-600 dark:text-purple-400">B</kbd>
                     </div>
                 </div>
                 <div class="flex items-center justify-between p-2 rounded bg-[var(--bg-body)] border border-[var(--border)]">
@@ -2332,6 +2410,12 @@
             allocationStudentSearch: '',
             allocationPage: 1,
             allocationPageSize: 10,
+            // Biometric Approval & Twin Conflict Inspection state
+            approvalBookRotation: 0,
+            approvalFaceRotation: 0,
+            approvalZoomLevel: 1.0,
+            approvalHighContrast: false,
+            approvalComparisonMode: 'selfies',
         };
 
         function formatBytes(bytes, decimals = 1) {
@@ -3925,16 +4009,31 @@
                 const isReviewing = btn.dataset.mode === 'reviewing';
                 const hasBook = Boolean(student.student_book_photo_url || student.student_book_photo_path);
 
+                const isConflict = student.status === 'PENDING_DUPLICATE_REVIEW' || Boolean(student.duplicate_flagged_student_id);
+
+                const cardBorder = isSelected && isReviewing
+                    ? (isConflict ? 'border-purple-500 ring-2 ring-purple-500/30 bg-purple-50/30 dark:bg-purple-950/30' : 'border-blue-500 ring-2 ring-blue-500/30 bg-blue-50/20 dark:bg-blue-500/10')
+                    : isSelected
+                        ? (isConflict ? 'border-purple-500/70 bg-purple-50/15 dark:bg-purple-950/20' : 'border-blue-500/70 bg-blue-50/10')
+                        : (isConflict ? 'border-purple-500/30 bg-purple-50/5 dark:bg-purple-950/10 hover:border-purple-400/60' : 'border-[var(--border)] hover:border-blue-400/50');
+
+                const avatarStyle = isSelected && isReviewing
+                    ? (isConflict ? 'bg-purple-600 text-white' : 'bg-blue-600 text-white')
+                    : (isConflict ? 'bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 border border-purple-500/30' : 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20');
+
                 return `
-                    <div class="pending-student-card border rounded-[var(--radius)] p-2.5 bg-[var(--bg-card)] transition cursor-pointer ${isSelected && isReviewing ? 'border-blue-500 ring-2 ring-blue-500/30 bg-blue-50/20 dark:bg-blue-500/10' : isSelected ? 'border-blue-500/70 bg-blue-50/10' : 'border-[var(--border)] hover:border-blue-400/50'}" data-index="${index}">
+                    <div class="pending-student-card border rounded-[var(--radius)] p-2.5 bg-[var(--bg-card)] transition cursor-pointer ${cardBorder}" data-index="${index}">
                         <div class="flex items-center gap-2.5">
-                            <div class="w-7 h-7 rounded-full ${isSelected && isReviewing ? 'bg-blue-600 text-white' : 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400'} font-bold text-[10px] flex items-center justify-center shrink-0 border border-blue-500/20">
+                            <div class="w-7 h-7 rounded-full ${avatarStyle} font-bold text-[10px] flex items-center justify-center shrink-0">
                                 ${escapeHtml(initials)}
                             </div>
                             <div class="min-w-0 flex-1">
                                 <div class="flex items-center justify-between gap-1">
                                     <p class="font-bold text-xs text-[var(--text-main)] truncate">${escapeHtml(student.full_name)}</p>
-                                    ${hasBook ? '<span class="text-[9px] text-blue-600 dark:text-blue-400 font-bold px-1 bg-blue-50 dark:bg-blue-500/10 rounded" title="Прикачена студентска книжка">📖 2/2</span>' : '<span class="text-[9px] text-amber-600 font-bold px-1 bg-amber-50 rounded" title="Липсва книжка (legacy)">1/2</span>'}
+                                    <div class="flex items-center gap-1 shrink-0">
+                                        ${isConflict ? '<span class="text-[9px] text-purple-600 dark:text-purple-400 font-bold px-1.5 py-0.5 bg-purple-50 dark:bg-purple-500/15 border border-purple-500/30 rounded" title="Засечено биометрично съвпадение / Потенциален близнак">⚠️ Конфликт</span>' : ''}
+                                        ${hasBook ? '<span class="text-[9px] text-blue-600 dark:text-blue-400 font-bold px-1 bg-blue-50 dark:bg-blue-500/10 rounded" title="Прикачена студентска книжка">📖 2/2</span>' : '<span class="text-[9px] text-amber-600 font-bold px-1 bg-amber-50 rounded" title="Липсва книжка (legacy)">1/2</span>'}
+                                    </div>
                                 </div>
                                 <p class="text-[11px] text-[var(--text-muted)] mt-0.5 font-mono truncate">${escapeHtml(student.student_id_number)} • ${escapeHtml(student.specialty || '')} • гр. ${escapeHtml(student.group || '')}</p>
                             </div>
@@ -3957,9 +4056,11 @@
 
         function renderCurrentApprovalItem() {
             const student = state.pendingQueue[state.queueIndex];
+            const dossier = document.getElementById('approvalDossierSection');
             const approvalPhoto = document.getElementById('approvalPhoto');
             const approvalBookPhoto = document.getElementById('approvalBookPhoto');
             const bookEmptyNotice = document.getElementById('bookPhotoEmptyNotice');
+            const faceEmptyNotice = document.getElementById('facePhotoEmptyNotice');
             const actionsDiv = document.getElementById('approvalActions');
             const startBtn = document.getElementById('startApprovalBtn');
             const facBadge = document.getElementById('approvalFacBadge');
@@ -3968,8 +4069,26 @@
             const nextBtn = document.getElementById('nextStudentBtn');
             const curIdxElem = document.getElementById('queueCurrentIndex');
             const totalCountElem = document.getElementById('queueTotalCount');
+            const twinCard = document.getElementById('twinConflictCard');
+            const standardApproveBtn = document.getElementById('approveBtn');
+            const standardRejectBtn = document.getElementById('rejectBtn');
+
+            const card1Title = document.getElementById('approvalCard1Title');
+            const card1Badge = document.getElementById('approvalCard1Badge');
+            const card1Caption = document.getElementById('approvalCard1Caption');
+            const card2Title = document.getElementById('approvalCard2Title');
+            const card2Badge = document.getElementById('approvalCard2Badge');
+            const card2Caption = document.getElementById('approvalCard2Caption');
+
+            const chk1Label = document.getElementById('checkNamesMatchLabel');
+            const chk2Label = document.getElementById('checkFacesMatchLabel');
+            const chk3Label = document.getElementById('checkStampValidLabel');
 
             if (!student) {
+                if (dossier) {
+                    dossier.classList.remove('bg-purple-950/10', 'dark:bg-purple-950/20', 'border-purple-500/40', 'ring-1', 'ring-purple-500/20');
+                    dossier.classList.add('bg-[var(--bg-card)]', 'border-[var(--border)]');
+                }
                 document.getElementById('approvalTitle').textContent = 'Няма повече студенти в опашката';
                 document.getElementById('approvalMeta').textContent = 'Опашката е празна.';
                 document.getElementById('approvalStudentNumber').textContent = '-';
@@ -3985,14 +4104,19 @@
                 if (curIdxElem) curIdxElem.textContent = '0';
                 if (totalCountElem) totalCountElem.textContent = '0';
                 
-                if (approvalPhoto) approvalPhoto.removeAttribute('src');
+                if (approvalPhoto) {
+                    approvalPhoto.removeAttribute('src');
+                    approvalPhoto.classList.add('hidden');
+                }
                 if (approvalBookPhoto) {
                     approvalBookPhoto.removeAttribute('src');
                     approvalBookPhoto.classList.add('hidden');
                 }
                 if (bookEmptyNotice) bookEmptyNotice.classList.add('hidden');
+                if (faceEmptyNotice) faceEmptyNotice.classList.add('hidden');
 
                 if (actionsDiv) actionsDiv.classList.add('hidden');
+                if (twinCard) twinCard.classList.add('hidden');
                 setStatus('База данни: Свързана');
                 return;
             }
@@ -4024,28 +4148,203 @@
             if (prevBtn) prevBtn.disabled = state.queueIndex <= 0;
             if (nextBtn) nextBtn.disabled = state.queueIndex >= state.pendingQueue.length - 1;
 
-            // Photos binding
-            approvalPhoto.src = student.photo_url ? `${student.photo_url}?token=${adminToken}` : '';
-
+            // Reset image rotations and styles
             state.approvalBookRotation = 0;
+            state.approvalFaceRotation = 0;
             if (approvalBookPhoto) approvalBookPhoto.style.transform = 'rotate(0deg)';
+            if (approvalPhoto) approvalPhoto.style.transform = 'rotate(0deg)';
 
-            if (student.student_book_photo_url) {
-                approvalBookPhoto.src = `${student.student_book_photo_url}?token=${adminToken}`;
-                approvalBookPhoto.classList.remove('hidden');
-                if (bookEmptyNotice) bookEmptyNotice.classList.add('hidden');
+            const isConflict = student.status === 'PENDING_DUPLICATE_REVIEW' || Boolean(student.duplicate_flagged_student_id);
+            const flagged = student.duplicate_flagged_student;
+
+            if (isConflict) {
+                // Cohesive Purple Theme for conflict inspection
+                if (dossier) {
+                    dossier.classList.remove('bg-[var(--bg-card)]', 'border-[var(--border)]');
+                    dossier.classList.add('bg-purple-950/10', 'dark:bg-purple-950/20', 'border-purple-500/40', 'ring-1', 'ring-purple-500/20');
+                }
+
                 if (bookBadge) {
-                    bookBadge.textContent = 'Наличен документ';
-                    bookBadge.className = 'inline-block font-bold text-[10px] px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 mt-0.5';
+                    bookBadge.textContent = 'Засечен конфликт';
+                    bookBadge.className = 'inline-block font-bold text-[10px] px-2 py-0.5 rounded bg-purple-50 dark:bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30 mt-0.5';
+                }
+
+                // Show twin conflict warning & comparison bar
+                if (twinCard) {
+                    twinCard.classList.remove('hidden');
+
+                    const distBadge = document.getElementById('twinConflictDistanceBadge');
+                    if (distBadge) {
+                        const distVal = student.duplicate_similarity_distance;
+                        distBadge.textContent = distVal != null
+                            ? `L2 Разстояние: ${Number(distVal).toFixed(3)} (< 0.42)`
+                            : 'L2 Разстояние: Засечено (< 0.42)';
+                    }
+                }
+
+                // Hide generic approve/reject buttons in header to avoid duplicates
+                if (standardApproveBtn) standardApproveBtn.classList.add('hidden');
+                if (standardRejectBtn) standardRejectBtn.classList.add('hidden');
+
+                // Dynamic checklist labels for twin conflict
+                if (chk1Label) chk1Label.textContent = 'Фак. номера са различни (двама отделни студенти)';
+                if (chk2Label) chk2Label.textContent = 'Снимките в книжките/селфитата са на две отделни лица';
+                if (chk3Label) chk3Label.textContent = 'Печатите и подписите в книжките са автентични';
+
+                // Comparison toggle button styling
+                const selfiesBtn = document.getElementById('twinCompareSelfiesBtn');
+                const booksBtn = document.getElementById('twinCompareBooksBtn');
+                const activeCls = 'bg-purple-600 text-white shadow-sm shadow-purple-500/30 font-bold border border-purple-500';
+                const inactiveCls = 'bg-[var(--bg-card)] hover:bg-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border)] font-semibold';
+
+                if (state.approvalComparisonMode === 'books') {
+                    if (booksBtn) booksBtn.className = `px-3 py-1.5 rounded-[calc(var(--radius)-2px)] text-xs transition cursor-pointer flex items-center gap-1.5 ${activeCls}`;
+                    if (selfiesBtn) selfiesBtn.className = `px-3 py-1.5 rounded-[calc(var(--radius)-2px)] text-xs transition cursor-pointer flex items-center gap-1.5 ${inactiveCls}`;
+
+                    // CARD 1: Candidate Student Book
+                    if (card1Title) card1Title.textContent = `Книжка: ${student.full_name}`;
+                    if (card1Badge) {
+                        card1Badge.textContent = 'Кандидат за регистрация';
+                        card1Badge.className = 'text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20';
+                    }
+                    if (card1Caption) card1Caption.textContent = `Фак. № ${student.student_id_number} • Проверете печата на деканата и снимката в книжката.`;
+
+                    if (student.student_book_photo_url) {
+                        approvalBookPhoto.src = `${student.student_book_photo_url}?token=${adminToken}`;
+                        approvalBookPhoto.classList.remove('hidden');
+                        if (bookEmptyNotice) bookEmptyNotice.classList.add('hidden');
+                    } else {
+                        approvalBookPhoto.removeAttribute('src');
+                        approvalBookPhoto.classList.add('hidden');
+                        if (bookEmptyNotice) bookEmptyNotice.classList.remove('hidden');
+                    }
+
+                    // CARD 2: Registered Student Book
+                    if (card2Title) card2Title.textContent = `Книжка: ${flagged?.full_name || 'Вече регистриран студент'}`;
+                    if (card2Badge) {
+                        card2Badge.textContent = 'Вече регистриран студент';
+                        card2Badge.className = 'text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20';
+                    }
+                    if (card2Caption) card2Caption.textContent = `Фак. № ${flagged?.student_id_number || '-'} • Сравнете печата на деканата и снимката в книжката.`;
+
+                    if (flagged?.student_book_photo_url) {
+                        approvalPhoto.src = `${flagged.student_book_photo_url}?token=${adminToken}`;
+                        approvalPhoto.classList.remove('hidden');
+                        if (faceEmptyNotice) faceEmptyNotice.classList.add('hidden');
+                    } else {
+                        approvalPhoto.removeAttribute('src');
+                        approvalPhoto.classList.add('hidden');
+                        if (faceEmptyNotice) {
+                            faceEmptyNotice.classList.remove('hidden');
+                            const faceNoticeTitle = faceEmptyNotice.querySelector('p.font-bold');
+                            const faceNoticeSub = faceEmptyNotice.querySelector('p.text-\\[11px\\]');
+                            if (faceNoticeTitle) faceNoticeTitle.textContent = 'Няма студентска книжка';
+                            if (faceNoticeSub) faceNoticeSub.textContent = flagged ? 'Вече регистрираният студент няма прикачена книжка (Legacy профил).' : 'Няма свързан конфликтен профил в базата данни.';
+                        }
+                    }
+                } else {
+                    // MODE: selfies (default)
+                    state.approvalComparisonMode = 'selfies';
+                    if (selfiesBtn) selfiesBtn.className = `px-3 py-1.5 rounded-[calc(var(--radius)-2px)] text-xs transition cursor-pointer flex items-center gap-1.5 ${activeCls}`;
+                    if (booksBtn) booksBtn.className = `px-3 py-1.5 rounded-[calc(var(--radius)-2px)] text-xs transition cursor-pointer flex items-center gap-1.5 ${inactiveCls}`;
+
+                    // CARD 1: Candidate Selfie
+                    if (card1Title) card1Title.textContent = `Селфи: ${student.full_name}`;
+                    if (card1Badge) {
+                        card1Badge.textContent = 'Кандидат за регистрация';
+                        card1Badge.className = 'text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20';
+                    }
+                    if (card1Caption) card1Caption.textContent = `Фак. № ${student.student_id_number} • ${student.specialty || '-'} (гр. ${student.group || '-'})`;
+
+                    if (student.photo_url) {
+                        approvalBookPhoto.src = `${student.photo_url}?token=${adminToken}`;
+                        approvalBookPhoto.classList.remove('hidden');
+                        if (bookEmptyNotice) bookEmptyNotice.classList.add('hidden');
+                    } else {
+                        approvalBookPhoto.removeAttribute('src');
+                        approvalBookPhoto.classList.add('hidden');
+                        if (bookEmptyNotice) bookEmptyNotice.classList.remove('hidden');
+                    }
+
+                    // CARD 2: Registered Student Selfie
+                    if (card2Title) card2Title.textContent = `Селфи: ${flagged?.full_name || 'Вече регистриран студент'}`;
+                    if (card2Badge) {
+                        card2Badge.textContent = 'Вече регистриран студент';
+                        card2Badge.className = 'text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20';
+                    }
+                    if (card2Caption) card2Caption.textContent = `Фак. № ${flagged?.student_id_number || '-'} • ${flagged?.specialty || '-'} (гр. ${flagged?.group || '-'})`;
+
+                    if (flagged?.photo_url) {
+                        approvalPhoto.src = `${flagged.photo_url}?token=${adminToken}`;
+                        approvalPhoto.classList.remove('hidden');
+                        if (faceEmptyNotice) faceEmptyNotice.classList.add('hidden');
+                    } else {
+                        approvalPhoto.removeAttribute('src');
+                        approvalPhoto.classList.add('hidden');
+                        if (faceEmptyNotice) {
+                            faceEmptyNotice.classList.remove('hidden');
+                            const faceNoticeTitle = faceEmptyNotice.querySelector('p.font-bold');
+                            const faceNoticeSub = faceEmptyNotice.querySelector('p.text-\\[11px\\]');
+                            if (faceNoticeTitle) faceNoticeTitle.textContent = 'Няма селфи снимка';
+                            if (faceNoticeSub) faceNoticeSub.textContent = flagged ? 'Липсва лицева снимка за регистрирания профил.' : 'Няма свързан конфликтен профил в базата данни.';
+                        }
+                    }
                 }
             } else {
-                approvalBookPhoto.removeAttribute('src');
-                approvalBookPhoto.classList.add('hidden');
-                if (bookEmptyNotice) bookEmptyNotice.classList.remove('hidden');
-                if (bookBadge) {
-                    bookBadge.textContent = 'Липсва книжка (Legacy)';
-                    bookBadge.className = 'inline-block font-bold text-[10px] px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 mt-0.5';
+                // NORMAL APPROVAL MODE (REGULAR STUDENT)
+                if (dossier) {
+                    dossier.classList.remove('bg-purple-950/10', 'dark:bg-purple-950/20', 'border-purple-500/40', 'ring-1', 'ring-purple-500/20');
+                    dossier.classList.add('bg-[var(--bg-card)]', 'border-[var(--border)]');
                 }
+
+                if (twinCard) twinCard.classList.add('hidden');
+
+                // Restore generic approve/reject buttons in header
+                if (standardApproveBtn) standardApproveBtn.classList.remove('hidden');
+                if (standardRejectBtn) standardRejectBtn.classList.remove('hidden');
+
+                // Standard checklist labels
+                if (chk1Label) chk1Label.textContent = 'Имената и фак. № съвпадат';
+                if (chk2Label) chk2Label.textContent = 'Лицето от книжката съответства на селфито';
+                if (chk3Label) chk3Label.textContent = 'Печатът на ТУ е легитимен';
+
+                // CARD 1: Student Book
+                if (card1Title) card1Title.textContent = '1. Студентска книжка (1-ва стр.)';
+                if (card1Badge) {
+                    card1Badge.textContent = 'Официален документ';
+                    card1Badge.className = 'text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20';
+                }
+                if (card1Caption) card1Caption.textContent = 'Проверете печата на деканата, факултетния номер и снимката на документа.';
+
+                if (student.student_book_photo_url) {
+                    approvalBookPhoto.src = `${student.student_book_photo_url}?token=${adminToken}`;
+                    approvalBookPhoto.classList.remove('hidden');
+                    if (bookEmptyNotice) bookEmptyNotice.classList.add('hidden');
+                    if (bookBadge) {
+                        bookBadge.textContent = 'Наличен документ';
+                        bookBadge.className = 'inline-block font-bold text-[10px] px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 mt-0.5';
+                    }
+                } else {
+                    approvalBookPhoto.removeAttribute('src');
+                    approvalBookPhoto.classList.add('hidden');
+                    if (bookEmptyNotice) bookEmptyNotice.classList.remove('hidden');
+                    if (bookBadge) {
+                        bookBadge.textContent = 'Липсва книжка (Legacy)';
+                        bookBadge.className = 'inline-block font-bold text-[10px] px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 mt-0.5';
+                    }
+                }
+
+                // CARD 2: Biometric Face Photo (Selfie)
+                if (card2Title) card2Title.textContent = '2. Биометрична лицева снимка';
+                if (card2Badge) {
+                    card2Badge.textContent = 'Биометричен профил';
+                    card2Badge.className = 'text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20';
+                }
+                if (card2Caption) card2Caption.textContent = 'Фронтално селфи без слънчеви очила и шапки за AI лицево разпознаване.';
+
+                approvalPhoto.src = student.photo_url ? `${student.photo_url}?token=${adminToken}` : '';
+                approvalPhoto.classList.remove('hidden');
+                if (faceEmptyNotice) faceEmptyNotice.classList.add('hidden');
             }
 
             // Reset checklist checkboxes
@@ -4756,7 +5055,7 @@
                                 <p class="font-bold text-sm">Готови за създаване на ${readyCount} нови студентски регистрации!</p>
                                 <p class="text-xs mt-1 leading-relaxed">
                                     Ще бъдат разпределени <strong>${uniqueStudents} одобрени студенти</strong> към техните семестриални изпити в <strong>${affectedExams} зали</strong>.
-                                    ${pendingBio > 0 ? `<br><span class="text-[11px] text-amber-700 dark:text-amber-300 font-medium">⚠️ Забележка: Други ${pendingBio} студенти ще бъдат пропуснати, тъй като нямат одобрена биометрия.</span>` : ''}
+                                    ${pendingBio > 0 ? `<br><span class="text-[11px] text-amber-700 dark:text-amber-300 font-medium">Забележка: Други ${pendingBio} студенти ще бъдат пропуснати, тъй като нямат одобрена биометрия.</span>` : ''}
                                 </p>
                             </div>
                         `;
@@ -5145,6 +5444,115 @@
             }
         }
 
+        async function executeTwinApproval() {
+            const student = state.pendingQueue[state.queueIndex];
+            if (!student) return;
+
+            const btn = document.getElementById('approveTwinBtn');
+            if (btn) {
+                btn.disabled = true;
+                btn.classList.add('opacity-60', 'pointer-events-none');
+                btn.innerHTML = `
+                    <svg class="animate-spin h-3.5 w-3.5 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Анализиране и одобряване...</span>
+                `;
+            }
+
+            try {
+                const response = await authFetch(`/admins/approve-twin/${student.id}`, { method: 'POST' });
+                const data = await response.json();
+
+                if (response.ok) {
+                    showToast(data.message || `Студент ${student.full_name} е одобрен като близнак (изключение по чл. 22 GDPR)!`, 'success');
+                    await loadDashboardData();
+                    const remaining = state.data?.pending_students?.length || 0;
+
+                    if (remaining === 0) {
+                        state.queueIndex = 0;
+                        renderPendingStudents();
+                        renderCurrentApprovalItem();
+                        showToast('Всички чакащи студенти са обработени!', 'info');
+                        return;
+                    }
+
+                    if (state.queueIndex >= remaining) {
+                        state.queueIndex = Math.max(0, remaining - 1);
+                    }
+                    renderPendingStudents();
+                    renderCurrentApprovalItem();
+                } else {
+                    showToast(`Грешка при одобрение на близнак: ${data.detail || 'Неуспешна операция.'}`, 'error');
+                }
+            } catch (err) {
+                console.error("Грешка при одобрение на близнак:", err);
+                showToast('Критична грешка при връзка със сървъра.', 'error');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.classList.remove('opacity-60', 'pointer-events-none');
+                    btn.innerHTML = `
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                        </svg>
+                        <span>Одобри като близнак</span>
+                    `;
+                }
+            }
+        }
+
+        async function executeDuplicateRejection() {
+            const student = state.pendingQueue[state.queueIndex];
+            if (!student) return;
+
+            const btn = document.getElementById('rejectDuplicateBtn');
+            if (btn) {
+                btn.disabled = true;
+                btn.classList.add('opacity-60', 'pointer-events-none');
+            }
+
+            try {
+                const response = await authFetch(`/admins/reject-duplicate/${student.id}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reason: 'Отхвърлена дублираща/нелегитимна регистрация (биометрично съвпадение с друг студент).' }),
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    showToast(data.message || `Студент ${student.full_name} е отхвърлен като дубликат.`, 'success');
+                    await loadDashboardData();
+                    const remaining = state.data?.pending_students?.length || 0;
+
+                    if (remaining === 0) {
+                        state.queueIndex = 0;
+                        renderPendingStudents();
+                        renderCurrentApprovalItem();
+                        showToast('Всички чакащи студенти са обработени!', 'info');
+                        return;
+                    }
+
+                    if (state.queueIndex >= remaining) {
+                        state.queueIndex = Math.max(0, remaining - 1);
+                    }
+                    renderPendingStudents();
+                    renderCurrentApprovalItem();
+                } else {
+                    showToast(`Грешка при отхвърляне на дубликат: ${data.detail || 'Неуспешна операция.'}`, 'error');
+                }
+            } catch (err) {
+                console.error("Грешка при отхвърляне на дубликат:", err);
+                showToast('Критична грешка при връзка със сървъра.', 'error');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.classList.remove('opacity-60', 'pointer-events-none');
+                }
+            }
+        }
+
         // ===============================================
         // ZOOM / INSPECTION MODAL & HOVER LOUPE ENGINE
         // ===============================================
@@ -5153,6 +5561,51 @@
             const container = document.getElementById('bookPhotoContainer');
             const img = document.getElementById('approvalBookPhoto');
             const lens = document.getElementById('bookLoupeLens');
+            if (!container || !img || !lens) return;
+
+            container.addEventListener('mouseenter', () => {
+                if (!img.src || img.classList.contains('hidden')) return;
+                lens.style.display = 'block';
+                lens.style.backgroundImage = `url("${img.src}")`;
+            });
+
+            container.addEventListener('mouseleave', () => {
+                lens.style.display = 'none';
+            });
+
+            container.addEventListener('mousemove', (e) => {
+                if (!img.src || img.classList.contains('hidden') || lens.style.display === 'none') return;
+                
+                const rect = img.getBoundingClientRect();
+                const containerRect = container.getBoundingClientRect();
+                
+                const lensWidth = lens.offsetWidth || 144;
+                const lensHeight = lens.offsetHeight || 144;
+                
+                let mouseX = e.clientX - containerRect.left;
+                let mouseY = e.clientY - containerRect.top;
+                
+                let lensLeft = mouseX - lensWidth / 2;
+                let lensTop = mouseY - lensHeight / 2;
+                
+                lens.style.left = `${lensLeft}px`;
+                lens.style.top = `${lensTop}px`;
+                
+                const imgX = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+                const imgY = Math.max(0, Math.min(e.clientY - rect.top, rect.height));
+                
+                const zoomFactor = 2.6;
+                lens.style.backgroundSize = `${rect.width * zoomFactor}px ${rect.height * zoomFactor}px`;
+                const bgX = (imgX * zoomFactor) - (lensWidth / 2);
+                const bgY = (imgY * zoomFactor) - (lensHeight / 2);
+                lens.style.backgroundPosition = `-${bgX}px -${bgY}px`;
+            });
+        }
+
+        function initFaceHoverMagnifier() {
+            const container = document.getElementById('facePhotoContainer');
+            const img = document.getElementById('approvalPhoto');
+            const lens = document.getElementById('faceLoupeLens');
             if (!container || !img || !lens) return;
 
             container.addEventListener('mouseenter', () => {
@@ -5203,12 +5656,22 @@
 
             const nameElem = document.getElementById('zoomModalStudentName');
             const facElem = document.getElementById('zoomModalStudentFac');
+            const subtitleElem = document.getElementById('zoomModalSubtitle');
             const bookImg = document.getElementById('zoomBookImg');
             const faceImg = document.getElementById('zoomFaceImg');
             const emptyNotice = document.getElementById('zoomBookEmptyNotice');
             const counter = document.getElementById('zoomModalQueueCounter');
             const prevBtn = document.getElementById('zoomModalPrevBtn');
             const nextBtn = document.getElementById('zoomModalNextBtn');
+            const bookLabel = document.getElementById('zoomBookLabel');
+            const faceLabel = document.getElementById('zoomFaceLabel');
+            const approveText = document.getElementById('zoomModalApproveText');
+            const rejectText = document.getElementById('zoomModalRejectText');
+            const approveBtn = document.getElementById('zoomModalApproveBtn');
+            const rejectBtn = document.getElementById('zoomModalRejectBtn');
+
+            const isConflict = student.status === 'PENDING_DUPLICATE_REVIEW' || Boolean(student.duplicate_flagged_student_id);
+            const flagged = student.duplicate_flagged_student;
 
             if (nameElem) nameElem.textContent = student.full_name;
             if (facElem) facElem.textContent = `(Фак. № ${student.student_id_number})`;
@@ -5216,22 +5679,73 @@
             if (prevBtn) prevBtn.disabled = state.queueIndex <= 0;
             if (nextBtn) nextBtn.disabled = state.queueIndex >= state.pendingQueue.length - 1;
 
-            if (student.student_book_photo_url) {
-                if (bookImg) {
-                    bookImg.src = `${student.student_book_photo_url}?token=${adminToken}`;
-                    bookImg.classList.remove('hidden');
-                }
-                if (emptyNotice) emptyNotice.classList.add('hidden');
-            } else {
-                if (bookImg) {
-                    bookImg.src = '';
-                    bookImg.classList.add('hidden');
-                }
-                if (emptyNotice) emptyNotice.classList.remove('hidden');
-            }
+            if (isConflict) {
+                if (approveText) approveText.textContent = 'Одобри като близнак [A]';
+                if (rejectText) rejectText.textContent = 'Отхвърли като дубликат [R]';
+                if (approveBtn) approveBtn.className = 'px-3.5 py-1.5 rounded bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition cursor-pointer flex items-center gap-1 shadow-sm';
+                if (rejectBtn) rejectBtn.className = 'px-3 py-1.5 rounded bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition cursor-pointer flex items-center gap-1 shadow-sm';
 
-            if (faceImg) {
-                faceImg.src = student.photo_url ? `${student.photo_url}?token=${adminToken}` : '';
+                if (state.approvalComparisonMode === 'books') {
+                    if (subtitleElem) subtitleElem.textContent = 'Сравнение на студентски книжки: Кандидат vs. Вече регистриран студент';
+                    if (bookLabel) bookLabel.textContent = `Книжка: ${student.full_name} (${student.student_id_number})`;
+                    if (faceLabel) faceLabel.textContent = `Книжка: ${flagged?.full_name || 'Регистриран'} (${flagged?.student_id_number || '-'})`;
+
+                    if (student.student_book_photo_url) {
+                        if (bookImg) {
+                            bookImg.src = `${student.student_book_photo_url}?token=${adminToken}`;
+                            bookImg.classList.remove('hidden');
+                        }
+                        if (emptyNotice) emptyNotice.classList.add('hidden');
+                    } else {
+                        if (bookImg) { bookImg.src = ''; bookImg.classList.add('hidden'); }
+                        if (emptyNotice) emptyNotice.classList.remove('hidden');
+                    }
+
+                    if (faceImg) {
+                        faceImg.src = flagged?.student_book_photo_url ? `${flagged.student_book_photo_url}?token=${adminToken}` : '';
+                    }
+                } else {
+                    // selfies
+                    if (subtitleElem) subtitleElem.textContent = 'Сравнение на селфита: Кандидат vs. Вече регистриран студент';
+                    if (bookLabel) bookLabel.textContent = `Селфи: ${student.full_name} (${student.student_id_number})`;
+                    if (faceLabel) faceLabel.textContent = `Селфи: ${flagged?.full_name || 'Регистриран'} (${flagged?.student_id_number || '-'})`;
+
+                    if (bookImg) {
+                        bookImg.src = student.photo_url ? `${student.photo_url}?token=${adminToken}` : '';
+                        bookImg.classList.remove('hidden');
+                    }
+                    if (emptyNotice) emptyNotice.classList.add('hidden');
+
+                    if (faceImg) {
+                        faceImg.src = flagged?.photo_url ? `${flagged.photo_url}?token=${adminToken}` : '';
+                    }
+                }
+            } else {
+                if (approveText) approveText.textContent = 'Одобри & Следващ [A]';
+                if (rejectText) rejectText.textContent = 'Отхвърли [R]';
+                if (approveBtn) approveBtn.className = 'px-3.5 py-1.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition cursor-pointer flex items-center gap-1 shadow-sm';
+                if (rejectBtn) rejectBtn.className = 'px-3 py-1.5 rounded bg-red-600/90 hover:bg-red-700 text-white text-xs font-bold transition cursor-pointer flex items-center gap-1 shadow-sm';
+                if (subtitleElem) subtitleElem.textContent = 'Сравнение в реално време: Студентска книжка vs. Биометрично лице';
+                if (bookLabel) bookLabel.textContent = 'Студентска книжка';
+                if (faceLabel) faceLabel.textContent = 'Биометрично селфи';
+
+                if (student.student_book_photo_url) {
+                    if (bookImg) {
+                        bookImg.src = `${student.student_book_photo_url}?token=${adminToken}`;
+                        bookImg.classList.remove('hidden');
+                    }
+                    if (emptyNotice) emptyNotice.classList.add('hidden');
+                } else {
+                    if (bookImg) {
+                        bookImg.src = '';
+                        bookImg.classList.add('hidden');
+                    }
+                    if (emptyNotice) emptyNotice.classList.remove('hidden');
+                }
+
+                if (faceImg) {
+                    faceImg.src = student.photo_url ? `${student.photo_url}?token=${adminToken}` : '';
+                }
             }
 
             updateZoomTransform();
@@ -5244,6 +5758,7 @@
             const modal = document.getElementById('photoZoomModal');
             state.approvalZoomLevel = 1.0;
             state.approvalBookRotation = 0;
+            state.approvalFaceRotation = 0;
             state.approvalHighContrast = false;
             
             updatePhotoZoomModalContent();
@@ -5270,7 +5785,7 @@
                 bookImg.style.filter = contrastFilter;
             }
             if (faceImg) {
-                faceImg.style.transform = `scale(${state.approvalZoomLevel})`;
+                faceImg.style.transform = `scale(${state.approvalZoomLevel}) rotate(${state.approvalFaceRotation || 0}deg)`;
                 faceImg.style.filter = contrastFilter;
             }
         }
@@ -5340,6 +5855,9 @@
 
                 // Modal-specific hotkeys
                 if (isZoomOpen) {
+                    const currentStudent = state.pendingQueue[state.queueIndex];
+                    const isConflict = currentStudent && (currentStudent.status === 'PENDING_DUPLICATE_REVIEW' || Boolean(currentStudent.duplicate_flagged_student_id));
+
                     if (e.key === '+' || e.key === '=') {
                         e.preventDefault();
                         state.approvalZoomLevel = Math.min(3.5, state.approvalZoomLevel + 0.25);
@@ -5354,7 +5872,12 @@
                         updateZoomTransform();
                     } else if (e.key.toLowerCase() === 'r') {
                         e.preventDefault();
-                        openRejectionModal();
+                        if (isConflict) {
+                            closePhotoZoomModal();
+                            executeDuplicateRejection();
+                        } else {
+                            openRejectionModal();
+                        }
                     } else if (e.key.toLowerCase() === 'c') {
                         e.preventDefault();
                         state.approvalHighContrast = !state.approvalHighContrast;
@@ -5362,10 +5885,26 @@
                     } else if (e.key.toLowerCase() === 'w' || e.key.toLowerCase() === 't') {
                         e.preventDefault();
                         state.approvalBookRotation = (state.approvalBookRotation + 90) % 360;
+                        state.approvalFaceRotation = ((state.approvalFaceRotation || 0) + 90) % 360;
                         updateZoomTransform();
                     } else if (e.key.toLowerCase() === 'a' || e.key === 'Enter') {
                         e.preventDefault();
-                        executeStudentApproval();
+                        if (isConflict) {
+                            closePhotoZoomModal();
+                            executeTwinApproval();
+                        } else {
+                            executeStudentApproval();
+                        }
+                    } else if (isConflict && e.key.toLowerCase() === 's') {
+                        e.preventDefault();
+                        state.approvalComparisonMode = 'selfies';
+                        renderCurrentApprovalItem();
+                        updatePhotoZoomModalContent();
+                    } else if (isConflict && e.key.toLowerCase() === 'b') {
+                        e.preventDefault();
+                        state.approvalComparisonMode = 'books';
+                        renderCurrentApprovalItem();
+                        updatePhotoZoomModalContent();
                     } else if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'j') {
                         e.preventDefault();
                         if (state.queueIndex > 0) {
@@ -5395,13 +5934,34 @@
                     return;
                 }
 
+                const currentStudent = state.pendingQueue[state.queueIndex];
+                const isConflict = currentStudent && (currentStudent.status === 'PENDING_DUPLICATE_REVIEW' || Boolean(currentStudent.duplicate_flagged_student_id));
+
                 // Main approval panel shortcuts
                 if (e.key.toLowerCase() === 'a' || e.key === 'Enter') {
                     e.preventDefault();
-                    executeStudentApproval();
+                    if (isConflict) {
+                        executeTwinApproval();
+                    } else {
+                        executeStudentApproval();
+                    }
                 } else if (e.key.toLowerCase() === 'r') {
                     e.preventDefault();
-                    openRejectionModal();
+                    if (isConflict) {
+                        executeDuplicateRejection();
+                    } else {
+                        openRejectionModal();
+                    }
+                } else if (isConflict && e.key.toLowerCase() === 's') {
+                    e.preventDefault();
+                    state.approvalComparisonMode = 'selfies';
+                    renderCurrentApprovalItem();
+                    if (!document.getElementById('photoZoomModal')?.classList.contains('hidden')) updatePhotoZoomModalContent();
+                } else if (isConflict && e.key.toLowerCase() === 'b') {
+                    e.preventDefault();
+                    state.approvalComparisonMode = 'books';
+                    renderCurrentApprovalItem();
+                    if (!document.getElementById('photoZoomModal')?.classList.contains('hidden')) updatePhotoZoomModalContent();
                 } else if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'j') {
                     e.preventDefault();
                     if (state.queueIndex > 0) {
@@ -5430,8 +5990,40 @@
         // WIRE APPROVAL EVENTS
         // ===============================================
         document.getElementById('approveBtn')?.addEventListener('click', executeStudentApproval);
-        document.getElementById('zoomModalApproveBtn')?.addEventListener('click', executeStudentApproval);
-        document.getElementById('zoomModalRejectBtn')?.addEventListener('click', openRejectionModal);
+        document.getElementById('approveTwinBtn')?.addEventListener('click', executeTwinApproval);
+        document.getElementById('rejectDuplicateBtn')?.addEventListener('click', executeDuplicateRejection);
+        document.getElementById('zoomModalApproveBtn')?.addEventListener('click', () => {
+            const student = state.pendingQueue[state.queueIndex];
+            const isConflict = student && (student.status === 'PENDING_DUPLICATE_REVIEW' || Boolean(student.duplicate_flagged_student_id));
+            if (isConflict) {
+                closePhotoZoomModal();
+                executeTwinApproval();
+            } else {
+                executeStudentApproval();
+            }
+        });
+        document.getElementById('zoomModalRejectBtn')?.addEventListener('click', () => {
+            const student = state.pendingQueue[state.queueIndex];
+            const isConflict = student && (student.status === 'PENDING_DUPLICATE_REVIEW' || Boolean(student.duplicate_flagged_student_id));
+            if (isConflict) {
+                closePhotoZoomModal();
+                executeDuplicateRejection();
+            } else {
+                openRejectionModal();
+            }
+        });
+
+        // Twin comparison toggle buttons
+        document.getElementById('twinCompareSelfiesBtn')?.addEventListener('click', () => {
+            state.approvalComparisonMode = 'selfies';
+            renderCurrentApprovalItem();
+            if (!document.getElementById('photoZoomModal')?.classList.contains('hidden')) updatePhotoZoomModalContent();
+        });
+        document.getElementById('twinCompareBooksBtn')?.addEventListener('click', () => {
+            state.approvalComparisonMode = 'books';
+            renderCurrentApprovalItem();
+            if (!document.getElementById('photoZoomModal')?.classList.contains('hidden')) updatePhotoZoomModalContent();
+        });
         document.getElementById('zoomModalPrevBtn')?.addEventListener('click', () => {
             if (state.queueIndex > 0) {
                 state.queueIndex -= 1;
@@ -5496,10 +6088,12 @@
         document.getElementById('zoomResetBtn')?.addEventListener('click', () => {
             state.approvalZoomLevel = 1.0;
             state.approvalBookRotation = 0;
+            state.approvalFaceRotation = 0;
             updateZoomTransform();
         });
         document.getElementById('zoomRotateBtn')?.addEventListener('click', () => {
             state.approvalBookRotation = (state.approvalBookRotation + 90) % 360;
+            state.approvalFaceRotation = ((state.approvalFaceRotation || 0) + 90) % 360;
             updateZoomTransform();
         });
         document.getElementById('zoomContrastBtn')?.addEventListener('click', () => {
@@ -5513,6 +6107,14 @@
             state.approvalBookRotation = (state.approvalBookRotation + 90) % 360;
             const bookImg = document.getElementById('approvalBookPhoto');
             if (bookImg) bookImg.style.transform = `rotate(${state.approvalBookRotation}deg)`;
+        });
+
+        // Rotate face in main card
+        document.getElementById('rotateFaceBtn')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            state.approvalFaceRotation = ((state.approvalFaceRotation || 0) + 90) % 360;
+            const faceImg = document.getElementById('approvalPhoto');
+            if (faceImg) faceImg.style.transform = `rotate(${state.approvalFaceRotation}deg)`;
         });
 
         // Prev / Next queue navigation
@@ -5552,6 +6154,7 @@
 
         // Initialize features
         initBookHoverMagnifier();
+        initFaceHoverMagnifier();
         initApprovalKeyboardShortcuts();
 
         document.getElementById('examinerForm')?.addEventListener('submit', async (event) => {
