@@ -256,6 +256,10 @@ async def fetch_frames_from_esp32(room_number: str, esp32_ip: str):
                             break
                             
                         bytes_buffer += chunk
+
+                        # Защита от препълване на буфера при изгубен байт на рамката по Wi-Fi
+                        if len(bytes_buffer) > 500_000:
+                            bytes_buffer = bytes_buffer[-100_000:]
                         
                         while True:
                             a = bytes_buffer.find(b'\xff\xd8')

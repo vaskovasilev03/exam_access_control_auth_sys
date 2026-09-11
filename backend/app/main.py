@@ -13,6 +13,7 @@ import cv2
 import numpy as np
 import requests
 import pandas as pd
+import httpx
 import fastapi
 from fastapi import FastAPI, Depends, Response, File, UploadFile, HTTPException, Form, APIRouter, BackgroundTasks, Query, Body
 from fastapi.responses import StreamingResponse, HTMLResponse, RedirectResponse
@@ -2242,6 +2243,33 @@ async def stream_exam_room(room_number: str, background_tasks: BackgroundTasks, 
         generate_from_memory(room_number),
         media_type="multipart/x-mixed-replace; boundary=frame"
     )
+
+@app.get("/api/v1/exams/{room_number}/raw-stream")
+async def get_raw_esp32_stream(
+    room_number: str,
+    token: Optional[str] = Query(None)
+):
+    """
+    Директен достъп до суровия MJPEG стрийм без изискване на токен.
+    Използва съществуващия високоскоростен канал от паметта, предотвратявайки
+    хардуерно блокиране на ESP32 DMA буферите при паралелни сокети.
+    """
+    if room_number not in ACTIVE_CAMERAS:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Няма регистрирана активна ESP32 камера за зала {room_number}."
+        )
+
+    esp32_ip = ACTIVE_CAMERAS[room_number]
+    if room_number not in CAMERA_TASKS or CAMERA_TASKS[room_number].done():
+        CAMERA_TASKS[room_number] = asyncio.create_task(fetch_frames_from_esp32(room_number, esp32_ip))
+
+    return StreamingResponse(
+        generate_from_memory(room_number),
+        media_type="multipart/x-mixed-replace; boundary=frame"
+    )
+
+
 # def get_room_live_stream(room_number: str):
 #     """
 #     Ендпоинт, който админ панелът (Frontend-а) може да зареди директно в един <img> таг!
@@ -3035,9 +3063,24 @@ async def register_camera(data: CameraRegisterSchema):
     """
     Автоматичен ендпоинт за ESP32 устройствата.
     При включване платката казва в коя зала се намира и какво IP е взела.
+    Поддържа и периодично сърцебиене (heartbeat) без прекъсване на активния стрийм.
     """
-    # При повторна регистрация прекратяваме старата задача (в случай че IP-то е сменено)
+    current_ip = ACTIVE_CAMERAS.get(data.room_number)
     old_task = CAMERA_TASKS.get(data.room_number)
+    task_alive = old_task and not old_task.done()
+
+    # Ако камерата вече е регистрирана със същото IP и фоновата задача работи нормално,
+    # не я рестартираме, а само обновяваме здравето и времето
+    if current_ip == data.esp32_ip and task_alive:
+        CAMERA_HEALTH[data.room_number]["last_frame_time"] = time.time()
+        CAMERA_HEALTH[data.room_number]["is_online"] = True
+        return {
+            "status": "already_active",
+            "room_number": data.room_number,
+            "esp32_ip": data.esp32_ip
+        }
+
+    # При промяна на IP или неактивна задача, прекратяваме старата задача
     if old_task and not old_task.done():
         old_task.cancel()
 
@@ -3055,6 +3098,7 @@ async def register_camera(data: CameraRegisterSchema):
         "room_number": data.room_number, 
         "esp32_ip": data.esp32_ip
     }
+
 
 @app.get("/api/v1/exams/{room_number}/camera-status")
 def get_exam_room_camera_status(room_number: str):
