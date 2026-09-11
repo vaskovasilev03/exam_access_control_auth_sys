@@ -1485,9 +1485,9 @@
                                     <img id="approvalBookPhoto" alt="Студентска книжка" class="w-full h-auto object-contain max-h-[620px] transition-transform duration-200 cursor-pointer block rounded-[var(--radius)]" title="Задръжте мишката за лупа / Кликнете за пълен Zoom">
 
                                     <!-- FLOATING HOVER BADGE HINT -->
-                                    <div class="absolute bottom-2 left-2 pointer-events-none opacity-80 group-hover:opacity-100 transition text-[10px] bg-slate-900/80 text-white px-2 py-0.5 rounded backdrop-blur-xs flex items-center gap-1">
+                                    <div id="card1HoverHint" class="absolute bottom-2 left-2 pointer-events-none opacity-80 group-hover:opacity-100 transition text-[10px] bg-slate-900/80 text-white px-2 py-0.5 rounded backdrop-blur-xs flex items-center gap-1">
                                         <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                                        <span>Лупа при посочване • Клик за Zoom</span>
+                                        <span id="card1HoverHintText">Лупа при посочване • Клик за Zoom</span>
                                     </div>
                                 </div>
                                 <p id="approvalCard1Caption" class="text-[11px] text-[var(--text-muted)] leading-tight">Проверете печата на деканата, факултетния номер и снимката на документа.</p>
@@ -1508,9 +1508,9 @@
                                     </div>
                                 </div>
 
-                                <!-- PHOTO CONTAINER WITH HOVER MAGNIFIER -->
-                                <div id="facePhotoContainer" class="relative group w-full min-h-[340px] rounded-[var(--radius)] border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden flex items-center justify-center cursor-crosshair select-none">
-                                    <!-- HOVER MAGNIFIER LOUPE LENS -->
+                                <!-- PHOTO CONTAINER (MAGNIFIER ACTIVE ONLY FOR DOCUMENTS) -->
+                                <div id="facePhotoContainer" class="relative group w-full min-h-[340px] rounded-[var(--radius)] border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden flex items-center justify-center cursor-pointer select-none">
+                                    <!-- HOVER MAGNIFIER LOUPE LENS (ACTIVE ONLY IN BOOKS COMPARISON MODE) -->
                                     <div id="faceLoupeLens" class="pointer-events-none absolute hidden w-36 h-36 rounded-full border-2 border-emerald-500 shadow-2xl bg-no-repeat z-30 ring-4 ring-black/30" style="display: none;"></div>
 
                                     <!-- FALLBACK EMPTY -->
@@ -1521,12 +1521,12 @@
                                     </div>
 
                                     <!-- MAIN CARD 2 IMAGE -->
-                                    <img id="approvalPhoto" alt="Преглед на студент" class="w-full h-auto object-contain max-h-[620px] cursor-pointer transition-transform duration-200 block rounded-[var(--radius)]" title="Задръжте мишката за лупа / Кликнете за пълен Zoom">
+                                    <img id="approvalPhoto" alt="Преглед на студент" class="w-full h-auto object-contain max-h-[620px] cursor-pointer transition-transform duration-200 block rounded-[var(--radius)]" title="Кликнете за преглед на пълен екран">
 
                                     <!-- FLOATING HOVER BADGE HINT -->
-                                    <div class="absolute bottom-2 left-2 pointer-events-none opacity-80 group-hover:opacity-100 transition text-[10px] bg-slate-900/80 text-white px-2 py-0.5 rounded backdrop-blur-xs flex items-center gap-1">
+                                    <div id="card2HoverHint" class="absolute bottom-2 left-2 pointer-events-none opacity-80 group-hover:opacity-100 transition text-[10px] bg-slate-900/80 text-white px-2 py-0.5 rounded backdrop-blur-xs flex items-center gap-1">
                                         <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                                        <span>Лупа при посочване • Клик за Zoom</span>
+                                        <span id="card2HoverHintText">Клик за Zoom</span>
                                     </div>
                                 </div>
                                 <p id="approvalCard2Caption" class="text-[11px] text-[var(--text-muted)] leading-tight">Фронтално селфи без слънчеви очила и шапки за AI лицево разпознаване.</p>
@@ -4054,6 +4054,16 @@
             renderCurrentApprovalItem();
         }
 
+        function isCardShowingDocument(cardNumber) {
+            const student = state.pendingQueue[state.queueIndex];
+            if (!student) return false;
+            const isConflict = student.status === 'PENDING_DUPLICATE_REVIEW' || Boolean(student.duplicate_flagged_student_id);
+            if (isConflict) {
+                return state.approvalComparisonMode === 'books';
+            }
+            return cardNumber === 1;
+        }
+
         function renderCurrentApprovalItem() {
             const student = state.pendingQueue[state.queueIndex];
             const dossier = document.getElementById('approvalDossierSection');
@@ -4354,6 +4364,52 @@
             if (chk1) chk1.checked = false;
             if (chk2) chk2.checked = false;
             if (chk3) chk3.checked = false;
+
+            // Update hover hints and cursor depending on whether each card shows a document or selfie
+            const isDoc1 = isCardShowingDocument(1);
+            const isDoc2 = isCardShowingDocument(2);
+
+            const card1Container = document.getElementById('bookPhotoContainer');
+            const card1HintText = document.getElementById('card1HoverHintText');
+            const bookLoupe = document.getElementById('bookLoupeLens');
+            if (bookLoupe) bookLoupe.style.display = 'none';
+
+            if (isDoc1) {
+                if (card1Container) {
+                    card1Container.classList.add('cursor-crosshair');
+                    card1Container.classList.remove('cursor-pointer');
+                }
+                if (card1HintText) card1HintText.textContent = 'Лупа при посочване • Клик за Zoom';
+                if (approvalBookPhoto) approvalBookPhoto.title = 'Задръжте мишката за лупа / Кликнете за пълен Zoom';
+            } else {
+                if (card1Container) {
+                    card1Container.classList.remove('cursor-crosshair');
+                    card1Container.classList.add('cursor-pointer');
+                }
+                if (card1HintText) card1HintText.textContent = 'Клик за Zoom';
+                if (approvalBookPhoto) approvalBookPhoto.title = 'Кликнете за преглед на пълен екран';
+            }
+
+            const card2Container = document.getElementById('facePhotoContainer');
+            const card2HintText = document.getElementById('card2HoverHintText');
+            const faceLoupe = document.getElementById('faceLoupeLens');
+            if (faceLoupe) faceLoupe.style.display = 'none';
+
+            if (isDoc2) {
+                if (card2Container) {
+                    card2Container.classList.add('cursor-crosshair');
+                    card2Container.classList.remove('cursor-pointer');
+                }
+                if (card2HintText) card2HintText.textContent = 'Лупа при посочване • Клик за Zoom';
+                if (approvalPhoto) approvalPhoto.title = 'Задръжте мишката за лупа / Кликнете за пълен Zoom';
+            } else {
+                if (card2Container) {
+                    card2Container.classList.remove('cursor-crosshair');
+                    card2Container.classList.add('cursor-pointer');
+                }
+                if (card2HintText) card2HintText.textContent = 'Клик за Zoom';
+                if (approvalPhoto) approvalPhoto.title = 'Кликнете за преглед на пълен екран';
+            }
         }
 
         function renderExaminers() {
@@ -5564,7 +5620,10 @@
             if (!container || !img || !lens) return;
 
             container.addEventListener('mouseenter', () => {
-                if (!img.src || img.classList.contains('hidden')) return;
+                if (!isCardShowingDocument(1) || !img.src || img.classList.contains('hidden')) {
+                    lens.style.display = 'none';
+                    return;
+                }
                 lens.style.display = 'block';
                 lens.style.backgroundImage = `url("${img.src}")`;
             });
@@ -5574,7 +5633,10 @@
             });
 
             container.addEventListener('mousemove', (e) => {
-                if (!img.src || img.classList.contains('hidden') || lens.style.display === 'none') return;
+                if (!isCardShowingDocument(1) || !img.src || img.classList.contains('hidden') || lens.style.display === 'none') {
+                    lens.style.display = 'none';
+                    return;
+                }
                 
                 const rect = img.getBoundingClientRect();
                 const containerRect = container.getBoundingClientRect();
@@ -5609,7 +5671,10 @@
             if (!container || !img || !lens) return;
 
             container.addEventListener('mouseenter', () => {
-                if (!img.src || img.classList.contains('hidden')) return;
+                if (!isCardShowingDocument(2) || !img.src || img.classList.contains('hidden')) {
+                    lens.style.display = 'none';
+                    return;
+                }
                 lens.style.display = 'block';
                 lens.style.backgroundImage = `url("${img.src}")`;
             });
@@ -5619,7 +5684,10 @@
             });
 
             container.addEventListener('mousemove', (e) => {
-                if (!img.src || img.classList.contains('hidden') || lens.style.display === 'none') return;
+                if (!isCardShowingDocument(2) || !img.src || img.classList.contains('hidden') || lens.style.display === 'none') {
+                    lens.style.display = 'none';
+                    return;
+                }
                 
                 const rect = img.getBoundingClientRect();
                 const containerRect = container.getBoundingClientRect();
