@@ -130,12 +130,12 @@ class _LoginScreenState extends State<LoginScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text(
-                      '🎓', 
-                      style: TextStyle(fontSize: 40), 
-                      textAlign: TextAlign.center,
+                    const Icon(
+                      Icons.school_rounded,
+                      size: 44,
+                      color: UiThemeTokens.primary,
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     Text(
                       'Exam Gate: Студенти',
                       textAlign: TextAlign.center,

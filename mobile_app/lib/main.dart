@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'core/app_theme.dart';
 import 'core/secure_storage_service.dart';
 import 'core/api_client.dart';
@@ -6,8 +7,11 @@ import 'core/api_client.dart';
 import 'features/auth/auth_repository.dart';
 import 'features/auth/login_screen.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+  ]);
   
   final storageService = SecureStorageService();
   final apiClient = ApiClient(storageService);

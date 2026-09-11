@@ -1459,29 +1459,38 @@
                         <!-- MAIN DUAL COMPARISON VIEWPORT (ADAPTS DYNAMICALLY TO NORMAL VS TWIN MODES) -->
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
                             <!-- CARD 1: LEFT -->
-                            <div id="approvalCard1" class="border border-[var(--border)] rounded-[var(--radius)] p-3.5 bg-[var(--bg-body)] flex flex-col space-y-2.5">
-                                <div class="flex items-center justify-between">
-                                    <div class="flex items-center gap-2">
+                            <div id="approvalCard1" class="border border-[var(--border)] rounded-[var(--radius)] p-3.5 bg-[var(--bg-body)] flex flex-col space-y-2.5 overflow-hidden">
+                                <div class="flex items-center justify-between gap-2 min-w-0">
+                                    <div class="flex items-center gap-1.5 min-w-0 flex-1">
                                         <svg id="approvalCard1Icon" class="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
-                                        <span id="approvalCard1Title" class="text-xs font-bold text-[var(--text-main)] truncate">1. Студентска книжка (1-ва стр.)</span>
+                                        <span id="approvalCard1Title" class="text-xs font-bold text-[var(--text-main)] truncate" title="1. Студентска книжка (1-ва стр.)">1. Студентска книжка (1-ва стр.)</span>
                                     </div>
                                     <div class="flex items-center gap-1.5 shrink-0">
                                         <button id="rotateBookBtn" type="button" class="p-1 rounded hover:bg-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer" title="Завърти на 90°">
                                             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                                         </button>
-                                        <span id="approvalCard1Badge" class="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">Официален документ</span>
+                                        <span id="approvalCard1Badge" class="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded whitespace-nowrap bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">Официален документ</span>
                                     </div>
                                 </div>
 
                                 <!-- PHOTO CONTAINER WITH HOVER MAGNIFIER -->
                                 <div id="bookPhotoContainer" class="relative group w-full min-h-[340px] rounded-[var(--radius)] border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden flex items-center justify-center cursor-crosshair select-none">
+                                    <!-- LOADING SPINNER -->
+                                    <div id="bookPhotoLoading" class="hidden absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-[var(--bg-card)]/90 backdrop-blur-xs">
+                                        <svg class="w-7 h-7 text-purple-600 dark:text-purple-400 animate-spin" fill="none" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        <span class="text-[11px] font-medium text-[var(--text-muted)]">Зареждане на снимка...</span>
+                                    </div>
+
                                     <!-- HOVER MAGNIFIER LOUPE LENS -->
                                     <div id="bookLoupeLens" class="pointer-events-none absolute hidden w-36 h-36 rounded-full border-2 border-blue-500 shadow-2xl bg-no-repeat z-30 ring-4 ring-black/30" style="display: none;"></div>
 
                                     <!-- FALLBACK EMPTY -->
                                     <div id="bookPhotoEmptyNotice" class="hidden text-center p-6 space-y-2 text-xs text-[var(--text-muted)] py-12">
                                         <svg class="w-8 h-8 mx-auto opacity-40 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                                        <p class="font-bold text-amber-700 dark:text-amber-400">Няма качена студентска книжка</p>
+                                        <p class="font-bold text-amber-700 dark:text-amber-400">Няма качена снимка </p>
                                         <p class="text-[11px] max-w-xs mx-auto">Студентът е регистриран преди въвеждането на двуснимковата верификация.</p>
                                     </div>
 
@@ -1498,22 +1507,31 @@
                             </div>
 
                             <!-- CARD 2: RIGHT -->
-                            <div id="approvalCard2" class="border border-[var(--border)] rounded-[var(--radius)] p-3.5 bg-[var(--bg-body)] flex flex-col space-y-2.5">
-                                <div class="flex items-center justify-between">
-                                    <div class="flex items-center gap-2">
+                            <div id="approvalCard2" class="border border-[var(--border)] rounded-[var(--radius)] p-3.5 bg-[var(--bg-body)] flex flex-col space-y-2.5 overflow-hidden">
+                                <div class="flex items-center justify-between gap-2 min-w-0">
+                                    <div class="flex items-center gap-1.5 min-w-0 flex-1">
                                         <svg id="approvalCard2Icon" class="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                        <span id="approvalCard2Title" class="text-xs font-bold text-[var(--text-main)] truncate">2. Биометрична лицева снимка</span>
+                                        <span id="approvalCard2Title" class="text-xs font-bold text-[var(--text-main)] truncate" title="2. Биометрична лицева снимка">2. Биометрична лицева снимка</span>
                                     </div>
                                     <div class="flex items-center gap-1.5 shrink-0">
                                         <button id="rotateFaceBtn" type="button" class="p-1 rounded hover:bg-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer" title="Завърти на 90°">
                                             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                                         </button>
-                                        <span id="approvalCard2Badge" class="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">Биометричен профил</span>
+                                        <span id="approvalCard2Badge" class="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded whitespace-nowrap bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">Биометричен профил</span>
                                     </div>
                                 </div>
 
                                 <!-- PHOTO CONTAINER (MAGNIFIER ACTIVE ONLY FOR DOCUMENTS) -->
                                 <div id="facePhotoContainer" class="relative group w-full min-h-[340px] rounded-[var(--radius)] border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden flex items-center justify-center cursor-pointer select-none">
+                                    <!-- LOADING SPINNER -->
+                                    <div id="facePhotoLoading" class="hidden absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-[var(--bg-card)]/90 backdrop-blur-xs">
+                                        <svg class="w-7 h-7 text-purple-600 dark:text-purple-400 animate-spin" fill="none" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        <span class="text-[11px] font-medium text-[var(--text-muted)]">Зареждане на снимка...</span>
+                                    </div>
+
                                     <!-- HOVER MAGNIFIER LOUPE LENS (ACTIVE ONLY IN BOOKS COMPARISON MODE) -->
                                     <div id="faceLoupeLens" class="pointer-events-none absolute hidden w-36 h-36 rounded-full border-2 border-emerald-500 shadow-2xl bg-no-repeat z-30 ring-4 ring-black/30" style="display: none;"></div>
 
@@ -2150,7 +2168,7 @@
                     <!-- EMPTY STATE FOR LEGACY STUDENTS -->
                     <div id="zoomBookEmptyNotice" class="hidden text-center p-6 space-y-2 text-slate-400">
                         <svg class="w-12 h-12 mx-auto text-amber-400/60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                        <p class="font-bold text-sm text-amber-400">Няма качена студентска книжка</p>
+                        <p class="font-bold text-sm text-amber-400">Няма качена снимка</p>
                         <p class="text-xs text-slate-400 max-w-xs mx-auto">Студентът е регистриран преди въвеждането на двуснимковата верификация.</p>
                     </div>
                     <img id="zoomBookImg" alt="Студентска книжка (Zoom)" class="max-w-full max-h-full object-contain transition-transform duration-75 origin-center">
@@ -4086,11 +4104,60 @@
             return cardNumber === 1;
         }
 
+        function setApprovalCardImage(imgElem, spinnerElem, emptyNoticeElem, srcUrl) {
+            if (!srcUrl) {
+                if (spinnerElem) spinnerElem.classList.add('hidden');
+                if (imgElem) {
+                    imgElem.removeAttribute('src');
+                    imgElem.classList.add('hidden');
+                    imgElem.classList.remove('invisible');
+                }
+                if (emptyNoticeElem) emptyNoticeElem.classList.remove('hidden');
+                return;
+            }
+
+            if (emptyNoticeElem) emptyNoticeElem.classList.add('hidden');
+            if (spinnerElem) spinnerElem.classList.remove('hidden');
+
+            if (imgElem) {
+                // Immediately make invisible so previous student's photo does NOT show as stale placeholder
+                imgElem.classList.add('invisible');
+                imgElem.classList.remove('hidden');
+
+                const onFinish = () => {
+                    if (spinnerElem) spinnerElem.classList.add('hidden');
+                    imgElem.classList.remove('invisible');
+                    imgElem.onload = null;
+                    imgElem.onerror = null;
+                };
+
+                const onFail = () => {
+                    if (spinnerElem) spinnerElem.classList.add('hidden');
+                    imgElem.classList.add('hidden');
+                    imgElem.classList.remove('invisible');
+                    if (emptyNoticeElem) emptyNoticeElem.classList.remove('hidden');
+                    imgElem.onload = null;
+                    imgElem.onerror = null;
+                };
+
+                imgElem.onload = onFinish;
+                imgElem.onerror = onFail;
+
+                if (imgElem.src === srcUrl && imgElem.complete && imgElem.naturalWidth > 0) {
+                    onFinish();
+                } else {
+                    imgElem.src = srcUrl;
+                }
+            }
+        }
+
         function renderCurrentApprovalItem() {
             const student = state.pendingQueue[state.queueIndex];
             const dossier = document.getElementById('approvalDossierSection');
             const approvalPhoto = document.getElementById('approvalPhoto');
             const approvalBookPhoto = document.getElementById('approvalBookPhoto');
+            const bookPhotoLoading = document.getElementById('bookPhotoLoading');
+            const facePhotoLoading = document.getElementById('facePhotoLoading');
             const bookEmptyNotice = document.getElementById('bookPhotoEmptyNotice');
             const faceEmptyNotice = document.getElementById('facePhotoEmptyNotice');
             const actionsDiv = document.getElementById('approvalActions');
@@ -4144,6 +4211,8 @@
                     approvalBookPhoto.removeAttribute('src');
                     approvalBookPhoto.classList.add('hidden');
                 }
+                if (bookPhotoLoading) bookPhotoLoading.classList.add('hidden');
+                if (facePhotoLoading) facePhotoLoading.classList.add('hidden');
                 if (bookEmptyNotice) bookEmptyNotice.classList.add('hidden');
                 if (faceEmptyNotice) faceEmptyNotice.classList.add('hidden');
 
@@ -4234,45 +4303,47 @@
                     if (selfiesBtn) selfiesBtn.className = `px-3 py-1.5 rounded-[calc(var(--radius)-2px)] text-xs transition cursor-pointer flex items-center gap-1.5 ${inactiveCls}`;
 
                     // CARD 1: Candidate Student Book
-                    if (card1Title) card1Title.textContent = `Книжка: ${student.full_name}`;
+                    if (card1Title) {
+                        card1Title.textContent = `Книжка: ${student.full_name}`;
+                        card1Title.title = `Книжка: ${student.full_name}`;
+                    }
                     if (card1Badge) {
-                        card1Badge.textContent = 'Кандидат за регистрация';
-                        card1Badge.className = 'text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20';
+                        card1Badge.textContent = 'Кандидат';
+                        card1Badge.title = 'Кандидат за регистрация';
+                        card1Badge.className = 'text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded whitespace-nowrap bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20';
                     }
                     if (card1Caption) card1Caption.textContent = `Фак. № ${student.student_id_number} • Проверете печата на деканата и снимката в книжката.`;
 
-                    if (student.student_book_photo_url) {
-                        approvalBookPhoto.src = `${student.student_book_photo_url}?token=${adminToken}`;
-                        approvalBookPhoto.classList.remove('hidden');
-                        if (bookEmptyNotice) bookEmptyNotice.classList.add('hidden');
-                    } else {
-                        approvalBookPhoto.removeAttribute('src');
-                        approvalBookPhoto.classList.add('hidden');
-                        if (bookEmptyNotice) bookEmptyNotice.classList.remove('hidden');
-                    }
+                    setApprovalCardImage(
+                        approvalBookPhoto,
+                        bookPhotoLoading,
+                        bookEmptyNotice,
+                        student.student_book_photo_url ? `${student.student_book_photo_url}?token=${adminToken}` : null
+                    );
 
                     // CARD 2: Registered Student Book
-                    if (card2Title) card2Title.textContent = `Книжка: ${flagged?.full_name || 'Вече регистриран студент'}`;
+                    if (card2Title) {
+                        card2Title.textContent = `Книжка: ${flagged?.full_name || 'Вече регистриран студент'}`;
+                        card2Title.title = `Книжка: ${flagged?.full_name || 'Вече регистриран студент'}`;
+                    }
                     if (card2Badge) {
-                        card2Badge.textContent = 'Вече регистриран студент';
-                        card2Badge.className = 'text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20';
+                        card2Badge.textContent = 'Регистриран';
+                        card2Badge.title = 'Вече регистриран студент';
+                        card2Badge.className = 'text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded whitespace-nowrap bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20';
                     }
                     if (card2Caption) card2Caption.textContent = `Фак. № ${flagged?.student_id_number || '-'} • Сравнете печата на деканата и снимката в книжката.`;
 
-                    if (flagged?.student_book_photo_url) {
-                        approvalPhoto.src = `${flagged.student_book_photo_url}?token=${adminToken}`;
-                        approvalPhoto.classList.remove('hidden');
-                        if (faceEmptyNotice) faceEmptyNotice.classList.add('hidden');
-                    } else {
-                        approvalPhoto.removeAttribute('src');
-                        approvalPhoto.classList.add('hidden');
-                        if (faceEmptyNotice) {
-                            faceEmptyNotice.classList.remove('hidden');
-                            const faceNoticeTitle = faceEmptyNotice.querySelector('p.font-bold');
-                            const faceNoticeSub = faceEmptyNotice.querySelector('p.text-\\[11px\\]');
-                            if (faceNoticeTitle) faceNoticeTitle.textContent = 'Няма студентска книжка';
-                            if (faceNoticeSub) faceNoticeSub.textContent = flagged ? 'Вече регистрираният студент няма прикачена книжка (Legacy профил).' : 'Няма свързан конфликтен профил в базата данни.';
-                        }
+                    setApprovalCardImage(
+                        approvalPhoto,
+                        facePhotoLoading,
+                        faceEmptyNotice,
+                        flagged?.student_book_photo_url ? `${flagged.student_book_photo_url}?token=${adminToken}` : null
+                    );
+                    if (!flagged?.student_book_photo_url && faceEmptyNotice) {
+                        const faceNoticeTitle = faceEmptyNotice.querySelector('p.font-bold');
+                        const faceNoticeSub = faceEmptyNotice.querySelector('p.text-\\[11px\\]');
+                        if (faceNoticeTitle) faceNoticeTitle.textContent = 'Няма качена снимка';
+                        if (faceNoticeSub) faceNoticeSub.textContent = flagged ? 'Вече регистрираният студент няма прикачена книжка (Legacy профил).' : 'Няма свързан конфликтен профил в базата данни.';
                     }
                 } else {
                     // MODE: selfies (default)
@@ -4281,45 +4352,47 @@
                     if (booksBtn) booksBtn.className = `px-3 py-1.5 rounded-[calc(var(--radius)-2px)] text-xs transition cursor-pointer flex items-center gap-1.5 ${inactiveCls}`;
 
                     // CARD 1: Candidate Selfie
-                    if (card1Title) card1Title.textContent = `Селфи: ${student.full_name}`;
+                    if (card1Title) {
+                        card1Title.textContent = `Селфи: ${student.full_name}`;
+                        card1Title.title = `Селфи: ${student.full_name}`;
+                    }
                     if (card1Badge) {
-                        card1Badge.textContent = 'Кандидат за регистрация';
-                        card1Badge.className = 'text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20';
+                        card1Badge.textContent = 'Кандидат';
+                        card1Badge.title = 'Кандидат за регистрация';
+                        card1Badge.className = 'text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded whitespace-nowrap bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20';
                     }
                     if (card1Caption) card1Caption.textContent = `Фак. № ${student.student_id_number} • ${student.specialty || '-'} (гр. ${student.group || '-'})`;
 
-                    if (student.photo_url) {
-                        approvalBookPhoto.src = `${student.photo_url}?token=${adminToken}`;
-                        approvalBookPhoto.classList.remove('hidden');
-                        if (bookEmptyNotice) bookEmptyNotice.classList.add('hidden');
-                    } else {
-                        approvalBookPhoto.removeAttribute('src');
-                        approvalBookPhoto.classList.add('hidden');
-                        if (bookEmptyNotice) bookEmptyNotice.classList.remove('hidden');
-                    }
+                    setApprovalCardImage(
+                        approvalBookPhoto,
+                        bookPhotoLoading,
+                        bookEmptyNotice,
+                        student.photo_url ? `${student.photo_url}?token=${adminToken}` : null
+                    );
 
                     // CARD 2: Registered Student Selfie
-                    if (card2Title) card2Title.textContent = `Селфи: ${flagged?.full_name || 'Вече регистриран студент'}`;
+                    if (card2Title) {
+                        card2Title.textContent = `Селфи: ${flagged?.full_name || 'Вече регистриран студент'}`;
+                        card2Title.title = `Селфи: ${flagged?.full_name || 'Вече регистриран студент'}`;
+                    }
                     if (card2Badge) {
-                        card2Badge.textContent = 'Вече регистриран студент';
-                        card2Badge.className = 'text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20';
+                        card2Badge.textContent = 'Регистриран';
+                        card2Badge.title = 'Вече регистриран студент';
+                        card2Badge.className = 'text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded whitespace-nowrap bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20';
                     }
                     if (card2Caption) card2Caption.textContent = `Фак. № ${flagged?.student_id_number || '-'} • ${flagged?.specialty || '-'} (гр. ${flagged?.group || '-'})`;
 
-                    if (flagged?.photo_url) {
-                        approvalPhoto.src = `${flagged.photo_url}?token=${adminToken}`;
-                        approvalPhoto.classList.remove('hidden');
-                        if (faceEmptyNotice) faceEmptyNotice.classList.add('hidden');
-                    } else {
-                        approvalPhoto.removeAttribute('src');
-                        approvalPhoto.classList.add('hidden');
-                        if (faceEmptyNotice) {
-                            faceEmptyNotice.classList.remove('hidden');
-                            const faceNoticeTitle = faceEmptyNotice.querySelector('p.font-bold');
-                            const faceNoticeSub = faceEmptyNotice.querySelector('p.text-\\[11px\\]');
-                            if (faceNoticeTitle) faceNoticeTitle.textContent = 'Няма селфи снимка';
-                            if (faceNoticeSub) faceNoticeSub.textContent = flagged ? 'Липсва лицева снимка за регистрирания профил.' : 'Няма свързан конфликтен профил в базата данни.';
-                        }
+                    setApprovalCardImage(
+                        approvalPhoto,
+                        facePhotoLoading,
+                        faceEmptyNotice,
+                        flagged?.photo_url ? `${flagged.photo_url}?token=${adminToken}` : null
+                    );
+                    if (!flagged?.photo_url && faceEmptyNotice) {
+                        const faceNoticeTitle = faceEmptyNotice.querySelector('p.font-bold');
+                        const faceNoticeSub = faceEmptyNotice.querySelector('p.text-\\[11px\\]');
+                        if (faceNoticeTitle) faceNoticeTitle.textContent = 'Няма селфи снимка';
+                        if (faceNoticeSub) faceNoticeSub.textContent = flagged ? 'Липсва лицева снимка за регистрирания профил.' : 'Няма свързан конфликтен профил в базата данни.';
                     }
                 }
             } else {
@@ -4341,42 +4414,51 @@
                 if (chk3Label) chk3Label.textContent = 'Печатът на ТУ е легитимен';
 
                 // CARD 1: Student Book
-                if (card1Title) card1Title.textContent = '1. Студентска книжка (1-ва стр.)';
+                if (card1Title) {
+                    card1Title.textContent = '1. Студентска книжка (1-ва стр.)';
+                    card1Title.title = '1. Студентска книжка (1-ва стр.)';
+                }
                 if (card1Badge) {
                     card1Badge.textContent = 'Официален документ';
-                    card1Badge.className = 'text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20';
+                    card1Badge.title = 'Официален документ';
+                    card1Badge.className = 'text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded whitespace-nowrap bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20';
                 }
                 if (card1Caption) card1Caption.textContent = 'Проверете печата на деканата, факултетния номер и снимката на документа.';
 
-                if (student.student_book_photo_url) {
-                    approvalBookPhoto.src = `${student.student_book_photo_url}?token=${adminToken}`;
-                    approvalBookPhoto.classList.remove('hidden');
-                    if (bookEmptyNotice) bookEmptyNotice.classList.add('hidden');
-                    if (bookBadge) {
+                setApprovalCardImage(
+                    approvalBookPhoto,
+                    bookPhotoLoading,
+                    bookEmptyNotice,
+                    student.student_book_photo_url ? `${student.student_book_photo_url}?token=${adminToken}` : null
+                );
+                if (bookBadge) {
+                    if (student.student_book_photo_url) {
                         bookBadge.textContent = 'Наличен документ';
                         bookBadge.className = 'inline-block font-bold text-[10px] px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 mt-0.5';
-                    }
-                } else {
-                    approvalBookPhoto.removeAttribute('src');
-                    approvalBookPhoto.classList.add('hidden');
-                    if (bookEmptyNotice) bookEmptyNotice.classList.remove('hidden');
-                    if (bookBadge) {
+                    } else {
                         bookBadge.textContent = 'Липсва книжка (Legacy)';
                         bookBadge.className = 'inline-block font-bold text-[10px] px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 mt-0.5';
                     }
                 }
 
                 // CARD 2: Biometric Face Photo (Selfie)
-                if (card2Title) card2Title.textContent = '2. Биометрична лицева снимка';
+                if (card2Title) {
+                    card2Title.textContent = '2. Биометрична лицева снимка';
+                    card2Title.title = '2. Биометрична лицева снимка';
+                }
                 if (card2Badge) {
                     card2Badge.textContent = 'Биометричен профил';
-                    card2Badge.className = 'text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20';
+                    card2Badge.title = 'Биометричен профил';
+                    card2Badge.className = 'text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded whitespace-nowrap bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20';
                 }
                 if (card2Caption) card2Caption.textContent = 'Фронтално селфи без слънчеви очила и шапки за AI лицево разпознаване.';
 
-                approvalPhoto.src = student.photo_url ? `${student.photo_url}?token=${adminToken}` : '';
-                approvalPhoto.classList.remove('hidden');
-                if (faceEmptyNotice) faceEmptyNotice.classList.add('hidden');
+                setApprovalCardImage(
+                    approvalPhoto,
+                    facePhotoLoading,
+                    faceEmptyNotice,
+                    student.photo_url ? `${student.photo_url}?token=${adminToken}` : null
+                );
             }
 
             // Reset checklist checkboxes

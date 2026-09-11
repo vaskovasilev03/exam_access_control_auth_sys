@@ -190,20 +190,22 @@ class LivenessAndDuplicateIntegrationTestCase(unittest.TestCase):
         self.assertIn("открити няколко лица", ctx.exception.detail)
 
     @patch("face_recognition.face_locations", return_value=[(20, 80, 80, 20)])
-    @patch.object(LivenessDetector, "check", return_value=(False, 0.32))
-    def test_05_spoof_attack_rejected(self, mock_check, mock_locations):
+    def test_05_upload_bypasses_liveness(self, mock_locations):
+        """
+        Liveness detection is decoupled from student upload endpoints (reserved for ESP32 streams).
+        verify_selfie_liveness_and_uniqueness succeeds as long as exactly one face is present and unique.
+        """
         dummy_img = _make_dummy_image_bytes()
-        from fastapi import HTTPException
-        with self.assertRaises(HTTPException) as ctx:
-            verify_selfie_liveness_and_uniqueness(dummy_img, None, self.db)
-        self.assertEqual(ctx.exception.status_code, 400)
-        self.assertIn("Liveness Failed: 0.32", ctx.exception.detail)
+        is_live, score, dup, dist = verify_selfie_liveness_and_uniqueness(dummy_img, None, self.db)
+        self.assertTrue(is_live)
+        self.assertEqual(score, 1.0)
+        self.assertIsNone(dup)
+        self.assertIsNone(dist)
 
     @patch("face_recognition.face_locations", return_value=[(20, 80, 80, 20)])
-    @patch.object(LivenessDetector, "check", return_value=(True, 0.94))
     @patch("face_recognition.face_encodings")
     @patch("app.main.upload_photo_to_cloud", return_value="/access-control-bucket/test_photo.jpg")
-    def test_06_genuine_live_face_upload_success(self, mock_upload, mock_encodings, mock_check, mock_locations):
+    def test_06_genuine_live_face_upload_success(self, mock_upload, mock_encodings, mock_locations):
         # Unique face vector
         mock_encodings.return_value = [np.array([0.5] * 128, dtype=np.float32)]
 
@@ -221,7 +223,7 @@ class LivenessAndDuplicateIntegrationTestCase(unittest.TestCase):
         data = res.json()
         self.assertEqual(data["status"], "success")
         self.assertFalse(data["duplicate_detected"])
-        self.assertAlmostEqual(data["liveness_score"], 0.94, places=2)
+        self.assertEqual(data["liveness_score"], 1.0)
 
         self.db.refresh(student)
         self.assertEqual(student.status, "PENDING_APPROVAL")

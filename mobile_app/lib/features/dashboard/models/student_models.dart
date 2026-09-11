@@ -13,6 +13,8 @@ class StudentProfileModel {
   final String? rejectionReason;
   final bool isSuperadmin;
   final bool isImpersonating;
+  final bool isTwinException;
+  final bool gdprConsentGiven;
 
   const StudentProfileModel({
     required this.id,
@@ -29,6 +31,8 @@ class StudentProfileModel {
     this.rejectionReason,
     this.isSuperadmin = false,
     this.isImpersonating = false,
+    this.isTwinException = false,
+    this.gdprConsentGiven = false,
   });
 
   factory StudentProfileModel.fromJson(Map<String, dynamic> json) {
@@ -47,11 +51,17 @@ class StudentProfileModel {
       rejectionReason: json['rejection_reason'] as String?,
       isSuperadmin: json['is_superadmin'] as bool? ?? false,
       isImpersonating: json['is_impersonating'] as bool? ?? false,
+      isTwinException: json['is_twin_exception'] as bool? ?? false,
+      gdprConsentGiven: json['gdpr_consent_given'] as bool? ?? false,
     );
   }
 
   bool get isApproved => status.toUpperCase() == 'APPROVED';
-  bool get isPendingApproval => status.toUpperCase() == 'PENDING_APPROVAL';
+  bool get isPendingApproval =>
+      status.toUpperCase() == 'PENDING_APPROVAL' ||
+      status.toUpperCase() == 'PENDING_DUPLICATE_REVIEW';
+  bool get isPendingDuplicateReview =>
+      status.toUpperCase() == 'PENDING_DUPLICATE_REVIEW';
   bool get isRejected => status.toUpperCase() == 'REJECTED';
   bool get isPendingScan => status.toUpperCase() == 'PENDING';
   bool get hasAccessToExams => isApproved && hasFaceEmbedding;
@@ -160,7 +170,11 @@ class StudentSummaryModel {
   }
 
   bool get isApproved => status.toUpperCase() == 'APPROVED';
-  bool get isPendingApproval => status.toUpperCase() == 'PENDING_APPROVAL';
+  bool get isPendingApproval =>
+      status.toUpperCase() == 'PENDING_APPROVAL' ||
+      status.toUpperCase() == 'PENDING_DUPLICATE_REVIEW';
+  bool get isPendingDuplicateReview =>
+      status.toUpperCase() == 'PENDING_DUPLICATE_REVIEW';
   bool get isRejected => status.toUpperCase() == 'REJECTED';
 }
 

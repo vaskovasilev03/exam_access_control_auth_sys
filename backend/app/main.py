@@ -26,6 +26,7 @@ from pydantic import ValidationError
 from typing import Optional, Tuple
 from zoneinfo import ZoneInfo
 from collections import defaultdict
+from PIL import Image, ImageOps
 
 from .database import init_db, get_db
 from .models import Student, Exam, Admin, ExamRegistration, AccessLog, Examiner, AdminLog, SessionType, SecureKey
@@ -51,8 +52,16 @@ from .storage import init_storage, upload_photo_to_cloud, get_photo_from_cloud, 
 from .mailer import send_welcome_email, send_allocation_email
 
 from starlette.middleware.gzip import GZipMiddleware
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 templates = Jinja2Templates(directory="app/templates")
 timezone = ZoneInfo("Europe/Sofia")
@@ -224,7 +233,7 @@ def _resolve_log_students(
     parsed_details = _parse_admin_log_details(log.details)
     
     if log.action_type == "STUDENT_IMPORT":
-        # ⚡ Безопасно преобразуваме стринга от лога към Integer
+        # Безопасно преобразуваме стринга от лога към Integer
         group_int = None
         if log.group:
             try:
@@ -1112,7 +1121,11 @@ def get_student_photo(student_id: str, token: str = Query(...), db: Session = De
 
     file_data = get_photo_from_cloud(object_name)
     content_type, _ = mimetypes.guess_type(object_name)
-    return StreamingResponse(io.BytesIO(file_data), media_type=content_type or "image/jpeg")
+    return StreamingResponse(
+        io.BytesIO(file_data),
+        media_type=content_type or "image/jpeg",
+        headers={"Cache-Control": "private, max-age=3600"}
+    )
 
 
 @app.get("/admins/students/{student_id}/student-book-photo")
@@ -1138,7 +1151,11 @@ def get_student_book_photo(student_id: str, token: str = Query(...), db: Session
 
     file_data = get_photo_from_cloud(object_name)
     content_type, _ = mimetypes.guess_type(object_name)
-    return StreamingResponse(io.BytesIO(file_data), media_type=content_type or "image/jpeg")
+    return StreamingResponse(
+        io.BytesIO(file_data),
+        media_type=content_type or "image/jpeg",
+        headers={"Cache-Control": "private, max-age=3600"}
+    )
 
 @app.post("/admins/upload/exams")
 async def upload_exams(
@@ -2179,7 +2196,7 @@ def check_door_access(room_number: str, db: Session = Depends(get_db)):
     STREAM_URL = f"http://{ESP32_IP}:81/stream"
     STOP_URL = f"http://{ESP32_IP}:81/stop"
     
-    print(f"📷 Отваряне на видео стрийма от залата {room_number}...")
+    print(f"Отваряне на видео стрийма от залата {room_number}...")
     cap = cv2.VideoCapture(STREAM_URL)
     
     if not cap.isOpened():
@@ -2949,18 +2966,45 @@ def force_register_student_to_exam(
     print(f"[Спешен Допуск] Квесторът записа студент {student.full_name} за изпит в зала {room_number}")
     return {"status": "success", "message": f"Успешно извънредно записване на {student.full_name} за дисциплина: {current_exam.subject}."}
 
+def optimize_image_for_storage(image_bytes: bytes, max_dim: int = 800, quality: int = 85) -> bytes:
+    """
+    Нормализира и оптимизира изображения преди качване в MinIO / запис:
+    1. Автоматично коригира EXIF ориентацията (предпазва от обърнати мобилни селфита).
+    2. Преоразмерява изображението до максимум max_dim по по-дългата страна с висококачествен филтър LANCZOS.
+    3. Прилага JPEG компресия с quality=85 и optimize=True.
+    Резултат: кристално ясна снимка с файлов размер ~150-250KB, зареждаща се мигновено в админ панела.
+    """
+    if not image_bytes:
+        return image_bytes
+    try:
+        with Image.open(io.BytesIO(image_bytes)) as img:
+            img = ImageOps.exif_transpose(img)
+            if img.mode in ("RGBA", "P"):
+                img = img.convert("RGB")
+            w, h = img.size
+            if max(w, h) > max_dim:
+                scale = max_dim / max(w, h)
+                new_size = (max(1, int(w * scale)), max(1, int(h * scale)))
+                img = img.resize(new_size, Image.Resampling.LANCZOS)
+            output = io.BytesIO()
+            img.save(output, format="JPEG", quality=quality, optimize=True)
+            return output.getvalue()
+    except Exception as e:
+        print(f"[Storage Image Optimization Warning] Falling back to raw bytes: {e}")
+        return image_bytes
+
 def verify_selfie_liveness_and_uniqueness(
     face_bytes: bytes,
     student_id: Optional[str],
-    db: Session
+    db: Session,
+    enforce_liveness: bool = False
 ) -> Tuple[bool, float, Optional[Student], Optional[float]]:
     """
     Валидира:
     1. Декодиране на изображението (OpenCV)
     2. Откриване на точно едно лице (face_recognition)
-    3. Проверка за жив човек (Anti-Spoofing MiniFASNet, score >= 0.85)
-    4. 1:N векторна проверка за съвпадение (pgvector, distance < 0.42)
-    Връща: (is_real, liveness_score, closest_duplicate_student, duplicate_distance)
+    3. 1:N векторна проверка за съвпадение (pgvector, distance < 0.42)
+    Връща: (True, 1.0, closest_duplicate_student, duplicate_distance)
     """
     if not face_bytes:
         raise HTTPException(status_code=400, detail="Липсва съдържание на снимката.")
@@ -2984,13 +3028,32 @@ def verify_selfie_liveness_and_uniqueness(
         )
 
     face_box = face_locations[0] # (top, right, bottom, left)
-    detector = get_liveness_detector()
-    is_real, liveness_score = detector.check(frame, face_box)
-    if not is_real:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Неуспешна проверка за автентичност (Liveness Failed: {liveness_score:.2f})! Снимката изглежда заснета от екран, хартия или маска. Моля, направете снимка на живо."
+
+    # 1:N collision check against approved students
+    closest_duplicate = None
+    min_distance = None
+    encodings = face_recognition.face_encodings(rgb_frame, [face_box])
+    if encodings and student_id:
+        candidate_encoding = encodings[0]
+        # Query closest approved student with existing embedding (excluding self)
+        closest_row = (
+            db.query(
+                Student,
+                Student.face_embedding.l2_distance(candidate_encoding).label("dist")
+            )
+            .filter(
+                Student.face_embedding != None,
+                Student.id != student_id,
+                Student.status == "APPROVED"
+            )
+            .order_by("dist")
+            .first()
         )
+        if closest_row and closest_row.dist is not None:
+            closest_duplicate = closest_row[0]
+            min_distance = float(closest_row[1])
+
+    return True, 1.0, closest_duplicate, min_distance
 
     # 1:N collision check against approved students
     closest_duplicate = None
@@ -3080,12 +3143,20 @@ async def student_submit_for_verification(
     if student.status == "APPROVED":
         return {"status": "already_approved", "message": "Profile is already approved and verified."}
 
+    if student.status in ("PENDING_APPROVAL", "PENDING_DUPLICATE_REVIEW"):
+        raise HTTPException(
+            status_code=400,
+            detail="Вашите биометрични данни вече са изпратени и се обработват. Не можете да изпращате повторно до решение на администратор."
+        )
+
     try:
         contents = await file.read()
+        contents = optimize_image_for_storage(contents, max_dim=800, quality=85)
         is_real, liveness_score, closest_duplicate, min_dist = verify_selfie_liveness_and_uniqueness(
             face_bytes=contents,
             student_id=str(student.id) if student else None,
-            db=db
+            db=db,
+            enforce_liveness=False
         )
 
         ts = int(time.time())
@@ -3098,6 +3169,7 @@ async def student_submit_for_verification(
         book_photo_url = None
         if student_book_file:
             book_contents = await student_book_file.read()
+            book_contents = optimize_image_for_storage(book_contents, max_dim=960, quality=85)
             book_photo_url = upload_photo_to_cloud(
                 file_data=book_contents,
                 object_name=f"{student.student_id_number}_book_{ts}{os.path.splitext(student_book_file.filename or '.jpg')[1]}",
@@ -3111,12 +3183,12 @@ async def student_submit_for_verification(
             student.status = "PENDING_DUPLICATE_REVIEW"
             student.duplicate_flagged_student_id = closest_duplicate.id
             student.duplicate_similarity_distance = min_dist
-            message = "Снимката премина успешно проверка за автентичност, но бе отчетено биометрично сходство с друг студент. Акаунтът е изпратен за допълнителен административен преглед."
+            message = "Снимката е качена успешно. Отчетено е биометрично сходство с друг профил и акаунтът е изпратен за допълнителен административен преглед."
         else:
             student.status = "PENDING_APPROVAL"
             student.duplicate_flagged_student_id = None
             student.duplicate_similarity_distance = None
-            message = "Image uploaded successfully. Your profile is now pending admin approval."
+            message = "Снимката е качена успешно и очаква преглед от администратор."
 
         student.photo_path = photo_url
         student.gdpr_consent_given = True
@@ -3174,14 +3246,24 @@ async def student_upload_verification_docs(
     if student.status == "APPROVED":
         return {"status": "already_approved", "message": "Profile is already approved and verified."}
 
+    if student.status in ("PENDING_APPROVAL", "PENDING_DUPLICATE_REVIEW"):
+        raise HTTPException(
+            status_code=400,
+            detail="Вашите документи вече са изпратени и се обработват. Не можете да изпращате нови документи до решение на администратор."
+        )
+
     try:
         face_contents = await face_photo.read()
         book_contents = await student_book_photo.read()
 
+        face_contents = optimize_image_for_storage(face_contents, max_dim=800, quality=85)
+        book_contents = optimize_image_for_storage(book_contents, max_dim=960, quality=85)
+
         is_real, liveness_score, closest_duplicate, min_dist = verify_selfie_liveness_and_uniqueness(
             face_bytes=face_contents,
             student_id=str(student.id) if student else None,
-            db=db
+            db=db,
+            enforce_liveness=False
         )
 
         ts = int(time.time())
@@ -3201,7 +3283,7 @@ async def student_upload_verification_docs(
             student.status = "PENDING_DUPLICATE_REVIEW"
             student.duplicate_flagged_student_id = closest_duplicate.id
             student.duplicate_similarity_distance = min_dist
-            message = "Документите са получени успешно (Liveness Passed). Отчетено е сходство с друг профил и акаунтът е изпратен за допълнителен административен преглед."
+            message = "Документите са получени успешно. Отчетено е сходство с друг профил и акаунтът е изпратен за допълнителен административен преглед."
         else:
             student.status = "PENDING_APPROVAL"
             student.duplicate_flagged_student_id = None

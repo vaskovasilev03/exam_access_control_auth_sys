@@ -112,6 +112,8 @@ class _AdminStudentsViewState extends State<AdminStudentsView> {
         return Colors.green;
       case 'PENDING_APPROVAL':
         return Colors.amber.shade700;
+      case 'PENDING_DUPLICATE_REVIEW':
+        return Colors.orange.shade800;
       case 'REJECTED':
         return UiThemeTokens.destructive;
       default:
@@ -125,6 +127,8 @@ class _AdminStudentsViewState extends State<AdminStudentsView> {
         return 'Одобрен';
       case 'PENDING_APPROVAL':
         return 'Чака одобрение';
+      case 'PENDING_DUPLICATE_REVIEW':
+        return 'Чака преглед (сходство)';
       case 'REJECTED':
         return 'Отхвърлен';
       case 'PENDING':
@@ -524,6 +528,7 @@ class _AdminStudentsViewState extends State<AdminStudentsView> {
         const PopupMenuItem(value: null, child: Text('Статус: Всички')),
         const PopupMenuItem(value: 'APPROVED', child: Text('Одобрени')),
         const PopupMenuItem(value: 'PENDING_APPROVAL', child: Text('Чакащи одобрение')),
+        const PopupMenuItem(value: 'PENDING_DUPLICATE_REVIEW', child: Text('Чакащи преглед (сходство)')),
         const PopupMenuItem(value: 'PENDING', child: Text('Чакащи сканиране')),
         const PopupMenuItem(value: 'REJECTED', child: Text('Отхвърлени')),
       ],

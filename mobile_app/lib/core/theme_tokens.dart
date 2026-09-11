@@ -19,11 +19,15 @@ class UiThemeTokens {
     Color? color,
     double? fontSize,
     FontWeight? fontWeight,
+    double? height,
+    double? letterSpacing,
   }) {
     return GoogleFonts.montserrat(
       color: color ?? foreground,
       fontSize: fontSize,
       fontWeight: fontWeight,
+      height: height,
+      letterSpacing: letterSpacing,
       textStyle: const TextStyle(
         fontFamilyFallback: ['Roboto', 'sans-serif'],
       ),

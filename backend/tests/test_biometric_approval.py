@@ -470,6 +470,46 @@ class BiometricApprovalTestCase(unittest.TestCase):
         self.db.refresh(student_2)
         self.assertEqual(student_2.status, "REJECTED")
 
+    @patch("app.main.verify_selfie_liveness_and_uniqueness", return_value=(True, 0.98, None, None))
+    @patch("app.main.upload_photo_to_cloud", return_value="/access-control-bucket/test_photo.jpg")
+    def test_12_reupload_blocked_for_pending_statuses(self, mock_upload, mock_verify):
+        """Проверява, че студенти със статус PENDING_APPROVAL и PENDING_DUPLICATE_REVIEW не могат да изпращат повторно данни до решение от администратор."""
+        face_file = ("face.jpg", io.BytesIO(b"fake_face_bytes"), "image/jpeg")
+        book_file = ("book.jpg", io.BytesIO(b"fake_book_bytes"), "image/jpeg")
+
+        # 1. PENDING_APPROVAL не може да качва документи
+        st_pending = self._create_test_student(student_id_number="99900013", email="st13@tu-sofia.bg", status="PENDING_APPROVAL")
+        tok_pending = create_access_token(data={"sub": str(st_pending.id), "role": "student"})
+        res_1 = client.post(
+            "/students/upload-verification-docs",
+            files={"face_photo": face_file, "student_book_photo": book_file},
+            headers={"Authorization": f"Bearer {tok_pending}"}
+        )
+        self.assertEqual(res_1.status_code, 400)
+        self.assertIn("вече са изпратени", res_1.json()["detail"])
+
+        # 2. PENDING_DUPLICATE_REVIEW не може да качва документи
+        st_duplicate = self._create_test_student(student_id_number="99900014", email="st14@tu-sofia.bg", status="PENDING_DUPLICATE_REVIEW")
+        tok_duplicate = create_access_token(data={"sub": str(st_duplicate.id), "role": "student"})
+        res_2 = client.post(
+            "/students/upload-verification-docs",
+            files={"face_photo": ("face.jpg", io.BytesIO(b"fake_face_bytes"), "image/jpeg"), "student_book_photo": ("book.jpg", io.BytesIO(b"fake_book_bytes"), "image/jpeg")},
+            headers={"Authorization": f"Bearer {tok_duplicate}"}
+        )
+        self.assertEqual(res_2.status_code, 400)
+        self.assertIn("вече са изпратени", res_2.json()["detail"])
+
+        # 3. След отхвърляне (REJECTED), студентът има право на повторно заснемане и качване
+        st_duplicate.status = "REJECTED"
+        self.db.commit()
+        res_3 = client.post(
+            "/students/upload-verification-docs",
+            files={"face_photo": ("face.jpg", io.BytesIO(b"fake_face_bytes"), "image/jpeg"), "student_book_photo": ("book.jpg", io.BytesIO(b"fake_book_bytes"), "image/jpeg")},
+            headers={"Authorization": f"Bearer {tok_duplicate}"}
+        )
+        self.assertEqual(res_3.status_code, 200)
+        self.assertEqual(res_3.json()["status"], "success")
+
 
 if __name__ == "__main__":
     unittest.main()

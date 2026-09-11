@@ -5,7 +5,8 @@ import '../../../core/theme_tokens.dart';
 import '../auth/auth_repository.dart';
 import '../auth/change_password_sheet.dart';
 import '../auth/login_screen.dart';
-import '../liveness/liveness_screen.dart';
+import '../verification/verification_wizard_screen.dart';
+import '../verification/widgets/twin_access_qr_sheet.dart';
 import 'models/student_models.dart';
 import 'admin_students_view.dart';
 import 'admin_exams_view.dart';
@@ -218,14 +219,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  void _openLivenessScan() async {
+  void _openVerificationWizard() async {
     if (widget.authRepository == null) return;
+    if (_profile != null && _profile!.isPendingApproval) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Вашите документи вече са изпратени и се обработват. Не можете да изпращате повторно до решение на администратор.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
     final apiClient = widget.authRepository!.getApiClient();
 
     final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (context) => LivenessScreen(apiClient: apiClient),
+        builder: (context) => VerificationWizardScreen(apiClient: apiClient),
       ),
     );
 
@@ -233,13 +243,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Биометричният шаблон е изпратен за одобрение!'),
+            content: Text('Документите са изпратени за одобрение!'),
             backgroundColor: Colors.green,
           ),
         );
       }
       _refreshAll();
     }
+  }
+
+  void _openLivenessScan() => _openVerificationWizard();
+
+  void _openTwinQrPassSheet() {
+    if (_profile == null) return;
+    TwinAccessQrSheet.show(context, _profile!);
   }
 
   void _openChangePasswordSheet() {
@@ -305,18 +322,58 @@ class _DashboardScreenState extends State<DashboardScreen> {
           'Сигурни ли сте, че искате да излезете от системата?',
           style: UiThemeTokens.getSansFont(fontSize: 14),
         ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('Отказ', style: UiThemeTokens.getSansFont(color: UiThemeTokens.mutedForeground)),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: UiThemeTokens.destructive,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Изход'),
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 44,
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: UiThemeTokens.border),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: UiThemeTokens.borderRadius,
+                      ),
+                    ),
+                    child: Text(
+                      'Отказ',
+                      style: UiThemeTokens.getSansFont(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: UiThemeTokens.foreground,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: SizedBox(
+                  height: 44,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: UiThemeTokens.destructive,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: UiThemeTokens.borderRadius,
+                      ),
+                    ),
+                    child: Text(
+                      'Изход',
+                      style: UiThemeTokens.getSansFont(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -340,6 +397,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: UiThemeTokens.background,
+        shape: RoundedRectangleBorder(
+          borderRadius: UiThemeTokens.borderRadius,
+          side: const BorderSide(color: UiThemeTokens.border),
+        ),
         title: Text(
           'Затваряне на приложението',
           style: UiThemeTokens.getSansFont(fontWeight: FontWeight.bold, fontSize: 18),
@@ -348,18 +410,58 @@ class _DashboardScreenState extends State<DashboardScreen> {
           'Желаете ли да затворите Exam Gate?',
           style: UiThemeTokens.getSansFont(fontSize: 14),
         ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('Отказ', style: UiThemeTokens.getSansFont(color: UiThemeTokens.mutedForeground)),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: UiThemeTokens.primary,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Затвори'),
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 44,
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: UiThemeTokens.border),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: UiThemeTokens.borderRadius,
+                      ),
+                    ),
+                    child: Text(
+                      'Отказ',
+                      style: UiThemeTokens.getSansFont(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: UiThemeTokens.foreground,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: SizedBox(
+                  height: 44,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: UiThemeTokens.primary,
+                      foregroundColor: UiThemeTokens.primaryForeground,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: UiThemeTokens.borderRadius,
+                      ),
+                    ),
+                    child: Text(
+                      'Затвори',
+                      style: UiThemeTokens.getSansFont(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: UiThemeTokens.primaryForeground,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -475,7 +577,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Expanded(
             child: Row(
               children: [
-                Text(isSuper ? '👑' : '🎓', style: const TextStyle(fontSize: 24)),
+                Icon(
+                  isSuper ? Icons.admin_panel_settings_rounded : Icons.school_rounded,
+                  size: 26,
+                  color: UiThemeTokens.primary,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
@@ -702,7 +808,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       bg = const Color(0xFFFFF8E1);
       border = const Color(0xFFFFE082);
       icon = Icons.hourglass_top_outlined;
-      text = 'Вашият биометричен профил се преглежда от администратор. Очаквайте потвърждение.';
+      text = _profile!.isPendingDuplicateReview
+          ? 'Вашият биометричен профил се преглежда от администратор (отчетено биометрично сходство). Очаквайте решение.'
+          : 'Вашият биометричен профил се преглежда от администратор. Очаквайте потвърждение.';
       actionButton = null; // Премахнат излишният бутон "Провери" - използва се горната лента
     } else if (isRejected) {
       bg = const Color(0xFFFFEBEE);
@@ -884,6 +992,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ],
       );
     } else if (isPendingApproval) {
+      final bool isDuplicate = _profile!.isPendingDuplicateReview;
       statusBadge = Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -897,12 +1006,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           const SizedBox(width: 8),
           Text(
-            'Pending verification.',
+            isDuplicate ? 'Чака преглед (сходство)' : 'Чака одобрение',
             style: UiThemeTokens.getSansFont(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.orange.shade800),
           ),
         ],
       );
-      // Премахнат излишният бутон "Обнови" при чакащо одобрение
+      // Премахнат бутон при чакащо одобрение или преглед за дубликат
       actionButton = null;
     } else if (isRejected) {
       statusBadge = Row(
@@ -1117,6 +1226,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 onPressed: _openChangePasswordSheet,
                 icon: const Icon(Icons.lock_reset, size: 18),
                 label: const Text('Смяна на парола'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 48),
+                  side: const BorderSide(color: UiThemeTokens.border),
+                  shape: RoundedRectangleBorder(borderRadius: UiThemeTokens.borderRadius),
+                  textStyle: UiThemeTokens.getSansFont(fontSize: 14, fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
+            if (_profile?.isTwinException == true) ...[
+              OutlinedButton.icon(
+                onPressed: _openTwinQrPassSheet,
+                icon: const Icon(Icons.qr_code_2_rounded, size: 18),
+                label: const Text('Дигитален изпитен пропуск (QR)'),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 48),
                   side: const BorderSide(color: UiThemeTokens.border),
