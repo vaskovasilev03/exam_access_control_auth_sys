@@ -19,8 +19,37 @@ CAMERA_TASKS = {}
 AI_ROOM_STATES = {}
 CAMERA_HEALTH = {}
 SUBSCRIBERS = {}
+ROOM_EVENT_SUBSCRIBERS = {}
 
 timezone = ZoneInfo("Europe/Sofia")
+
+def subscribe_room_events(room_number: str) -> asyncio.Queue:
+    if room_number not in ROOM_EVENT_SUBSCRIBERS:
+        ROOM_EVENT_SUBSCRIBERS[room_number] = set()
+    queue = asyncio.Queue(maxsize=50)
+    ROOM_EVENT_SUBSCRIBERS[room_number].add(queue)
+    return queue
+
+def unsubscribe_room_events(room_number: str, queue: asyncio.Queue):
+    if room_number in ROOM_EVENT_SUBSCRIBERS:
+        ROOM_EVENT_SUBSCRIBERS[room_number].discard(queue)
+        if not ROOM_EVENT_SUBSCRIBERS[room_number]:
+            del ROOM_EVENT_SUBSCRIBERS[room_number]
+
+def emit_room_event(room_number: str, event_name: str, data: dict):
+    if room_number in ROOM_EVENT_SUBSCRIBERS:
+        payload = {"event": event_name, "data": data}
+        for q in list(ROOM_EVENT_SUBSCRIBERS[room_number]):
+            if q.full():
+                try:
+                    q.get_nowait()
+                except Exception:
+                    pass
+            try:
+                q.put_nowait(payload)
+            except Exception:
+                pass
+
 
 def subscribe_client(room_number: str) -> asyncio.Queue:
     if room_number not in SUBSCRIBERS:
@@ -153,6 +182,7 @@ def analyze_frame_outside_ui(jpg_bytes: bytes, room_number: str, known_face_enco
                 state["locked_fac_num"] = student_found.student_id_number
                 state["status_text"] = "ДОСТЪПЪТ РАЗРЕШЕН!"
                 state["status_type"] = "success" # Зелен цвят в UI
+                return {"admitted": True, "student_id": str(student_found.id), "student_name": student_found.full_name}
                 
             elif valid_registration and not is_time_valid:
                 state["status_text"] = f"Интервал за достъп нарушен, изпита започва в {valid_registration.exam.date_time.strftime('%H:%M')}."
@@ -177,15 +207,32 @@ def analyze_frame_outside_ui(jpg_bytes: bytes, room_number: str, known_face_enco
     except Exception as e:
         print(f"Грешка ИИ: {e}")
 
+    return None
+
 
 async def run_heavy_ai_async(jpg_bytes: bytes, room_number: str, known_face_encodings, known_face_names):
     state = AI_ROOM_STATES.get(room_number)
     if not state:
         return
+    prev_sig = (state.get("status_type"), state.get("student_name"), state.get("status_text"))
     try:
-        await asyncio.to_thread(
+        admission_info = await asyncio.to_thread(
             analyze_frame_outside_ui, jpg_bytes, room_number, known_face_encodings, known_face_names, state
         )
+        new_sig = (state.get("status_type"), state.get("student_name"), state.get("status_text"))
+        if new_sig != prev_sig:
+            emit_room_event(room_number, "biometric_status", {
+                "student_name": state.get("student_name", ""),
+                "faculty_number": state.get("faculty_number", ""),
+                "status_text": state.get("status_text", ""),
+                "status_type": state.get("status_type", "idle")
+            })
+        if admission_info and admission_info.get("admitted"):
+            emit_room_event(room_number, "roster_update", {
+                "room_number": room_number,
+                "student_id": admission_info.get("student_id"),
+                "student_name": admission_info.get("student_name")
+            })
     finally:
         state["ai_busy"] = False
 
@@ -241,14 +288,27 @@ async def fetch_frames_from_esp32(room_number: str, esp32_ip: str):
                 async with client.stream("GET", url) as response:
                     if response.status_code != 200:
                         print(f"⚠️ Сървърът на ESP32 в Зала {room_number} върна код {response.status_code}. Презареждане след 2 сек...")
+                        was_on = CAMERA_HEALTH[room_number].get("is_online", False)
                         CAMERA_HEALTH[room_number]["is_online"] = False
+                        if was_on:
+                            emit_room_event(room_number, "camera_status", {
+                                "room_number": room_number, "armed": False, "is_online": False, "esp32_ip": esp32_ip
+                            })
                         await asyncio.sleep(2)
                         continue
                     
+                    was_offline = not CAMERA_HEALTH[room_number].get("is_online", False)
                     CAMERA_HEALTH[room_number]["is_online"] = True
                     CAMERA_HEALTH[room_number]["last_frame_time"] = time.time()
                     state["status_text"] = "Очакване на обект пред камерата..."
                     state["status_type"] = "idle"
+                    if was_offline:
+                        emit_room_event(room_number, "camera_status", {
+                            "room_number": room_number, "armed": True, "is_online": True, "esp32_ip": esp32_ip
+                        })
+                        emit_room_event(room_number, "biometric_status", {
+                            "student_name": "", "faculty_number": "", "status_text": state["status_text"], "status_type": "idle"
+                        })
 
                     bytes_buffer = b""
                     async for chunk in response.aiter_bytes():
@@ -288,6 +348,15 @@ async def fetch_frames_from_esp32(room_number: str, esp32_ip: str):
                                         state["faculty_number"] = state.get("locked_fac_num", "")
                                         state["status_text"] = "ДОСТЪПЪТ РАЗРЕШЕН!"
                                         state["status_type"] = "success"
+                                    elif state.get("green_state_end_time", 0) > 0 and current_time >= state.get("green_state_end_time", 0):
+                                        state["green_state_end_time"] = 0
+                                        state["student_name"] = ""
+                                        state["faculty_number"] = ""
+                                        state["status_text"] = "Очакване на студент пред терминала..."
+                                        state["status_type"] = "idle"
+                                        emit_room_event(room_number, "biometric_status", {
+                                            "student_name": "", "faculty_number": "", "status_text": state["status_text"], "status_type": "idle"
+                                        })
                                     
                                     # Пускаме ИИ анализа на заден план с балансирана честота (~700ms)
                                     if not state.get("ai_busy", False) and (current_time - state.get("last_ai_run_time", 0) > 0.70):
@@ -300,6 +369,7 @@ async def fetch_frames_from_esp32(room_number: str, esp32_ip: str):
                                 break
                                 
         except Exception as e:
+            was_online = CAMERA_HEALTH[room_number].get("is_online", False)
             CAMERA_HEALTH[room_number]["is_online"] = False
             print(f"❌ [Camera Disconnected] Загубена връзка с ESP32 в Зала {room_number}: {repr(e)}")
             LATEST_FRAMES.pop(room_number, None) # Изчистваме стария замръзнал кадър
@@ -307,6 +377,13 @@ async def fetch_frames_from_esp32(room_number: str, esp32_ip: str):
             state["faculty_number"] = "—"
             state["status_text"] = "Камерата е офлайн (няма връзка)"
             state["status_type"] = "danger"
+            if was_online:
+                emit_room_event(room_number, "camera_status", {
+                    "room_number": room_number, "armed": False, "is_online": False, "esp32_ip": esp32_ip
+                })
+                emit_room_event(room_number, "biometric_status", {
+                    "student_name": "—", "faculty_number": "—", "status_text": state["status_text"], "status_type": "danger"
+                })
             await asyncio.sleep(1.0)
 
 async def generate_from_memory(room_number: str):

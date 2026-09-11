@@ -41,7 +41,11 @@ from .auth import (
     get_password_hash, validate_secure_key, SECRET_KEY, ALGORITHM
 )
 from .seed import seed_superadmin
-from .stream_esp32 import generate_from_memory, fetch_frames_from_esp32, ACTIVE_CAMERAS, CAMERA_TASKS, AI_ROOM_STATES, CAMERA_HEALTH
+from .stream_esp32 import (
+    generate_from_memory, fetch_frames_from_esp32,
+    ACTIVE_CAMERAS, CAMERA_TASKS, AI_ROOM_STATES, CAMERA_HEALTH,
+    subscribe_room_events, unsubscribe_room_events, emit_room_event
+)
 from .storage import init_storage, upload_photo_to_cloud, get_photo_from_cloud, BUCKET_NAME
 from .mailer import send_welcome_email, send_allocation_email
 
@@ -2269,6 +2273,93 @@ async def get_raw_esp32_stream(
         media_type="multipart/x-mixed-replace; boundary=frame"
     )
 
+@app.get("/api/v1/exams/{room_number}/events")
+async def stream_exam_room_events(
+    room_number: str,
+    request: fastapi.Request,
+    token: Optional[str] = Query(None)
+):
+    """
+    Server-Sent Events (SSE) канал за залата в реално време.
+    Заменя постоянното HTTP запитване (polling) с push събития:
+      - camera_status: промяна онлайн/офлайн на ESP32
+      - biometric_status: разпознаване на лице и статус на допускане
+      - roster_update: събитие за допуснат студент (презареждане на списъка)
+    Изпраща ': ping' на всеки 15 секунди, за да държи връзката жива през ngrok и reverse proxies.
+    """
+    auth_token = token or request.cookies.get("examiner_token") or request.cookies.get("admin_token")
+    if not auth_token:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            auth_token = auth_header[7:]
+
+    if not auth_token:
+        raise HTTPException(status_code=401, detail="Authentication token required.")
+
+    try:
+        payload = jwt.decode(auth_token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("role") not in ["examiner", "superadmin"] and not is_superadmin_user(payload):
+            raise HTTPException(status_code=403, detail="Достъпът е отказан.")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired token.")
+
+    queue = subscribe_room_events(room_number)
+
+    async def event_generator():
+        try:
+            # 1. Моментално начално състояние (Snapshot)
+            esp32_ip = ACTIVE_CAMERAS.get(room_number)
+            health = CAMERA_HEALTH.get(room_number, {})
+            is_online = bool(
+                esp32_ip and
+                health.get("is_online", False) and
+                (time.time() - health.get("last_frame_time", 0) < 8.0)
+            )
+            init_cam = {
+                "room_number": room_number,
+                "armed": is_online,
+                "esp32_ip": esp32_ip,
+                "is_online": is_online
+            }
+            yield f"event: camera_status\ndata: {json.dumps(init_cam)}\n\n"
+
+            ai_state = AI_ROOM_STATES.get(room_number, {})
+            init_bio = {
+                "student_name": ai_state.get("student_name", ""),
+                "faculty_number": ai_state.get("faculty_number", ""),
+                "status_text": ai_state.get("status_text", "Очакване на студент..."),
+                "status_type": ai_state.get("status_type", "idle")
+            }
+            yield f"event: biometric_status\ndata: {json.dumps(init_bio)}\n\n"
+
+            # 2. Непрекъснато слушане на събития с 15s keep-alive пинг
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    msg = await asyncio.wait_for(queue.get(), timeout=15.0)
+                    evt_name = msg.get("event", "message")
+                    evt_data = json.dumps(msg.get("data", {}))
+                    yield f"event: {evt_name}\ndata: {evt_data}\n\n"
+                except asyncio.TimeoutError:
+                    # SSE Keep-alive коментар
+                    yield ": ping\n\n"
+        except asyncio.CancelledError:
+            pass
+        finally:
+            unsubscribe_room_events(room_number, queue)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
+
+
 
 # def get_room_live_stream(room_number: str):
 #     """
@@ -2710,6 +2801,14 @@ def admit_student_manual(
     db.add(log_entry)
     db.commit()
 
+    emit_room_event(room_number, "roster_update", {
+        "room_number": room_number,
+        "student_id": str(student.id),
+        "student_name": student.full_name,
+        "faculty_number": student.student_id_number,
+        "action": "manual_admit"
+    })
+
     return {
         "status": "admitted",
         "student_id": str(student.id),
@@ -2774,6 +2873,13 @@ def force_register_student_to_exam(
             log_entry = AccessLog(student_id=student.id, location=room_number, status="GRANTED")
             db.add(log_entry)
             db.commit()
+            emit_room_event(room_number, "roster_update", {
+                "room_number": room_number,
+                "student_id": str(student.id),
+                "student_name": student.full_name,
+                "faculty_number": student.student_id_number,
+                "action": "force_register"
+            })
             return {"status": "success", "message": f"Студентът {student.full_name} вече имаше регистрация и беше допуснат в зала {room_number}."}
         return {"status": "already_done", "message": "Студентът вече има валидна регистрация и е допуснат."}
 
@@ -2788,6 +2894,14 @@ def force_register_student_to_exam(
     log_entry = AccessLog(student_id=student.id, location=room_number, status="GRANTED")
     db.add(log_entry)
     db.commit()
+
+    emit_room_event(room_number, "roster_update", {
+        "room_number": room_number,
+        "student_id": str(student.id),
+        "student_name": student.full_name,
+        "faculty_number": student.student_id_number,
+        "action": "force_register"
+    })
 
     print(f"[Спешен Допуск] Квесторът записа студент {student.full_name} за изпит в зала {room_number}")
     return {"status": "success", "message": f"Успешно извънредно записване на {student.full_name} за дисциплина: {current_exam.subject}."}
@@ -3074,6 +3188,12 @@ async def register_camera(data: CameraRegisterSchema):
     if current_ip == data.esp32_ip and task_alive:
         CAMERA_HEALTH[data.room_number]["last_frame_time"] = time.time()
         CAMERA_HEALTH[data.room_number]["is_online"] = True
+        emit_room_event(data.room_number, "camera_status", {
+            "room_number": data.room_number,
+            "armed": True,
+            "is_online": True,
+            "esp32_ip": data.esp32_ip
+        })
         return {
             "status": "already_active",
             "room_number": data.room_number,
@@ -3091,6 +3211,13 @@ async def register_camera(data: CameraRegisterSchema):
         "esp32_ip": data.esp32_ip
     }
     CAMERA_TASKS[data.room_number] = asyncio.create_task(fetch_frames_from_esp32(data.room_number, data.esp32_ip))
+
+    emit_room_event(data.room_number, "camera_status", {
+        "room_number": data.room_number,
+        "armed": True,
+        "is_online": True,
+        "esp32_ip": data.esp32_ip
+    })
 
     print(f"[Hardware register] Room {data.room_number} is now linked with ESP32 at: {data.esp32_ip}")
     return {

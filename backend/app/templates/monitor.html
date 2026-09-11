@@ -668,66 +668,93 @@
             navigator.sendBeacon(`/api/v1/examiner/rooms/${encodeURIComponent(roomNumber)}/release`);
         });
 
-        // Biometric Real-Time Status Polling
+        // Biometric Real-Time Status Presentation
         let previousStatusType = "idle";
 
-        async function checkBiometricStatus() {
-            try {
-                const res = await fetch(`/api/v1/exams/${roomNumber}/status?token=${token}`);
-                if (res.status === 401) {
-                    logoutExaminer();
-                    return;
-                }
+        function applyBiometricUi(data) {
+            if (!data) return;
+            document.getElementById("studentName").innerText = data.student_name || "—";
+            document.getElementById("facultyNumber").innerText = data.faculty_number || "—";
+            document.getElementById("statusText").innerText = data.status_text || "Очакване на студент...";
+            currentDetectedFacNum = data.faculty_number;
 
-                const data = await res.json();
-                document.getElementById("studentName").innerText = data.student_name || "—";
-                document.getElementById("facultyNumber").innerText = data.faculty_number || "—";
-                document.getElementById("statusText").innerText = data.status_text || "Очакване на студент...";
-                currentDetectedFacNum = data.faculty_number;
+            const card = document.getElementById("statusCard");
+            const alertBox = document.getElementById("statusAlertBox");
+            const pill = document.getElementById("biometricStatePill");
 
-                const card = document.getElementById("statusCard");
-                const alertBox = document.getElementById("statusAlertBox");
-                const pill = document.getElementById("biometricStatePill");
-
-                // Звукова сигнализация при преход към нов статус
-                if (data.status_type !== previousStatusType) {
-                    if (data.status_type === "success") {
-                        playSuccessChime();
-                        fetchRoster(); // Обновяваме списъка с допуснати веднага
-                    } else if (data.status_type === "danger") {
-                        playAlertTone();
-                    }
-                    previousStatusType = data.status_type;
-                }
-
-                // Цветово форматиране на картата
-                card.className = "bg-[var(--card)] border rounded-[var(--radius)] p-6 transition-all duration-300 shadow-sm flex flex-col justify-between space-y-5";
-
+            // Звукова сигнализация при преход към нов статус
+            if (data.status_type !== previousStatusType) {
                 if (data.status_type === "success") {
-                    card.classList.add("border-emerald-500/60", "shadow-emerald-500/10");
-                    alertBox.className = "p-4 rounded-xl text-center border font-bold text-base bg-emerald-500/20 border-emerald-500 text-emerald-600 dark:text-emerald-400";
-                    pill.className = "text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30";
-                    pill.innerText = "ДОСТЪПЪТ РАЗРЕШЕН";
+                    playSuccessChime();
+                    fetchRoster(); // Обновяваме списъка с допуснати веднага
                 } else if (data.status_type === "danger") {
-                    card.classList.add("border-red-500/60", "shadow-red-500/10");
-                    alertBox.className = "p-4 rounded-xl text-center border font-bold text-base bg-red-500/20 border-red-500 text-red-600 dark:text-red-400";
-                    pill.className = "text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/30";
-                    pill.innerText = "ОТКАЗАН ДОСТЪП";
-                } else if (data.status_type === "warning") {
-                    card.classList.add("border-amber-500/60", "shadow-amber-500/10");
-                    alertBox.className = "p-4 rounded-xl text-center border font-bold text-base bg-amber-500/20 border-amber-500 text-amber-600 dark:text-amber-400";
-                    pill.className = "text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30";
-                    pill.innerText = "ВНИМАНИЕ";
-                } else {
-                    card.classList.add("border-[var(--border)]");
-                    alertBox.className = "p-4 bg-[var(--input)] border border-[var(--border)] rounded-xl text-center font-bold text-base text-[var(--foreground)]";
-                    pill.className = "text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-[var(--input)] text-[var(--muted-foreground)] border border-[var(--border)]";
-                    pill.innerText = "ОЧАКВАНЕ";
+                    playAlertTone();
                 }
-
-            } catch (err) {
-                console.warn("Biometric status check error:", err);
+                previousStatusType = data.status_type;
             }
+
+            // Цветово форматиране на картата
+            card.className = "bg-[var(--card)] border rounded-[var(--radius)] p-6 transition-all duration-300 shadow-sm flex flex-col justify-between space-y-5";
+
+            if (data.status_type === "success") {
+                card.classList.add("border-emerald-500/60", "shadow-emerald-500/10");
+                alertBox.className = "p-4 rounded-xl text-center border font-bold text-base bg-emerald-500/20 border-emerald-500 text-emerald-600 dark:text-emerald-400";
+                pill.className = "text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30";
+                pill.innerText = "ДОСТЪПЪТ РАЗРЕШЕН";
+            } else if (data.status_type === "danger") {
+                card.classList.add("border-red-500/60", "shadow-red-500/10");
+                alertBox.className = "p-4 rounded-xl text-center border font-bold text-base bg-red-500/20 border-red-500 text-red-600 dark:text-red-400";
+                pill.className = "text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/30";
+                pill.innerText = "ОТКАЗАН ДОСТЪП";
+            } else if (data.status_type === "warning") {
+                card.classList.add("border-amber-500/60", "shadow-amber-500/10");
+                alertBox.className = "p-4 rounded-xl text-center border font-bold text-base bg-amber-500/20 border-amber-500 text-amber-600 dark:text-amber-400";
+                pill.className = "text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30";
+                pill.innerText = "ВНИМАНИЕ";
+            } else {
+                card.classList.add("border-[var(--border)]");
+                alertBox.className = "p-4 bg-[var(--input)] border border-[var(--border)] rounded-xl text-center font-bold text-base text-[var(--foreground)]";
+                pill.className = "text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-[var(--input)] text-[var(--muted-foreground)] border border-[var(--border)]";
+                pill.innerText = "ОЧАКВАНЕ";
+            }
+        }
+
+        // Real-Time Server-Sent Events (SSE) Pipeline
+        let sseSource = null;
+
+        function setupSSE() {
+            if (sseSource) {
+                try { sseSource.close(); } catch(e) {}
+            }
+
+            const sseUrl = `/api/v1/exams/${encodeURIComponent(roomNumber)}/events?token=${encodeURIComponent(token)}`;
+            sseSource = new EventSource(sseUrl);
+
+            sseSource.addEventListener("camera_status", (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    updateCameraUi(Boolean(data.armed));
+                } catch (err) {
+                    console.warn("SSE camera_status parse error:", err);
+                }
+            });
+
+            sseSource.addEventListener("biometric_status", (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    applyBiometricUi(data);
+                } catch (err) {
+                    console.warn("SSE biometric_status parse error:", err);
+                }
+            });
+
+            sseSource.addEventListener("roster_update", (e) => {
+                fetchRoster();
+            });
+
+            sseSource.onerror = (err) => {
+                console.warn("SSE връзката прекъсна, EventSource ще се свърже автоматично отново...");
+            };
         }
 
         // Permitted Students Hall Roster Fetching & Rendering
@@ -1061,16 +1088,14 @@
             window.location.href = "/login?role=examiner";
         }
 
-        // Initialize Loops
-        checkCameraStatus();
-        setInterval(checkCameraStatus, 2000);
+        // Initialize Real-Time SSE Pipeline & Background Tasks
+        setupSSE();
 
-        checkBiometricStatus();
-        setInterval(checkBiometricStatus, 400);
-
+        // Initial Roster Load + relaxed background sync (every 60s)
         fetchRoster();
-        setInterval(fetchRoster, 3000);
+        setInterval(fetchRoster, 60000);
 
+        // Examiner 1-Lock maintainer
         sendHeartbeat();
         setInterval(sendHeartbeat, 15000);
     </script>
