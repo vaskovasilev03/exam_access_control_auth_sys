@@ -42,7 +42,7 @@ from .auth import (
 )
 from .seed import seed_superadmin
 from .stream_esp32 import (
-    generate_from_memory, fetch_frames_from_esp32,
+    generate_from_memory, fetch_frames_from_esp32, stop_camera_stream,
     ACTIVE_CAMERAS, CAMERA_TASKS, AI_ROOM_STATES, CAMERA_HEALTH,
     subscribe_room_events, unsubscribe_room_events, emit_room_event
 )
@@ -3232,6 +3232,7 @@ def get_exam_room_camera_status(room_number: str):
     """Връща дали залата има регистрирана и работеща в момента активна камера."""
     esp32_ip = ACTIVE_CAMERAS.get(room_number)
     health = CAMERA_HEALTH.get(room_number, {})
+    is_stopped = health.get("stopped", False)
     is_online = bool(
         esp32_ip and 
         health.get("is_online", False) and 
@@ -3240,8 +3241,61 @@ def get_exam_room_camera_status(room_number: str):
     return {
         "room_number": room_number,
         "armed": is_online,
-        "esp32_ip": esp32_ip,
-        "is_online": is_online
+        "esp32_ip": esp32_ip or health.get("esp32_ip"),
+        "is_online": is_online,
+        "stopped": is_stopped
+    }
+
+@app.post("/api/v1/exams/{room_number}/stop-camera")
+async def stop_exam_room_camera(
+    room_number: str,
+    current_user: dict = Depends(get_current_examiner)
+):
+    """
+    Позволява на квестора ръчно да приключи верификацията и да изключи камерата за дадената зала.
+    Спира фоновия таск, освобождава паметта и уведомява свързаните клиенти през SSE.
+    """
+    stop_camera_stream(room_number, reason="manual")
+    return {
+        "status": "success",
+        "room_number": room_number,
+        "message": f"Верификацията за Зала {room_number} бе прекратена успешно."
+    }
+
+@app.post("/api/v1/exams/{room_number}/reconnect-camera")
+async def reconnect_exam_room_camera(
+    room_number: str,
+    current_user: dict = Depends(get_current_examiner)
+):
+    """
+    Опитва повторно свързване с последния известен IP адрес на камерата за залата.
+    """
+    health = CAMERA_HEALTH.get(room_number, {})
+    last_ip = health.get("esp32_ip") or ACTIVE_CAMERAS.get(room_number)
+    if not last_ip:
+        raise HTTPException(status_code=400, detail="Няма запазен IP адрес за тази камера. Включете ESP32 терминала отново.")
+    
+    old_task = CAMERA_TASKS.get(room_number)
+    if old_task and not old_task.done():
+        old_task.cancel()
+
+    ACTIVE_CAMERAS[room_number] = last_ip
+    CAMERA_HEALTH[room_number]["stopped"] = False
+    CAMERA_HEALTH[room_number]["is_online"] = False
+    CAMERA_TASKS[room_number] = asyncio.create_task(fetch_frames_from_esp32(room_number, last_ip))
+    
+    emit_room_event(room_number, "camera_status", {
+        "room_number": room_number,
+        "armed": False,
+        "is_online": False,
+        "stopped": False,
+        "esp32_ip": last_ip
+    })
+    return {
+        "status": "reconnecting",
+        "room_number": room_number,
+        "esp32_ip": last_ip,
+        "message": f"Стартиран е опит за свързване към {last_ip}."
     }
 
 @app.get("/api/v1/exams/{room_number}/status")
