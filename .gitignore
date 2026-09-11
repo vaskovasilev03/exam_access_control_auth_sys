@@ -27,6 +27,8 @@ refractoring*.md
 future*.md
 agent_data/
 .antigravityignore
+*liveness*.md
+LivenessDetection.md
 
 .dart_tool/
 .packages
