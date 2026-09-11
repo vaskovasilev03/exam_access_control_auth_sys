@@ -29,6 +29,8 @@ agent_data/
 .antigravityignore
 *liveness*.md
 LivenessDetection.md
+GEMINI.md
+.agents/
 
 .dart_tool/
 .packages
