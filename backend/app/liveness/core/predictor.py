@@ -13,6 +13,20 @@ MODEL_MAPPING = {
 }
 
 
+import numpy as np
+
+
+class ToTensor:
+    def __call__(self, pic):
+        if isinstance(pic, np.ndarray):
+            if pic.ndim == 2:
+                pic = pic.reshape((pic.shape[0], pic.shape[1], 1))
+            # MiniFASNet was trained on unnormalized raw [0..255] float inputs (see Minivision Silent-Face-Anti-Spoofing data_io/functional.py)
+            img = torch.from_numpy(np.ascontiguousarray(pic.transpose((2, 0, 1))))
+            return img.float()
+        return pic
+
+
 class AntiSpoofPredict:
     def __init__(self, device_id=None):
         if device_id is None or device_id == "cpu":
@@ -26,7 +40,7 @@ class AntiSpoofPredict:
 
         self._models_cache = {}
         self._transform = trans.Compose([
-            trans.ToTensor(),
+            ToTensor(),
         ])
 
     def _load_model(self, model_path):

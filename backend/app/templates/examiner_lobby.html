@@ -88,9 +88,22 @@
                     <span id="liveClockDate" class="text-[10px] uppercase font-semibold text-[var(--muted-foreground)]">--</span>
                 </div>
 
+                <!-- Superadmin Biometric Debugger Button (Visible only to Superadmin) -->
+                <a href="/examiner/biometric-debugger" id="btnSuperadminDebugger" title="Биометричен Дебъгер и Анализ" class="hidden px-3 py-1.5 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 border border-purple-500/30 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"></path>
+                    </svg>
+                    <span class="hidden sm:inline">Биометричен Дебъгер</span>
+                </a>
+
                 <!-- Theme Toggle Button -->
                 <button onclick="toggleTheme()" id="themeToggleBtn" title="Смяна на тема" class="p-2 rounded-lg bg-[var(--input)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--accent)] transition cursor-pointer">
-                    <span id="themeIcon">☀️</span>
+                    <svg id="themeIconSun" class="w-4 h-4 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                    </svg>
+                    <svg id="themeIconMoon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+                    </svg>
                 </button>
 
                 <!-- Refresh Button -->
@@ -256,8 +269,10 @@
 
         <!-- Empty State -->
         <div id="emptyRoomsState" class="hidden bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius)] p-12 text-center shadow-sm space-y-3">
-            <div class="w-16 h-16 rounded-full bg-[var(--input)] text-[var(--muted-foreground)] flex items-center justify-center mx-auto text-2xl">
-                🔍
+            <div class="w-16 h-16 rounded-full bg-[var(--input)] text-[var(--muted-foreground)] flex items-center justify-center mx-auto">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
             </div>
             <h3 class="text-base font-bold text-[var(--foreground)]">Няма намерени изпитни зали</h3>
             <p class="text-xs text-[var(--muted-foreground)] max-w-sm mx-auto">
@@ -293,6 +308,12 @@
             if (payload.role === 'admin' || payload.is_superadmin) {
                 document.getElementById('examinerRoleBadge').innerText = payload.is_superadmin ? 'Superadmin' : 'Администратор';
             }
+            if (payload.is_superadmin || payload.role === 'superadmin') {
+                const debuggerBtn = document.getElementById('btnSuperadminDebugger');
+                if (debuggerBtn) {
+                    debuggerBtn.classList.remove('hidden');
+                }
+            }
         } catch (e) {
             console.warn("JWT parse warning:", e);
         }
@@ -308,13 +329,21 @@
 
         // Theme Toggle
         function applyTheme(isDark) {
+            const sun = document.getElementById("themeIconSun");
+            const moon = document.getElementById("themeIconMoon");
             if (isDark) {
                 document.body.classList.add("dark-mode");
-                document.getElementById("themeIcon").innerText = "🌙";
+                if (sun && moon) {
+                    sun.classList.remove("hidden");
+                    moon.classList.add("hidden");
+                }
                 localStorage.setItem("theme", "dark");
             } else {
                 document.body.classList.remove("dark-mode");
-                document.getElementById("themeIcon").innerText = "☀️";
+                if (sun && moon) {
+                    sun.classList.add("hidden");
+                    moon.classList.remove("hidden");
+                }
                 localStorage.setItem("theme", "light");
             }
         }
@@ -338,12 +367,22 @@
                 type === 'warning' ? 'bg-amber-600 text-white border-amber-500' :
                 'bg-slate-800 text-white border-slate-700'
             }`;
+            const iconSvg = type === 'success' ?
+                `<svg class="w-4 h-4 text-white shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>` :
+                type === 'error' ?
+                `<svg class="w-4 h-4 text-white shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>` :
+                `<svg class="w-4 h-4 text-white shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
+
             toast.innerHTML = `
                 <div class="flex items-center gap-2">
-                    <span>${type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ'}</span>
+                    ${iconSvg}
                     <span>${message}</span>
                 </div>
-                <button onclick="this.parentElement.remove()" class="text-white/80 hover:text-white ml-3 text-xs">✕</button>
+                <button onclick="this.parentElement.remove()" class="text-white/80 hover:text-white ml-3 p-1 rounded hover:bg-white/10 transition cursor-pointer" title="Затвори">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
             `;
             container.appendChild(toast);
             requestAnimationFrame(() => {
@@ -472,13 +511,18 @@
                 } else if (room.is_occupied) {
                     examinerStatusHtml = `
                         <div class="flex items-center gap-1.5 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-3 py-1 rounded-lg border border-amber-500/20">
-                            <span>🔒</span>
+                            <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                            </svg>
                             <span class="truncate">Наблюдава се от: ${room.assigned_examiner || 'друг квестор'}</span>
                         </div>
                     `;
                     actionBtnHtml = `
                         <button disabled class="w-full bg-[var(--input)] text-[var(--muted-foreground)] font-bold py-2.5 px-4 rounded-xl cursor-not-allowed text-xs flex items-center justify-center gap-2 border border-[var(--border)]">
-                            <span>🔒 Залата е заета</span>
+                            <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                            </svg>
+                            <span>Залата е заета</span>
                         </button>
                     `;
                 } else {
@@ -503,8 +547,9 @@
                         <span>Камера LIVE</span>
                     </span>
                 ` : `
-                    <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--muted-foreground)] bg-[var(--input)] px-2.5 py-0.5 rounded-full border border-[var(--border)]">
-                        <span>⚪ Офлайн</span>
+                    <span class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[var(--muted-foreground)] bg-[var(--input)] px-2.5 py-0.5 rounded-full border border-[var(--border)]">
+                        <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                        <span>Офлайн</span>
                     </span>
                 `;
 

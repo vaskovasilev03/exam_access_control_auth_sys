@@ -8,27 +8,22 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 RUN apt-get update && apt-get install -y \
-    build-essential cmake libopenblas-dev liblapack-dev libx11-dev libgl1 libglib2.0-0 \
+    build-essential cmake libopenblas-dev liblapack-dev libx11-dev libgl1 libglib2.0-0 libzbar0 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY requirements.txt .
 
-# Инсталираме пакетите
+# Инсталираме първо чистата CPU версия на torch & torchvision от официалния индекс
+RUN pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
+
+# Инсталираме останалите пакети
 RUN pip install --no-cache-dir -r requirements.txt
 
 # --- ОЛЕКОТЯВАНЕ ---
-RUN pip uninstall -y triton && \
-    rm -rf /usr/local/lib/python3.11/site-packages/nvidia/ && \
-    rm -rf /usr/local/lib/python3.11/site-packages/triton/ && \
-    # Почистване на тестове, кешове и временни библиотеки
-    find /usr/local/lib/python3.11/site-packages/ -type d -name "tests" -exec rm -rf {} + && \
-    find /usr/local/lib/python3.11/site-packages/ -type d -name "test" -exec rm -rf {} + && \
-    find /usr/local/lib/python3.11/site-packages/ -type d -name "__pycache__" -exec rm -rf {} + && \
+RUN find /usr/local/lib/python3.11/site-packages/ -type d -name "__pycache__" -exec rm -rf {} + && \
     find /usr/local/lib/python3.11/site-packages/ -name "*.pyc" -delete && \
-    find /usr/local/lib/python3.11/site-packages/ -name "*.a" -delete && \
-    # Махаме тежките тестови компоненти от самия torch
-    rm -rf /usr/local/lib/python3.11/site-packages/torch/testing*
+    find /usr/local/lib/python3.11/site-packages/ -name "*.a" -delete
 
 # ==========================================
 # STAGE 2: The Slim Runner (Краен олекотен контейнер)
@@ -40,7 +35,7 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 RUN apt-get update && apt-get install -y \
-    libopenblas0 liblapack3 libx11-6 libgl1 libglib2.0-0 \
+    libopenblas0 liblapack3 libx11-6 libgl1 libglib2.0-0 libzbar0 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /code

@@ -184,3 +184,10 @@ class StudentSummarySchema(BaseModel):
     is_twin_exception: Optional[bool] = False
     duplicate_flagged_student_id: Optional[str] = None
     gdpr_consent_given: Optional[bool] = False
+
+class VerifyTwinQrSchema(BaseModel):
+    qr_payload: str
+
+class ToggleQrScanModeSchema(BaseModel):
+    enabled: bool
+    duration_seconds: Optional[int] = 120

@@ -33,4 +33,23 @@ class UiThemeTokens {
       ),
     );
   }
+
+  static TextStyle getMonoFont({
+    Color? color,
+    double? fontSize,
+    FontWeight? fontWeight,
+    double? height,
+    double? letterSpacing,
+  }) {
+    return GoogleFonts.robotoMono(
+      color: color ?? foreground,
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      height: height,
+      letterSpacing: letterSpacing,
+      textStyle: const TextStyle(
+        fontFamilyFallback: ['Courier', 'monospace'],
+      ),
+    );
+  }
 }

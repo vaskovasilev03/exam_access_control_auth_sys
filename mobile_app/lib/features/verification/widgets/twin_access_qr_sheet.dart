@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:mobile_app/core/theme_tokens.dart';
@@ -24,16 +25,50 @@ class TwinAccessQrSheet extends StatefulWidget {
 
 class _TwinAccessQrSheetState extends State<TwinAccessQrSheet> {
   late DateTime _generatedAt;
+  QrCode? _qrCode;
+  String _passcode = '';
 
   @override
   void initState() {
     super.initState();
+    _generateCode();
+  }
+
+  void _generateCode() {
     _generatedAt = DateTime.now();
+    _passcode = _generateDynamicPasscode(
+      widget.profile.id,
+      widget.profile.studentIdNumber,
+      _generatedAt,
+    );
+    final payload = _buildQrPayload();
+    final validation = QrValidator.validate(
+      data: payload,
+      version: QrVersions.auto,
+      errorCorrectionLevel: QrErrorCorrectLevel.L,
+    );
+    _qrCode = validation.isValid ? validation.qrCode : null;
+  }
+
+  String _generateDynamicPasscode(String studentId, String studentIdNumber, DateTime dt) {
+    final epochSec = dt.toUtc().millisecondsSinceEpoch ~/ 1000;
+    final bucket = epochSec ~/ 300;
+    final seed = 'TWIN_PASS:${studentId.trim()}:${studentIdNumber.trim()}:$bucket';
+    final digest = sha256.convert(utf8.encode(seed)).toString();
+    final codeNum = int.parse(digest.substring(0, 8), radix: 16) % 1000000;
+    return codeNum.toString().padLeft(6, '0');
+  }
+
+  String _formattedPasscode(String code) {
+    if (code.length == 6) {
+      return '${code.substring(0, 3)} ${code.substring(3, 6)}';
+    }
+    return code;
   }
 
   void _refreshCode() {
     setState(() {
-      _generatedAt = DateTime.now();
+      _generateCode();
     });
   }
 
@@ -42,10 +77,8 @@ class _TwinAccessQrSheetState extends State<TwinAccessQrSheet> {
       'type': 'TWIN_EXAM_PASS',
       'student_id': widget.profile.id,
       'student_id_number': widget.profile.studentIdNumber,
-      'full_name': widget.profile.fullName,
-      'faculty': widget.profile.faculty,
-      'specialty': widget.profile.specialty,
       'is_twin_exception': true,
+      'passcode': _passcode,
       'timestamp': _generatedAt.toUtc().toIso8601String(),
     };
     return jsonEncode(payload);
@@ -60,7 +93,6 @@ class _TwinAccessQrSheetState extends State<TwinAccessQrSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final qrData = _buildQrPayload();
 
     return Container(
       constraints: BoxConstraints(
@@ -166,20 +198,32 @@ class _TwinAccessQrSheetState extends State<TwinAccessQrSheet> {
                 ),
                 child: Column(
                   children: [
-                    QrImageView(
-                      data: qrData,
-                      version: QrVersions.auto,
-                      size: 220.0,
-                      backgroundColor: Colors.white,
-                      errorCorrectionLevel: QrErrorCorrectLevel.M,
-                      eyeStyle: const QrEyeStyle(
-                        eyeShape: QrEyeShape.square,
-                        color: Colors.black87,
-                      ),
-                      dataModuleStyle: const QrDataModuleStyle(
-                        dataModuleShape: QrDataModuleShape.square,
-                        color: Colors.black87,
-                      ),
+                    RepaintBoundary(
+                      child: _qrCode != null
+                          ? QrImageView.withQr(
+                              qr: _qrCode!,
+                              size: 220.0,
+                              backgroundColor: Colors.white,
+                              errorCorrectionLevel: QrErrorCorrectLevel.M,
+                              eyeStyle: const QrEyeStyle(
+                                eyeShape: QrEyeShape.square,
+                                color: Colors.black87,
+                              ),
+                              dataModuleStyle: const QrDataModuleStyle(
+                                dataModuleShape: QrDataModuleShape.square,
+                                color: Colors.black87,
+                              ),
+                            )
+                          : const SizedBox(
+                              width: 220.0,
+                              height: 220.0,
+                              child: Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: UiThemeTokens.primary,
+                                ),
+                              ),
+                            ),
                     ),
                     const SizedBox(height: 12),
                     Row(
@@ -203,8 +247,71 @@ class _TwinAccessQrSheetState extends State<TwinAccessQrSheet> {
                   ],
                 ),
               ),
+              const SizedBox(height: 14),
 
-              const SizedBox(height: 18),
+              // Manual Verification Passcode Card (For Examiner Manual Entry)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  color: UiThemeTokens.primary.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: UiThemeTokens.primary.withValues(alpha: 0.25)),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.pin_outlined,
+                          size: 15,
+                          color: UiThemeTokens.primary,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'КОД ЗА РЪЧНО ВЪВЕЖДАНЕ ОТ КВЕСТОР',
+                          style: UiThemeTokens.getSansFont(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: UiThemeTokens.primary,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: UiThemeTokens.border),
+                      ),
+                      child: Text(
+                        _formattedPasscode(_passcode),
+                        style: UiThemeTokens.getMonoFont(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w900,
+                          color: UiThemeTokens.foreground,
+                          letterSpacing: 4,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Валиден 5 мин. • Алтернатива: Фак. № ${widget.profile.studentIdNumber}',
+                      style: UiThemeTokens.getSansFont(
+                        fontSize: 11,
+                        color: UiThemeTokens.mutedForeground,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 14),
 
               // Student Identity Information Card
               Container(

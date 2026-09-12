@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exam Gate: Биометричен Дебъгер (Biometric Debugger)</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --card: #ffffff;
+            --ring: #4f46e5;
+            --input: #f3f4f6;
+            --muted: #f9fafb;
+            --accent: #e5e7eb;
+            --border: #e5e7eb;
+            --radius: 0.75rem;
+            --popover: #ffffff;
+            --primary: #4f46e5;
+            --sidebar: #111827;
+            --font-mono: 'Fira Code', monospace;
+            --font-sans: 'Montserrat', sans-serif;
+            --secondary: #f3f4f6;
+            --background: #f8fafc;
+            --foreground: #0f172a;
+            --destructive: #ef4444;
+            --card-foreground: #0f172a;
+            --muted-foreground: #64748b;
+            --primary-foreground: #ffffff;
+        }
+
+        body.dark-mode {
+            --card: #1e293b;
+            --ring: #6366f1;
+            --input: #0f172a;
+            --muted: #334155;
+            --accent: #334155;
+            --border: #334155;
+            --popover: #1e293b;
+            --primary: #6366f1;
+            --sidebar: #0f172a;
+            --secondary: #1e293b;
+            --background: #0f172a;
+            --foreground: #f8fafc;
+            --card-foreground: #f8fafc;
+            --muted-foreground: #94a3b8;
+            --primary-foreground: #ffffff;
+        }
+
+        body {
+            background-color: var(--background);
+            color: var(--foreground);
+            font-family: var(--font-sans);
+        }
+
+        .font-mono-nums {
+            font-family: var(--font-mono);
+            font-variant-numeric: tabular-nums;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col transition-colors duration-200">
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="fixed bottom-6 right-6 z-50 flex flex-col gap-3 pointer-events-none max-w-md w-full px-4"></div>
+
+    <!-- Top Navigation Bar -->
+    <header class="sticky top-0 z-30 bg-[var(--card)]/90 backdrop-blur border-b border-[var(--border)] px-6 py-3.5 transition-colors duration-200">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <!-- Brand & Page Title -->
+            <div class="flex items-center gap-4">
+                <a href="/examiner/lobby" class="p-2 rounded-xl bg-[var(--input)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--accent)] transition cursor-pointer" title="Назад към фоайето">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                    </svg>
+                </a>
+                <div class="flex items-center gap-2.5">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-600 flex items-center justify-center text-white shadow-md shadow-indigo-500/20 font-extrabold text-lg">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-extrabold text-lg tracking-tight text-[var(--foreground)]">Биометричен Дебъгер</span>
+                            <span class="px-2.5 py-0.5 text-xs font-bold rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">Superadmin Mode</span>
+                        </div>
+                        <div class="text-xs text-[var(--muted-foreground)]">Анализ на лицево разпознаване и векторни разстояния в реално време</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Controls & User Profile -->
+            <div class="flex items-center gap-3">
+                <!-- Theme Toggle Button -->
+                <button onclick="toggleTheme()" id="themeToggleBtn" title="Смяна на тема" class="p-2 rounded-xl bg-[var(--input)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--accent)] transition cursor-pointer">
+                    <svg id="themeIconSun" class="w-4 h-4 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                    </svg>
+                    <svg id="themeIconMoon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+                    </svg>
+                </button>
+
+                <!-- Superadmin Profile -->
+                <div class="flex items-center gap-2 pl-2 border-l border-[var(--border)]">
+                    <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center font-bold text-sm shadow-sm" id="userAvatar">
+                        СА
+                    </div>
+                    <div class="hidden sm:flex flex-col text-left">
+                        <span id="userFullName" class="text-xs font-bold text-[var(--foreground)] leading-tight">Superadmin</span>
+                        <span class="text-[10px] text-purple-500 font-semibold">Главен Администратор</span>
+                    </div>
+                </div>
+
+                <!-- Back to Lobby Button -->
+                <a href="/examiner/lobby" class="ml-2 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm shadow-indigo-600/20">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                    </svg>
+                    <span>Към залите</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+
+        <!-- Top Control Bar Card -->
+        <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 shadow-sm space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                
+                <!-- 1. Select Camera -->
+                <div class="md:col-span-4 space-y-1.5">
+                    <label class="block text-xs font-bold text-[var(--foreground)] flex items-center gap-1.5">
+                        <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                        </svg>
+                        <span>Активна камера (Зала)</span>
+                    </label>
+                    <select id="cameraSelect" onchange="onCameraChange()" class="w-full bg-[var(--input)] text-[var(--foreground)] text-xs font-bold rounded-xl border border-[var(--border)] px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition cursor-pointer">
+                        <option value="">Зареждане на камери...</option>
+                    </select>
+                </div>
+
+                <!-- 2. Select Student -->
+                <div class="md:col-span-5 space-y-1.5">
+                    <label class="block text-xs font-bold text-[var(--foreground)] flex items-center gap-1.5">
+                        <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                        </svg>
+                        <span>Целеви студент за сравнение</span>
+                    </label>
+                    <select id="studentSelect" onchange="onStudentChange()" class="w-full bg-[var(--input)] text-[var(--foreground)] text-xs font-bold rounded-xl border border-[var(--border)] px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition cursor-pointer">
+                        <option value="">Първо изберете зала</option>
+                    </select>
+                </div>
+
+                <!-- 3. Tolerance Slider & Reset -->
+                <div class="md:col-span-3 space-y-1.5">
+                    <div class="flex items-center justify-between">
+                        <label class="block text-xs font-bold text-[var(--foreground)] flex items-center gap-1.5">
+                            <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
+                            </svg>
+                            <span>Праг (Tolerance)</span>
+                        </label>
+                        <div class="flex items-center gap-2">
+                            <span id="toleranceBadge" class="px-2 py-0.5 text-xs font-mono font-bold rounded-md bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">0.520</span>
+                            <button onclick="resetTolerance()" class="text-[10px] text-[var(--muted-foreground)] hover:text-indigo-500 underline cursor-pointer" title="Върни по подразбиране (0.520)">Ресет</button>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-[10px] text-[var(--muted-foreground)] font-mono">0.35</span>
+                        <input type="range" id="toleranceSlider" min="0.35" max="0.70" step="0.01" value="0.52" oninput="onToleranceInput(this.value)" class="w-full accent-indigo-600 cursor-pointer h-2 bg-[var(--input)] rounded-lg">
+                        <span class="text-[10px] text-[var(--muted-foreground)] font-mono">0.70</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Informational Banner -->
+            <div class="flex items-center justify-between text-xs pt-2 border-t border-[var(--border)] text-[var(--muted-foreground)]">
+                <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <span>Анти-спуфинг филтърът е деактивиран на този екран с цел изолиран анализ на биометричния вектор.</span>
+                </div>
+                <div class="flex items-center gap-4">
+                    <span id="cameraStatusIndicator" class="font-semibold text-slate-500">Камера: Не е избрана</span>
+                    <button onclick="refreshStream()" class="text-indigo-500 hover:text-indigo-600 font-bold flex items-center gap-1 cursor-pointer">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                        <span>Опресни стрийма</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main 2-Column Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+            <!-- LEFT: Live Camera MJPEG Stream (7 cols) -->
+            <div class="lg:col-span-7 flex flex-col space-y-4">
+                <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 shadow-sm flex flex-col flex-1">
+                    <div class="flex items-center justify-between mb-3 px-1">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" id="streamDot"></span>
+                            <span class="text-xs font-bold text-[var(--foreground)] uppercase tracking-wider" id="streamTitle">ESP32-CAM Видеопоток</span>
+                        </div>
+                        <span id="streamResolutionBadge" class="text-[11px] font-mono text-[var(--muted-foreground)] bg-[var(--input)] px-2 py-0.5 rounded-md border border-[var(--border)]">
+                            SVGA (800x600)
+                        </span>
+                    </div>
+
+                    <!-- Stream Container -->
+                    <div class="relative w-full aspect-[4/3] bg-slate-950 rounded-xl overflow-hidden flex items-center justify-center border border-slate-800 shadow-inner group">
+                        <!-- Placeholder when no stream is loaded -->
+                        <div id="streamPlaceholder" class="text-center space-y-3 p-6">
+                            <div class="w-16 h-16 rounded-2xl bg-slate-900 border border-slate-800 text-slate-500 flex items-center justify-center mx-auto">
+                                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                </svg>
+                            </div>
+                            <div class="space-y-1">
+                                <p class="text-sm font-bold text-slate-300">Няма активен видеопоток</p>
+                                <p class="text-xs text-slate-500 max-w-xs">Изберете онлайн камера и целеви студент от менюто по-горе, за да стартирате биометричния анализ.</p>
+                            </div>
+                        </div>
+
+                        <!-- Live Stream Image Element -->
+                        <img id="streamImage" class="hidden w-full h-full object-contain" alt="Дебъг стрийм" />
+
+                        <!-- Live FPS & Frame Counter Overlay -->
+                        <div id="streamOverlayBadge" class="hidden absolute top-3 left-3 bg-slate-950/80 backdrop-blur border border-slate-700/60 rounded-lg px-2.5 py-1 text-[10px] font-mono text-slate-300 flex items-center gap-2">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                            <span id="streamFpsCounter">MJPEG LIVE</span>
+                        </div>
+                    </div>
+
+                    <!-- Stream Diagnostics Bar -->
+                    <div class="mt-3 pt-3 border-t border-[var(--border)] flex flex-wrap items-center justify-between text-xs text-[var(--muted-foreground)] px-1 gap-2">
+                        <div class="flex items-center gap-3">
+                            <span id="esp32IpLabel" class="font-mono text-[11px]">IP: --</span>
+                            <span class="text-[var(--border)]">|</span>
+                            <span id="telemetryStatusText">Очакване на данни...</span>
+                        </div>
+                        <div class="flex items-center gap-1 font-mono text-[11px]">
+                            <span>Dlib ResNet:</span>
+                            <span class="font-bold text-indigo-500">128-d Vector</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT: Biometric Telemetry & Target Profile (5 cols) -->
+            <div class="lg:col-span-5 flex flex-col space-y-4">
+
+                <!-- Target Student Card -->
+                <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 shadow-sm space-y-4">
+                    <div class="flex items-center justify-between pb-3 border-b border-[var(--border)]">
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-[var(--muted-foreground)]">Целеви Профил</h2>
+                        <span id="registrationBadge" class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-500/10 text-slate-500 border border-slate-500/20">Не е избран</span>
+                    </div>
+
+                    <div class="flex gap-4 items-start">
+                        <!-- Reference Photo from MinIO -->
+                        <div class="relative shrink-0">
+                            <div id="photoPlaceholder" class="w-24 h-32 rounded-xl bg-[var(--input)] border border-[var(--border)] flex items-center justify-center text-[var(--muted-foreground)]">
+                                <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                                </svg>
+                            </div>
+                            <img id="targetStudentPhoto" class="hidden w-24 h-32 rounded-xl object-cover border border-[var(--border)] shadow-sm bg-[var(--input)]" alt="Референтна снимка" />
+                            <div class="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-[var(--card)] border border-[var(--border)] rounded-full px-2 py-0.5 text-[9px] font-bold text-[var(--muted-foreground)] shadow-xs uppercase tracking-tighter">
+                                Референция
+                            </div>
+                        </div>
+
+                        <!-- Details -->
+                        <div class="flex-1 min-w-0 space-y-1.5">
+                            <h3 id="targetStudentName" class="text-base font-extrabold text-[var(--foreground)] truncate">Изберете студент</h3>
+                            <div class="space-y-0.5 text-xs text-[var(--muted-foreground)]">
+                                <p><span class="font-semibold text-[var(--foreground)]">Фак. номер:</span> <span id="targetStudentFac" class="font-mono font-bold text-indigo-500">--</span></p>
+                                <p><span class="font-semibold text-[var(--foreground)]">Специалност:</span> <span id="targetStudentSpecialty">--</span></p>
+                                <p><span class="font-semibold text-[var(--foreground)]">Курс / Група:</span> <span id="targetStudentCourseGroup">--</span></p>
+                                <div id="twinWarningBadge" class="hidden mt-2 pt-1 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 text-[11px] font-bold">
+                                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                    </svg>
+                                    <span>Близнак: Изисква QR верификация</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Real-Time Metrics & Verdict Card -->
+                <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 shadow-sm space-y-4">
+                    <div class="flex items-center justify-between pb-3 border-b border-[var(--border)]">
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-[var(--muted-foreground)]">Резултат от Биометрия</h2>
+                        <span id="telemetryLiveBadge" class="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
+                            <span>LIVE TELEMETRY</span>
+                        </span>
+                    </div>
+
+                    <!-- Big Verdict Banner -->
+                    <div id="verdictBanner" class="p-4 rounded-xl border bg-[var(--input)] border-[var(--border)] text-center transition-colors duration-200">
+                        <span id="verdictText" class="text-sm font-extrabold tracking-wide text-[var(--muted-foreground)]">ОЧАКВАНЕ НА КАДЪР</span>
+                    </div>
+
+                    <!-- Gauge 1: Euclidean Distance -->
+                    <div class="space-y-1.5">
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="font-bold text-[var(--foreground)]">Евклидово разстояние (Euclidean Distance):</span>
+                            <div class="flex items-center gap-1.5 font-mono">
+                                <span id="metricEuclidean" class="text-sm font-extrabold text-[var(--foreground)]">--</span>
+                                <span class="text-[var(--muted-foreground)] text-[11px]">/ праг <span id="metricToleranceThreshold">0.520</span></span>
+                            </div>
+                        </div>
+                        <div class="w-full bg-[var(--input)] rounded-full h-3 overflow-hidden border border-[var(--border)] relative">
+                            <div id="euclideanBar" class="h-full bg-indigo-600 rounded-full transition-all duration-200" style="width: 0%;"></div>
+                            <!-- Threshold Marker Line -->
+                            <div id="thresholdMarker" class="absolute top-0 bottom-0 w-0.5 bg-red-500 z-10" style="left: 52%;"></div>
+                        </div>
+                        <div class="flex justify-between text-[10px] text-[var(--muted-foreground)] font-mono">
+                            <span>0.000 (Идентичен)</span>
+                            <span class="text-red-500 font-bold">Лимит</span>
+                            <span>1.000 (Различен)</span>
+                        </div>
+                    </div>
+
+                    <!-- Gauge 2: Cosine Similarity -->
+                    <div class="space-y-1.5">
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="font-bold text-[var(--foreground)]">Косинусово сходство (Cosine Similarity):</span>
+                            <span id="metricCosine" class="text-sm font-extrabold font-mono text-[var(--foreground)]">--%</span>
+                        </div>
+                        <div class="w-full bg-[var(--input)] rounded-full h-3 overflow-hidden border border-[var(--border)]">
+                            <div id="cosineBar" class="h-full bg-indigo-600 rounded-full transition-all duration-200" style="width: 0%;"></div>
+                        </div>
+                        <div class="flex justify-between text-[10px] text-[var(--muted-foreground)] font-mono">
+                            <span>0%</span>
+                            <span>50%</span>
+                            <span>100% (Пълно съвпадение)</span>
+                        </div>
+                    </div>
+
+                    <!-- Diagnostic Analysis Details -->
+                    <div class="p-3.5 rounded-xl bg-[var(--input)] border border-[var(--border)] space-y-1.5">
+                        <div class="flex items-center gap-1.5 text-xs font-bold text-[var(--foreground)]">
+                            <svg class="w-4 h-4 text-indigo-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <span>Диагностичен извод</span>
+                        </div>
+                        <p id="diagnosticExplanation" class="text-xs text-[var(--muted-foreground)] leading-relaxed">
+                            Изберете камера и студент, за да стартирате биометричния анализ на живо.
+                        </p>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-[var(--border)] py-4 text-center text-xs text-[var(--muted-foreground)] mt-auto">
+        Exam Gate Biometric Analysis Suite &copy; 2026. Защитено за административен достъп.
+    </footer>
+
+    <script>
+        // Проверка за автентикация (Superadmin Only)
+        const token = localStorage.getItem("admin_token") || localStorage.getItem("examiner_token");
+        if (!token) {
+            window.location.href = "/login?role=examiner";
+        }
+
+        let isSuperadmin = false;
+        try {
+            const base64Url = token.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+            const payload = JSON.parse(jsonPayload);
+            if (payload.is_superadmin || payload.role === 'superadmin') {
+                isSuperadmin = true;
+                document.getElementById('userFullName').innerText = payload.sub || "Superadmin";
+            } else {
+                alert("Достъпът до биометричния дебъгер е разрешен единствено за главен администратор (Superadmin).");
+                window.location.href = "/examiner/lobby";
+            }
+        } catch (e) {
+            console.error("Грешка при декодиране на JWT токен:", e);
+            window.location.href = "/login?role=examiner";
+        }
+
+        // Глобални променливи
+        let currentRoom = "";
+        let currentStudentId = "";
+        let currentTolerance = 0.52;
+        let telemetryInterval = null;
+        let allStudentsList = [];
+
+        // Тема (Dark / Light)
+        function applyTheme(isDark) {
+            if (isDark) {
+                document.body.classList.add("dark-mode");
+                document.getElementById("themeIconSun").classList.remove("hidden");
+                document.getElementById("themeIconMoon").classList.add("hidden");
+                localStorage.setItem("theme", "dark");
+            } else {
+                document.body.classList.remove("dark-mode");
+                document.getElementById("themeIconSun").classList.add("hidden");
+                document.getElementById("themeIconMoon").classList.remove("hidden");
+                localStorage.setItem("theme", "light");
+            }
+        }
+
+        function toggleTheme() {
+            const isDark = document.body.classList.contains("dark-mode");
+            applyTheme(!isDark);
+        }
+
+        if (localStorage.getItem("theme") === "dark") {
+            applyTheme(true);
+        }
+
+        // Toast съобщения
+        function showToast(message, type = 'info') {
+            const container = document.getElementById("toastContainer");
+            const toast = document.createElement("div");
+            toast.className = `p-4 rounded-xl shadow-lg border text-sm font-semibold flex items-center justify-between pointer-events-auto transform transition-all duration-300 translate-y-2 opacity-0 ${
+                type === 'success' ? 'bg-emerald-600 text-white border-emerald-500' :
+                type === 'error' ? 'bg-red-600 text-white border-red-500' :
+                type === 'warning' ? 'bg-amber-600 text-white border-amber-500' :
+                'bg-slate-800 text-white border-slate-700'
+            }`;
+            toast.innerHTML = `
+                <div class="flex items-center gap-2">
+                    <span>${message}</span>
+                </div>
+                <button onclick="this.parentElement.remove()" class="text-white/80 hover:text-white ml-3 p-1 rounded hover:bg-white/10 transition cursor-pointer" title="Затвори">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            `;
+            container.appendChild(toast);
+            requestAnimationFrame(() => {
+                toast.classList.remove("translate-y-2", "opacity-0");
+            });
+            setTimeout(() => {
+                toast.classList.add("translate-y-2", "opacity-0");
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        // 1. Зареждане на списъка с камери
+        async function loadCameras() {
+            const cameraSelect = document.getElementById("cameraSelect");
+            try {
+                const res = await fetch("/api/v1/examiner/debugger/cameras", {
+                    headers: { "Authorization": `Bearer ${token}` }
+                });
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}`);
+                }
+                const cameras = await res.json();
+                cameraSelect.innerHTML = '<option value="">-- Изберете камера --</option>';
+
+                if (cameras.length === 0) {
+                    cameraSelect.innerHTML = '<option value="">Няма намерени зали</option>';
+                    return;
+                }
+
+                cameras.forEach(c => {
+                    const opt = document.createElement("option");
+                    opt.value = c.room_number;
+                    opt.textContent = `Зала ${c.room_number} (${c.is_online ? 'ОНЛАЙН' : 'Офлайн'}${c.esp32_ip ? ' - ' + c.esp32_ip : ''})`;
+                    if (c.is_online) {
+                        opt.classList.add("text-emerald-600", "font-bold");
+                    }
+                    cameraSelect.appendChild(opt);
+                });
+
+                // Ако има онлайн камера, изберете първата
+                const onlineCam = cameras.find(c => c.is_online);
+                if (onlineCam) {
+                    cameraSelect.value = onlineCam.room_number;
+                    onCameraChange();
+                } else if (cameras.length > 0) {
+                    cameraSelect.value = cameras[0].room_number;
+                    onCameraChange();
+                }
+            } catch (err) {
+                console.error("Грешка при зареждане на камери:", err);
+                cameraSelect.innerHTML = '<option value="">Грешка при връзка със сървъра</option>';
+                showToast("Грешка при зареждане на камерите", "error");
+            }
+        }
+
+        // 2. Смяна на избрана камера
+        async function onCameraChange() {
+            const cameraSelect = document.getElementById("cameraSelect");
+            currentRoom = cameraSelect.value;
+            if (!currentRoom) {
+                stopStream();
+                return;
+            }
+
+            document.getElementById("cameraStatusIndicator").innerText = `Зала: ${currentRoom}`;
+            document.getElementById("streamTitle").innerText = `ESP32-CAM Видеопоток: Зала ${currentRoom}`;
+
+            await loadStudentsForRoom(currentRoom);
+        }
+
+        // 3. Зареждане на студенти за избраната камера
+        async function loadStudentsForRoom(roomNumber) {
+            const studentSelect = document.getElementById("studentSelect");
+            studentSelect.innerHTML = '<option value="">Зареждане на студенти...</option>';
+
+            try {
+                const res = await fetch(`/api/v1/examiner/debugger/students?room_number=${roomNumber}`, {
+                    headers: { "Authorization": `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                allStudentsList = await res.json();
+
+                studentSelect.innerHTML = '<option value="">-- Изберете студент за сравнение --</option>';
+                
+                // Групираме по записани в залата и други
+                const inRoom = allStudentsList.filter(s => s.is_registered_in_room);
+                const others = allStudentsList.filter(s => !s.is_registered_in_room);
+
+                if (inRoom.length > 0) {
+                    const optGroupIn = document.createElement("optgroup");
+                    optGroupIn.label = `Записани в зала ${roomNumber} (${inRoom.length})`;
+                    inRoom.forEach(s => {
+                        const opt = document.createElement("option");
+                        opt.value = s.id;
+                        opt.textContent = `${s.full_name} (${s.student_id_number})${s.is_twin_exception ? ' [Близнак]' : ''}`;
+                        optGroupIn.appendChild(opt);
+                    });
+                    studentSelect.appendChild(optGroupIn);
+                }
+
+                if (others.length > 0) {
+                    const optGroupOthers = document.createElement("optgroup");
+                    optGroupOthers.label = `Други одобрени студенти (${others.length})`;
+                    others.forEach(s => {
+                        const opt = document.createElement("option");
+                        opt.value = s.id;
+                        opt.textContent = `${s.full_name} (${s.student_id_number})${s.is_twin_exception ? ' [Близнак]' : ''}`;
+                        optGroupOthers.appendChild(opt);
+                    });
+                    studentSelect.appendChild(optGroupOthers);
+                }
+
+                // По подразбиране избираме първия студент в залата
+                if (inRoom.length > 0) {
+                    studentSelect.value = inRoom[0].id;
+                    onStudentChange();
+                } else if (others.length > 0) {
+                    studentSelect.value = others[0].id;
+                    onStudentChange();
+                } else {
+                    studentSelect.innerHTML = '<option value="">Няма студенти с вектор</option>';
+                }
+            } catch (err) {
+                console.error("Грешка при зареждане на студенти:", err);
+                studentSelect.innerHTML = '<option value="">Грешка при зареждане</option>';
+                showToast("Грешка при зареждане на студентите", "error");
+            }
+        }
+
+        // 4. Смяна на избран студент
+        function onStudentChange() {
+            const studentSelect = document.getElementById("studentSelect");
+            currentStudentId = studentSelect.value;
+            if (!currentStudentId) {
+                clearTargetStudentCard();
+                stopStream();
+                return;
+            }
+
+            const student = allStudentsList.find(s => s.id === currentStudentId);
+            if (student) {
+                renderTargetStudentCard(student);
+                startStream();
+            }
+        }
+
+        // 5. Рендериране на целевата карта на студента
+        function renderTargetStudentCard(student) {
+            document.getElementById("targetStudentName").innerText = student.full_name;
+            document.getElementById("targetStudentFac").innerText = student.student_id_number;
+            document.getElementById("targetStudentSpecialty").innerText = student.specialty || "—";
+            document.getElementById("targetStudentCourseGroup").innerText = `Курс ${student.course || '—'}, Група ${student.group || '—'}`;
+
+            const regBadge = document.getElementById("registrationBadge");
+            if (student.is_registered_in_room) {
+                regBadge.innerText = `Записан в зала ${currentRoom}`;
+                regBadge.className = "text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20";
+            } else {
+                regBadge.innerText = "Външен одобрен студент";
+                regBadge.className = "text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-500/10 text-slate-500 border border-slate-500/20";
+            }
+
+            const twinBadge = document.getElementById("twinWarningBadge");
+            if (student.is_twin_exception) {
+                twinBadge.classList.remove("hidden");
+            } else {
+                twinBadge.classList.add("hidden");
+            }
+
+            // Снимка от MinIO
+            const photoImg = document.getElementById("targetStudentPhoto");
+            const photoPlaceholder = document.getElementById("photoPlaceholder");
+            if (student.photo_url) {
+                photoImg.src = `${student.photo_url}?token=${encodeURIComponent(token)}`;
+                photoImg.onload = () => {
+                    photoImg.classList.remove("hidden");
+                    photoPlaceholder.classList.add("hidden");
+                };
+                photoImg.onerror = () => {
+                    photoImg.classList.add("hidden");
+                    photoPlaceholder.classList.remove("hidden");
+                };
+            } else {
+                photoImg.classList.add("hidden");
+                photoPlaceholder.classList.remove("hidden");
+            }
+        }
+
+        function clearTargetStudentCard() {
+            document.getElementById("targetStudentName").innerText = "Изберете студент";
+            document.getElementById("targetStudentFac").innerText = "--";
+            document.getElementById("targetStudentSpecialty").innerText = "--";
+            document.getElementById("targetStudentCourseGroup").innerText = "--";
+            document.getElementById("targetStudentPhoto").classList.add("hidden");
+            document.getElementById("photoPlaceholder").classList.remove("hidden");
+            document.getElementById("registrationBadge").innerText = "Не е избран";
+            document.getElementById("twinWarningBadge").classList.add("hidden");
+        }
+
+        // 6. Управление на прага (Tolerance)
+        function onToleranceInput(val) {
+            currentTolerance = parseFloat(val);
+            document.getElementById("toleranceBadge").innerText = currentTolerance.toFixed(3);
+            document.getElementById("metricToleranceThreshold").innerText = currentTolerance.toFixed(3);
+            
+            // Преместване на маркера на прага (0.00 to 1.00 scale)
+            const percent = Math.min(100, Math.max(0, currentTolerance * 100));
+            document.getElementById("thresholdMarker").style.left = `${percent}%`;
+
+            // Ако стриймът върви, презареждаме с новия праг
+            if (currentRoom && currentStudentId) {
+                updateStreamUrl();
+            }
+        }
+
+        function resetTolerance() {
+            document.getElementById("toleranceSlider").value = "0.52";
+            onToleranceInput("0.52");
+        }
+
+        // 7. Стартиране и опресняване на стрийма
+        function updateStreamUrl() {
+            const streamImg = document.getElementById("streamImage");
+            const url = `/api/v1/exams/${currentRoom}/debug-stream?student_id=${currentStudentId}&tolerance=${currentTolerance.toFixed(3)}&token=${encodeURIComponent(token)}`;
+            streamImg.src = url;
+        }
+
+        function startStream() {
+            if (!currentRoom || !currentStudentId) return;
+
+            const streamImg = document.getElementById("streamImage");
+            const placeholder = document.getElementById("streamPlaceholder");
+            const overlayBadge = document.getElementById("streamOverlayBadge");
+
+            updateStreamUrl();
+
+            streamImg.onload = () => {
+                streamImg.classList.remove("hidden");
+                placeholder.classList.add("hidden");
+                overlayBadge.classList.remove("hidden");
+            };
+
+            streamImg.onerror = () => {
+                streamImg.classList.add("hidden");
+                placeholder.classList.remove("hidden");
+                overlayBadge.classList.add("hidden");
+                document.getElementById("telemetryStatusText").innerText = "Грешка при видеопотока (камерата може да е офлайн)";
+            };
+
+            // Стартиране на polling на телеметрията на всеки 500ms
+            if (telemetryInterval) clearInterval(telemetryInterval);
+            telemetryInterval = setInterval(fetchTelemetry, 500);
+            fetchTelemetry();
+        }
+
+        function stopStream() {
+            const streamImg = document.getElementById("streamImage");
+            const placeholder = document.getElementById("streamPlaceholder");
+            const overlayBadge = document.getElementById("streamOverlayBadge");
+
+            streamImg.src = "";
+            streamImg.classList.add("hidden");
+            placeholder.classList.remove("hidden");
+            overlayBadge.classList.add("hidden");
+
+            if (telemetryInterval) {
+                clearInterval(telemetryInterval);
+                telemetryInterval = null;
+            }
+            resetTelemetryUi();
+        }
+
+        function refreshStream() {
+            if (currentRoom && currentStudentId) {
+                updateStreamUrl();
+                showToast("Видеопотокът се опреснява...", "info");
+            }
+        }
+
+        // 8. Извличане на телеметрия в реално време
+        async function fetchTelemetry() {
+            if (!currentRoom) return;
+            try {
+                const res = await fetch(`/api/v1/exams/${currentRoom}/debug/compare-telemetry?token=${encodeURIComponent(token)}`);
+                if (!res.ok) return;
+                const data = await res.json();
+                updateTelemetryUi(data);
+            } catch (err) {
+                console.warn("Грешка при телеметрия:", err);
+            }
+        }
+
+        function updateTelemetryUi(data) {
+            const verdictBanner = document.getElementById("verdictBanner");
+            const verdictText = document.getElementById("verdictText");
+            const metricEuclidean = document.getElementById("metricEuclidean");
+            const metricCosine = document.getElementById("metricCosine");
+            const euclideanBar = document.getElementById("euclideanBar");
+            const cosineBar = document.getElementById("cosineBar");
+            const explanation = document.getElementById("diagnosticExplanation");
+
+            if (!data.has_frame) {
+                verdictBanner.className = "p-4 rounded-xl border bg-[var(--input)] border-[var(--border)] text-center";
+                verdictText.innerText = "НЯМА ПОЛУЧЕН КАДЪР";
+                verdictText.className = "text-sm font-extrabold tracking-wide text-[var(--muted-foreground)]";
+                metricEuclidean.innerText = "--";
+                metricCosine.innerText = "--%";
+                euclideanBar.style.width = "0%";
+                cosineBar.style.width = "0%";
+                explanation.innerText = "Камерата не изпраща кадри или видеопотокът е спрян.";
+                return;
+            }
+
+            if (!data.face_detected) {
+                verdictBanner.className = "p-4 rounded-xl border bg-amber-500/10 border-amber-500/20 text-center";
+                verdictText.innerText = "ТЪРСЕНЕ НА ЛИЦЕ В КАДЪРА...";
+                verdictText.className = "text-sm font-extrabold tracking-wide text-amber-600 dark:text-amber-400";
+                metricEuclidean.innerText = "--";
+                metricCosine.innerText = "--%";
+                euclideanBar.style.width = "0%";
+                cosineBar.style.width = "0%";
+                explanation.innerText = "В момента пред обектива няма засечено лице. Уверете се, че студентът стои срещу камерата при добро осветление.";
+                return;
+            }
+
+            // Лице е открито и сравнено
+            const dist = data.euclidean_distance;
+            const sim = data.cosine_similarity;
+            const isMatch = data.is_match;
+            const tol = data.tolerance;
+
+            metricEuclidean.innerText = dist !== null ? dist.toFixed(3) : "--";
+            metricCosine.innerText = sim !== null ? `${sim.toFixed(1)}%` : "--%";
+
+            // Прогрес ленти
+            if (dist !== null) {
+                const distPercent = Math.min(100, Math.max(0, dist * 100));
+                euclideanBar.style.width = `${distPercent}%`;
+                euclideanBar.className = `h-full rounded-full transition-all duration-200 ${isMatch ? 'bg-emerald-500' : 'bg-rose-500'}`;
+            }
+
+            if (sim !== null) {
+                cosineBar.style.width = `${sim}%`;
+                cosineBar.className = `h-full rounded-full transition-all duration-200 ${isMatch ? 'bg-emerald-500' : 'bg-amber-500'}`;
+            }
+
+            if (isMatch) {
+                verdictBanner.className = "p-4 rounded-xl border bg-emerald-500/10 border-emerald-500/30 text-center";
+                verdictText.innerText = "СЪВПАДЕНИЕ (MATCH)";
+                verdictText.className = "text-base font-extrabold tracking-wide text-emerald-600 dark:text-emerald-400";
+                explanation.innerHTML = `Засеченото лице <span class="text-emerald-600 dark:text-emerald-400 font-bold">съвпада успешно</span> с профила на <strong>${data.target_name || 'студента'}</strong>. Евклидовото разстояние <strong>${dist.toFixed(3)}</strong> е под прага <strong>${tol.toFixed(3)}</strong> със сходство <strong>${sim.toFixed(1)}%</strong>.`;
+            } else {
+                verdictBanner.className = "p-4 rounded-xl border bg-rose-500/10 border-rose-500/30 text-center";
+                verdictText.innerText = "НЯМА СЪВПАДЕНИЕ (NO MATCH)";
+                verdictText.className = "text-base font-extrabold tracking-wide text-rose-600 dark:text-rose-400";
+                explanation.innerHTML = `Засечено е лице, но разстоянието <strong>${dist.toFixed(3)}</strong> <span class="text-rose-600 dark:text-rose-400 font-bold">надвишава прага ${tol.toFixed(3)}</span>. Ако лицето на живо е точно този студент, опитайте да увеличите прага (напр. 0.55 - 0.60) с плъзгача за тестване или прегледайте качеството на референтната снимка.`;
+            }
+
+            document.getElementById("telemetryStatusText").innerText = `Последен анализ: ${new Date().toLocaleTimeString("bg-BG")}`;
+        }
+
+        function resetTelemetryUi() {
+            const verdictBanner = document.getElementById("verdictBanner");
+            const verdictText = document.getElementById("verdictText");
+            verdictBanner.className = "p-4 rounded-xl border bg-[var(--input)] border-[var(--border)] text-center";
+            verdictText.innerText = "ОЧАКВАНЕ НА ИЗБОР";
+            verdictText.className = "text-sm font-extrabold tracking-wide text-[var(--muted-foreground)]";
+            document.getElementById("metricEuclidean").innerText = "--";
+            document.getElementById("metricCosine").innerText = "--%";
+            document.getElementById("euclideanBar").style.width = "0%";
+            document.getElementById("cosineBar").style.width = "0%";
+            document.getElementById("diagnosticExplanation").innerText = "Изберете камера и студент от горния панел.";
+        }
+
+        // Инициализация при зареждане
+        window.addEventListener("DOMContentLoaded", () => {
+            loadCameras();
+        });
+    </script>
+</body>
+</html>

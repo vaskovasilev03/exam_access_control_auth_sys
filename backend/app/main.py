@@ -34,7 +34,8 @@ from .schemas import (
     AdminCreateSchema, ExaminerCreateSchema, StudentEnrollSchema,
     ExamUploadValidationSchema, StudentLoginSchema, StudentLoginResponseSchema,
     ChangePasswordSchema, CameraRegisterSchema, StudentProfileSchema,
-    StudentSummarySchema, SecureKeyGenerateSchema, UnifiedRegisterSchema
+    StudentSummarySchema, SecureKeyGenerateSchema, UnifiedRegisterSchema,
+    VerifyTwinQrSchema, ToggleQrScanModeSchema
 )
 from .auth import (
     create_access_token, get_current_user, get_current_examiner, require_admin, require_examiner,
@@ -46,7 +47,9 @@ from .liveness import LivenessDetector, get_liveness_detector
 from .stream_esp32 import (
     generate_from_memory, fetch_frames_from_esp32, stop_camera_stream,
     ACTIVE_CAMERAS, CAMERA_TASKS, AI_ROOM_STATES, CAMERA_HEALTH,
-    subscribe_room_events, unsubscribe_room_events, emit_room_event
+    subscribe_room_events, unsubscribe_room_events, emit_room_event,
+    set_room_qr_scan_mode, process_twin_qr_admission,
+    generate_debug_stream, DEBUG_TELEMETRY
 )
 from .storage import init_storage, upload_photo_to_cloud, get_photo_from_cloud, BUCKET_NAME
 from .mailer import send_welcome_email, send_allocation_email
@@ -2333,6 +2336,194 @@ async def get_raw_esp32_stream(
         media_type="multipart/x-mixed-replace; boundary=frame"
     )
 
+@app.get("/api/v1/exams/{room_number}/debug/students")
+async def get_debug_students(
+    room_number: str,
+    request: fastapi.Request,
+    token: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """
+    Връща списък на всички одобрени студенти с face_embedding за биометричен дебъг.
+    Студентите, записани за изпит в тази зала, излизат най-отгоре.
+    """
+    auth_token = token or request.cookies.get("examiner_token") or request.cookies.get("admin_token")
+    if not auth_token:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            auth_token = auth_header[7:]
+
+    if not auth_token:
+        raise HTTPException(status_code=401, detail="Authentication token required.")
+
+    try:
+        payload = jwt.decode(auth_token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("role") not in ["examiner", "superadmin"] and not is_superadmin_user(payload):
+            raise HTTPException(status_code=403, detail="Достъпът е отказан.")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired token.")
+
+    all_students = db.query(Student).filter(
+        Student.face_embedding != None,
+        Student.status == "APPROVED"
+    ).all()
+
+    registered_ids = set(
+        s_id for (s_id,) in db.query(ExamRegistration.student_id).join(Exam).filter(
+            Exam.room_number == room_number
+        ).all()
+    )
+
+    results = []
+    for s in all_students:
+        is_reg = s.id in registered_ids
+        results.append({
+            "id": str(s.id),
+            "full_name": s.full_name,
+            "student_id_number": s.student_id_number,
+            "faculty": s.faculty,
+            "specialty": s.specialty,
+            "course": s.course,
+            "group": s.group,
+            "is_twin_exception": bool(s.is_twin_exception),
+            "is_registered_in_room": is_reg,
+            "photo_url": f"/api/v1/exams/{room_number}/debug/student-photo/{s.id}" if s.photo_path else None
+        })
+
+    results.sort(key=lambda x: (not x["is_registered_in_room"], x["full_name"]))
+    return results
+
+@app.get("/api/v1/exams/{room_number}/debug/student-photo/{student_id}")
+def get_debug_student_photo(
+    room_number: str,
+    student_id: str,
+    request: fastapi.Request,
+    token: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """
+    Предоставя референтната снимка на студента от MinIO за сравнение в дебъгера.
+    """
+    auth_token = token or request.cookies.get("examiner_token") or request.cookies.get("admin_token")
+    if not auth_token:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            auth_token = auth_header[7:]
+
+    if not auth_token:
+        raise HTTPException(status_code=401, detail="Authentication token required.")
+
+    try:
+        payload = jwt.decode(auth_token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("role") not in ["examiner", "superadmin"] and not is_superadmin_user(payload):
+            raise HTTPException(status_code=403, detail="Достъпът е отказан.")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired token.")
+
+    student = db.query(Student).filter(Student.id == student_id).first()
+    if not student or not student.photo_path:
+        raise HTTPException(status_code=404, detail="Снимката на студента не е намерена.")
+
+    prefix = f"/{BUCKET_NAME}/"
+    if student.photo_path.startswith(prefix):
+        object_name = student.photo_path[len(prefix):]
+    else:
+        object_name = student.photo_path.lstrip("/")
+
+    try:
+        file_data = get_photo_from_cloud(object_name)
+        return Response(content=file_data, media_type="image/jpeg")
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Грешка при извличане на снимката: {str(e)}")
+
+@app.get("/api/v1/exams/{room_number}/debug-stream")
+async def get_debug_esp32_stream(
+    room_number: str,
+    student_id: str = Query(..., description="ID на целевия студент за биометрично сравнение"),
+    tolerance: float = Query(0.52, ge=0.30, le=0.80, description="Праг на евклидово разстояние"),
+    token: Optional[str] = Query(None),
+    request: fastapi.Request = None
+):
+    """
+    Интерактивен MJPEG стрийм за дебъгване и визуален анализ на биометричното разпознаване.
+    Сравнява в реално време всяко засечено лице в кадъра с 128-мерния вектор на целевия студент.
+    Достъпно само за Superadmin.
+    """
+    auth_token = token
+    if not auth_token and request:
+        auth_token = request.cookies.get("examiner_token") or request.cookies.get("admin_token")
+        if not auth_token:
+            auth_header = request.headers.get("Authorization")
+            if auth_header and auth_header.startswith("Bearer "):
+                auth_token = auth_header[7:]
+
+    if not auth_token:
+        raise HTTPException(status_code=401, detail="Authentication token required.")
+
+    try:
+        payload = jwt.decode(auth_token, SECRET_KEY, algorithms=[ALGORITHM])
+        if not is_superadmin_user(payload):
+            raise HTTPException(status_code=403, detail="Достъпът е разрешен само за Superadmin.")
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired token.")
+
+    if room_number not in ACTIVE_CAMERAS:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Няма регистрирана активна ESP32 камера за зала {room_number}."
+        )
+
+    esp32_ip = ACTIVE_CAMERAS[room_number]
+    if room_number not in CAMERA_TASKS or CAMERA_TASKS[room_number].done():
+        CAMERA_TASKS[room_number] = asyncio.create_task(fetch_frames_from_esp32(room_number, esp32_ip))
+
+    return StreamingResponse(
+        generate_debug_stream(room_number, student_id, tolerance),
+        media_type="multipart/x-mixed-replace; boundary=frame"
+    )
+
+@app.get("/api/v1/exams/{room_number}/debug/compare-telemetry")
+async def get_debug_compare_telemetry(
+    room_number: str,
+    request: fastapi.Request,
+    token: Optional[str] = Query(None)
+):
+    """
+    Връща последно изчислените биометрични метрики от дебъг стрийма за зала {room_number}.
+    Достъпно само за Superadmin.
+    """
+    auth_token = token or request.cookies.get("examiner_token") or request.cookies.get("admin_token")
+    if not auth_token:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            auth_token = auth_header[7:]
+
+    if not auth_token:
+        raise HTTPException(status_code=401, detail="Authentication token required.")
+
+    try:
+        payload = jwt.decode(auth_token, SECRET_KEY, algorithms=[ALGORITHM])
+        if not is_superadmin_user(payload):
+            raise HTTPException(status_code=403, detail="Достъпът е разрешен само за Superadmin.")
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired token.")
+
+    data = DEBUG_TELEMETRY.get(room_number)
+    if not data:
+        return {
+            "has_frame": False,
+            "face_detected": False,
+            "target_student_id": None,
+            "target_name": None,
+            "target_fac": None,
+            "euclidean_distance": None,
+            "cosine_similarity": None,
+            "tolerance": 0.52,
+            "is_match": False,
+            "timestamp": time.time()
+        }
+    return data
+
 @app.get("/api/v1/exams/{room_number}/events")
 async def stream_exam_room_events(
     room_number: str,
@@ -2446,6 +2637,119 @@ def get_examiner_lobby_page(request: fastapi.Request, response: Response):
         name="examiner_lobby.html",
         context={"request": request}
     )
+
+@app.get("/examiner/biometric-debugger", response_class=HTMLResponse)
+def get_biometric_debugger_page(request: fastapi.Request, response: Response):
+    """
+    Връща самостоятелната страница за биометричен анализ и дебъг в реално време.
+    Достъпна единствено за Superadmin, логнат като квестор.
+    """
+    raw_token = request.cookies.get("examiner_token") or request.cookies.get("admin_token")
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        raw_token = auth_header[7:]
+
+    if not raw_token:
+        return RedirectResponse(url="/login?role=examiner", status_code=302)
+
+    try:
+        payload = jwt.decode(raw_token, SECRET_KEY, algorithms=[ALGORITHM])
+        if not is_superadmin_user(payload):
+            raise HTTPException(status_code=403, detail="Достъпът е разрешен само за главен администратор (Superadmin).")
+    except jwt.PyJWTError:
+        return RedirectResponse(url="/login?role=examiner", status_code=302)
+
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+
+    return templates.TemplateResponse(
+        request=request,
+        name="biometric_debugger.html",
+        context={"request": request}
+    )
+
+@app.get("/api/v1/examiner/debugger/cameras")
+def get_debugger_cameras(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_examiner)
+):
+    """
+    Връща списък на наличните ESP32 камери и зали за биометричния дебъгер.
+    Достъпно само за Superadmin.
+    """
+    if not is_superadmin_user(current_user):
+        raise HTTPException(status_code=403, detail="Достъпът е разрешен само за Superadmin.")
+
+    all_rooms_set = set(ACTIVE_CAMERAS.keys())
+    exam_rooms = db.query(Exam.room_number).distinct().all()
+    for r in exam_rooms:
+        if r[0]:
+            all_rooms_set.add(r[0])
+
+    cameras_list = []
+    for room in sorted(list(all_rooms_set)):
+        esp32_ip = ACTIVE_CAMERAS.get(room)
+        health = CAMERA_HEALTH.get(room, {})
+        is_online = bool(
+            esp32_ip and
+            health.get("is_online", False) and
+            (time.time() - health.get("last_frame_time", 0) < 8.0)
+        )
+        cameras_list.append({
+            "room_number": room,
+            "is_online": is_online,
+            "esp32_ip": esp32_ip or health.get("esp32_ip"),
+            "has_stream": room in ACTIVE_CAMERAS
+        })
+
+    cameras_list.sort(key=lambda c: (not c["is_online"], c["room_number"]))
+    return cameras_list
+
+@app.get("/api/v1/examiner/debugger/students")
+def get_debugger_students(
+    room_number: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_examiner)
+):
+    """
+    Връща списък на всички одобрени студенти с face_embedding за биометричен анализ.
+    Достъпно само за Superadmin.
+    """
+    if not is_superadmin_user(current_user):
+        raise HTTPException(status_code=403, detail="Достъпът е разрешен само за Superadmin.")
+
+    all_students = db.query(Student).filter(
+        Student.face_embedding != None,
+        Student.status == "APPROVED"
+    ).all()
+
+    registered_ids = set()
+    if room_number:
+        registered_ids = set(
+            s_id for (s_id,) in db.query(ExamRegistration.student_id).join(Exam).filter(
+                Exam.room_number == room_number
+            ).all()
+        )
+
+    results = []
+    for s in all_students:
+        is_reg = s.id in registered_ids
+        results.append({
+            "id": str(s.id),
+            "full_name": s.full_name,
+            "student_id_number": s.student_id_number,
+            "faculty": s.faculty,
+            "specialty": s.specialty,
+            "course": s.course,
+            "group": s.group,
+            "is_twin_exception": bool(s.is_twin_exception),
+            "is_registered_in_room": is_reg,
+            "photo_url": f"/api/v1/exams/{room_number or '1151'}/debug/student-photo/{s.id}" if s.photo_path else None
+        })
+
+    results.sort(key=lambda x: (not x["is_registered_in_room"], x["full_name"]))
+    return results
 
 @app.get("/api/v1/examiner/rooms-overview")
 def get_examiner_rooms_overview(
@@ -2693,6 +2997,8 @@ def get_exam_room_roster(
                 "subject": "Няма активен изпит",
                 "lecturer": "—",
                 "date_time": "—",
+                "iso_date_time": None,
+                "start_timestamp": None,
                 "session_type": "—"
             },
             "assigned_examiner": assigned_info.get("examiner_name") if assigned_info else None,
@@ -2781,6 +3087,8 @@ def get_exam_room_roster(
             "subject": exam.subject,
             "lecturer": exam.lecturer or "—",
             "date_time": exam.date_time.strftime("%d.%m.%Y %H:%M") if exam.date_time else "—",
+            "iso_date_time": exam.date_time.isoformat() if exam.date_time else None,
+            "start_timestamp": exam.date_time.timestamp() if exam.date_time else None,
             "session_type": exam.session_type.value if hasattr(exam.session_type, 'value') else str(exam.session_type)
         },
         "assigned_examiner": assigned_info.get("examiner_name") if assigned_info else None,
@@ -2878,7 +3186,42 @@ def admit_student_manual(
     }
 
 
+@app.post("/api/v1/exams/{room_number}/toggle-qr-scan-mode")
+def toggle_stream_qr_scan_mode(
+    room_number: str,
+    payload: ToggleQrScanModeSchema,
+    current_user: dict = Depends(get_current_examiner)
+):
+    """
+    Превключва режима за временно сканиране на дигитален QR код през ESP32 камерата на залата.
+    """
+    res = set_room_qr_scan_mode(
+        room_number,
+        enabled=payload.enabled,
+        duration_seconds=payload.duration_seconds or 120
+    )
+    return res
+
+
+@app.post("/api/v1/exams/{room_number}/verify-twin-qr")
+def verify_twin_qr(
+    room_number: str,
+    payload: VerifyTwinQrSchema,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_examiner)
+):
+    """
+    Ръчно/скенерно валидиране на динамичния дигитален QR пропуск за близнак (TWIN_EXAM_PASS).
+    """
+    state = AI_ROOM_STATES.get(room_number)
+    res = process_twin_qr_admission(payload.qr_payload, room_number, db=db, state=state)
+    if not res.get("admitted"):
+        raise HTTPException(status_code=400, detail=res.get("error", "Невалиден изпитен пропуск"))
+    return res
+
+
 @app.get("/api/v1/exams/{room_number}/monitor", response_class=HTMLResponse)
+
 def get_monitor_page(room_number: str, request: fastapi.Request, response: Response):
     """ Връща страницата за жив мониторинг на залата """
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
@@ -2997,14 +3340,15 @@ def verify_selfie_liveness_and_uniqueness(
     face_bytes: bytes,
     student_id: Optional[str],
     db: Session,
-    enforce_liveness: bool = False
+    enforce_liveness: bool = True
 ) -> Tuple[bool, float, Optional[Student], Optional[float]]:
     """
     Валидира:
     1. Декодиране на изображението (OpenCV)
     2. Откриване на точно едно лице (face_recognition)
-    3. 1:N векторна проверка за съвпадение (pgvector, distance < 0.42)
-    Връща: (True, 1.0, closest_duplicate_student, duplicate_distance)
+    3. Проверка за жив човек (Anti-Spoofing MiniFASNet)
+    4. 1:N векторна проверка за съвпадение (pgvector, distance < 0.42)
+    Връща: (is_real, liveness_score, closest_duplicate_student, duplicate_distance)
     """
     if not face_bytes:
         raise HTTPException(status_code=400, detail="Липсва съдържание на снимката.")
@@ -3029,31 +3373,16 @@ def verify_selfie_liveness_and_uniqueness(
 
     face_box = face_locations[0] # (top, right, bottom, left)
 
-    # 1:N collision check against approved students
-    closest_duplicate = None
-    min_distance = None
-    encodings = face_recognition.face_encodings(rgb_frame, [face_box])
-    if encodings and student_id:
-        candidate_encoding = encodings[0]
-        # Query closest approved student with existing embedding (excluding self)
-        closest_row = (
-            db.query(
-                Student,
-                Student.face_embedding.l2_distance(candidate_encoding).label("dist")
+    is_real = True
+    liveness_score = 1.0
+    if enforce_liveness:
+        detector = get_liveness_detector()
+        is_real, liveness_score = detector.check(frame, face_box)
+        if not is_real:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Неуспешна проверка за автентичност (Liveness Failed: {liveness_score:.2f})! Снимката изглежда заснета от екран, хартия или маска. Моля, направете снимка на живо."
             )
-            .filter(
-                Student.face_embedding != None,
-                Student.id != student_id,
-                Student.status == "APPROVED"
-            )
-            .order_by("dist")
-            .first()
-        )
-        if closest_row and closest_row.dist is not None:
-            closest_duplicate = closest_row[0]
-            min_distance = float(closest_row[1])
-
-    return True, 1.0, closest_duplicate, min_distance
 
     # 1:N collision check against approved students
     closest_duplicate = None
@@ -3120,7 +3449,7 @@ async def student_submit_for_verification(
     if not student:
         if is_superadmin_user(current_user):
             contents = await file.read()
-            verify_selfie_liveness_and_uniqueness(contents, None, db)
+            verify_selfie_liveness_and_uniqueness(contents, None, db, enforce_liveness=True)
             photo_url = upload_photo_to_cloud(
                 file_data=contents,
                 object_name=f"superadmin_{int(time.time())}{os.path.splitext(file.filename)[1]}",
@@ -3156,7 +3485,7 @@ async def student_submit_for_verification(
             face_bytes=contents,
             student_id=str(student.id) if student else None,
             db=db,
-            enforce_liveness=False
+            enforce_liveness=True
         )
 
         ts = int(time.time())
@@ -3263,7 +3592,7 @@ async def student_upload_verification_docs(
             face_bytes=face_contents,
             student_id=str(student.id) if student else None,
             db=db,
-            enforce_liveness=False
+            enforce_liveness=True
         )
 
         ts = int(time.time())
@@ -3449,6 +3778,18 @@ async def approve_twin_biometrics(
         student.face_embedding = student_embedding
         student.status = "APPROVED"
         student.is_twin_exception = True
+
+        # Синхронизиране на флага за близнак при другия свързан студент
+        if student.duplicate_flagged_student_id:
+            other_twin = db.query(Student).filter(Student.id == student.duplicate_flagged_student_id).first()
+            if other_twin:
+                other_twin.is_twin_exception = True
+                if not other_twin.duplicate_flagged_student_id:
+                    other_twin.duplicate_flagged_student_id = student.id
+
+        reverse_flagged = db.query(Student).filter(Student.duplicate_flagged_student_id == student.id).all()
+        for rf in reverse_flagged:
+            rf.is_twin_exception = True
 
         flagged_info = ""
         if student.duplicate_flagged_student_id:

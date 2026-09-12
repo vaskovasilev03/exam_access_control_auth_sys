@@ -104,14 +104,19 @@
                 </div>
 
                 <!-- Sound Chime Toggle -->
-                <button onclick="toggleAudio()" id="audioToggleBtn" title="Звукова сигнализация" class="p-2 rounded-lg bg-[var(--input)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--accent)] transition cursor-pointer">
-                    <span id="audioIcon">🔊</span>
+                <button onclick="toggleAudio()" id="audioToggleBtn" title="Звукова сигнализация" class="p-2 rounded-lg bg-[var(--input)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--accent)] transition cursor-pointer flex items-center justify-center">
+                    <span id="audioIcon" class="flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M11 5L6 9H2v6h4l5 4V5z"></path></svg>
+                    </span>
                 </button>
 
                 <!-- Dark/Light Theme Toggle -->
-                <button onclick="toggleTheme()" id="themeToggleBtn" title="Смяна на тема" class="p-2 rounded-lg bg-[var(--input)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--accent)] transition cursor-pointer">
-                    <span id="themeIcon">☀️</span>
+                <button onclick="toggleTheme()" id="themeToggleBtn" title="Смяна на тема" class="p-2 rounded-lg bg-[var(--input)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--accent)] transition cursor-pointer flex items-center justify-center">
+                    <span id="themeIcon" class="flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                    </span>
                 </button>
+
 
                 <!-- Assigned Examiner Pill -->
                 <div class="flex items-center gap-2 pl-2">
@@ -178,14 +183,14 @@
                 <!-- Video Frame Container with HUD Overlays -->
                 <div id="videoContainer" class="bg-slate-950 rounded-xl overflow-hidden flex items-center justify-center border border-[var(--border)] aspect-[16/10] shadow-inner relative group min-h-[320px]">
                     
-                    <!-- HUD Overlay: Top Left (LIVE dot & Ticker) -->
+                    <!-- HUD Overlay: Top Left (LIVE badge & Countdown Timer) -->
                     <div class="absolute top-3 left-3 z-20 flex items-center gap-2 pointer-events-none">
-                        <span class="flex items-center gap-1.5 text-[11px] font-bold text-white bg-red-600/80 backdrop-blur px-2.5 py-1 rounded-full shadow tracking-wider uppercase">
+                        <span id="hudLiveBadge" class="hidden flex items-center gap-1.5 text-[11px] font-bold text-white bg-red-600/80 backdrop-blur px-2.5 py-1 rounded-full shadow tracking-wider uppercase">
                             <span class="w-2 h-2 rounded-full bg-white animate-ping"></span>
                             <span>LIVE</span>
                         </span>
-                        <span id="hudTimestamp" class="text-[11px] font-mono font-semibold text-white/90 bg-black/60 backdrop-blur px-2.5 py-1 rounded-full shadow">
-                            --:--:--
+                        <span id="hudCountdownBadge" class="text-[11px] font-mono font-semibold text-white/90 bg-black/60 backdrop-blur px-2.5 py-1 rounded-full shadow flex items-center gap-1.5">
+                            --:--
                         </span>
                     </div>
 
@@ -244,13 +249,88 @@
                     <p id="statusText" class="font-bold text-base text-[var(--foreground)]">Очакване на студент пред терминала...</p>
                 </div>
 
+                <!-- Twin Disambiguation Section (Embedded in Biometric Result Card, NO POPUP) -->
+                <div id="twinAlertActionContainer" class="hidden space-y-3 pt-3 border-t border-purple-500/20">
+                    <!-- Twin Header Banner -->
+                    <div class="p-3 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-start gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-purple-600/20 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 mt-0.5 border border-purple-500/30">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                            </svg>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="text-xs font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Верификация на близнак</span>
+                                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-600 dark:text-purple-400 border border-purple-500/30">ИЗИСКВА СЕ ПРОПУСК</span>
+                            </div>
+                            <p class="text-[11px] text-[var(--muted-foreground)] mt-0.5">
+                                Засечено е лице с идентична морфология. Моля, верифицирайте чрез един от методите по-долу:
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Method 1: Camera QR Scan Toggle -->
+                    <div class="p-3 rounded-xl bg-[var(--input)] border border-[var(--border)] space-y-2">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <div id="twinScanPulseDot" class="w-2 h-2 rounded-full bg-slate-400"></div>
+                                <span id="twinScanModeLabel" class="text-xs font-semibold text-[var(--foreground)]">Камера: Нормален режим</span>
+                            </div>
+                            <span id="twinScanTimerBadge" class="hidden px-2 py-0.5 rounded-full font-mono font-bold text-[11px] bg-purple-500/20 text-purple-600 dark:text-purple-400 border border-purple-500/30">
+                                120s
+                            </span>
+                        </div>
+                        <p id="twinScanInstruction" class="text-[11px] text-[var(--muted-foreground)] leading-normal">
+                            Активирайте камерата на залата за 2 минути за автоматично сканиране на QR кода от телефона.
+                        </p>
+                        <div class="flex items-center gap-2">
+                            <button id="btnStartCameraQr" onclick="startCameraQrScan()" class="w-full px-3 py-2 text-xs font-bold rounded-lg bg-purple-600 hover:bg-purple-700 text-white shadow-sm transition flex items-center justify-center gap-1.5 cursor-pointer">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path>
+                                </svg>
+                                <span>Сканирай с камерата на залата (2 мин.)</span>
+                            </button>
+                            <button id="btnStopCameraQr" onclick="stopCameraQrScan()" class="hidden w-full px-3 py-2 text-xs font-bold rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/20 transition flex items-center justify-center gap-1.5 cursor-pointer">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"></path>
+                                </svg>
+                                <span>Спри сканирането</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Method 2: Manual Code or Faculty Number Entry -->
+                    <div class="p-3 rounded-xl bg-[var(--input)] border border-[var(--border)] space-y-2">
+                        <label class="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block">
+                            Ръчно въвеждане: 6-цифрен код или Факултетен №
+                        </label>
+                        <div class="flex items-center gap-2">
+                            <input 
+                                type="text" 
+                                id="twinManualQrInput" 
+                                placeholder="6-цифрен код от приложението или факултетен №..." 
+                                class="flex-1 px-3 py-2 text-xs font-mono bg-[var(--card)] border border-[var(--border)] rounded-lg text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-purple-500 transition"
+                                onkeydown="if(event.key==='Enter') submitTwinManualQr()"
+                            >
+                            <button onclick="submitTwinManualQr()" id="btnSubmitTwinManual" class="px-3.5 py-2 text-xs font-bold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm transition shrink-0 cursor-pointer">
+                                Потвърди
+                            </button>
+                        </div>
+                        <p id="twinManualFeedback" class="hidden text-[11px] font-semibold"></p>
+                    </div>
+                </div>
+
                 <!-- Emergency Manual Admission Button -->
                 <div class="pt-2">
                     <button onclick="openEmergencyAdmitModal()" class="w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white font-bold py-3 px-4 rounded-xl shadow-md shadow-indigo-600/20 transition transform active:scale-98 flex items-center justify-center gap-2 text-xs sm:text-sm cursor-pointer">
-                        <span>✍️</span>
+                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                        </svg>
                         <span>Допусни извънредно в тази зала</span>
                     </button>
                 </div>
+
             </div>
         </section>
 
@@ -287,7 +367,9 @@
                             class="w-full pl-8 pr-3 py-1.5 text-xs bg-[var(--input)] border border-[var(--border)] rounded-lg text-[var(--foreground)] placeholder-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] transition"
                             oninput="filterRoster()"
                         >
-                        <span class="absolute left-2.5 top-2 text-[var(--muted-foreground)] text-xs">🔍</span>
+                        <span class="absolute left-2.5 top-2 text-[var(--muted-foreground)] flex items-center justify-center pointer-events-none">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                        </span>
                     </div>
 
                     <!-- Filter Tabs with Badges -->
@@ -321,10 +403,13 @@
 
                 <!-- Empty State for Roster -->
                 <div id="emptyRosterState" class="hidden py-8 text-center text-xs text-[var(--muted-foreground)] space-y-1">
-                    <div class="text-xl">👥</div>
+                    <div class="w-9 h-9 mx-auto rounded-full bg-[var(--input)] text-[var(--muted-foreground)] flex items-center justify-center mb-1">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                    </div>
                     <div class="font-bold text-[var(--foreground)]">Няма студенти за показване</div>
                     <div>Няма резултати, отговарящи на избрания филтър.</div>
                 </div>
+
             </div>
 
             <!-- Recent Admissions Timeline Card -->
@@ -357,7 +442,9 @@
                     </div>
                     <h3 class="text-base font-extrabold text-[var(--foreground)]">Приключване на верификацията</h3>
                 </div>
-                <button onclick="closeEndSessionModal()" class="text-[var(--muted-foreground)] hover:text-[var(--foreground)] text-lg cursor-pointer">✕</button>
+                <button onclick="closeEndSessionModal()" class="text-[var(--muted-foreground)] hover:text-[var(--foreground)] p-1 cursor-pointer">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
             </div>
 
             <p class="text-xs text-[var(--muted-foreground)] leading-relaxed">
@@ -384,10 +471,14 @@
         <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 shadow-2xl max-w-md w-full space-y-4">
             <div class="flex items-center justify-between border-b border-[var(--border)] pb-3">
                 <div class="flex items-center gap-2">
-                    <span class="text-lg">✍️</span>
+                    <div class="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-500 flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                    </div>
                     <h3 class="text-base font-extrabold text-[var(--foreground)]">Извънредно допускане</h3>
                 </div>
-                <button onclick="closeEmergencyAdmitModal()" class="text-[var(--muted-foreground)] hover:text-[var(--foreground)] text-lg cursor-pointer">✕</button>
+                <button onclick="closeEmergencyAdmitModal()" class="text-[var(--muted-foreground)] hover:text-[var(--foreground)] p-1 cursor-pointer">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
             </div>
 
             <p class="text-xs text-[var(--muted-foreground)] leading-relaxed">
@@ -420,11 +511,16 @@
         <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 shadow-2xl max-w-md w-full space-y-4">
             <div class="flex items-center justify-between border-b border-[var(--border)] pb-3">
                 <div class="flex items-center gap-2">
-                    <span class="text-lg">📋</span>
+                    <div class="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-500 flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    </div>
                     <h3 class="text-base font-extrabold text-[var(--foreground)]">Студентско досие</h3>
                 </div>
-                <button onclick="closeDossierModal()" class="text-[var(--muted-foreground)] hover:text-[var(--foreground)] text-lg cursor-pointer">✕</button>
+                <button onclick="closeDossierModal()" class="text-[var(--muted-foreground)] hover:text-[var(--foreground)] p-1 cursor-pointer">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
             </div>
+
 
             <!-- Student Summary Details -->
             <div class="space-y-3">
@@ -488,6 +584,8 @@
         }
 
         let cameraArmed = false;
+        let cameraStopped = false;
+        let currentExamStartTime = null;
         let offlineCount = 0;
         let currentDetectedFacNum = "";
         let audioMuted = localStorage.getItem("sound_muted") === "true";
@@ -540,34 +638,119 @@
             }
         }
 
+        const SVG_ICONS = {
+            audioOn: `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M11 5L6 9H2v6h4l5 4V5z"></path></svg>`,
+            audioMute: `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"></path></svg>`,
+            themeSun: `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>`,
+            themeMoon: `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>`,
+            toastSuccess: `<svg class="w-4 h-4 text-white shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`,
+            toastError: `<svg class="w-4 h-4 text-white shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>`,
+            toastInfo: `<svg class="w-4 h-4 text-white shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`
+        };
+
         function toggleAudio() {
             audioMuted = !audioMuted;
             localStorage.setItem("sound_muted", audioMuted);
-            document.getElementById("audioIcon").innerText = audioMuted ? "🔇" : "🔊";
+            document.getElementById("audioIcon").innerHTML = audioMuted ? SVG_ICONS.audioMute : SVG_ICONS.audioOn;
             showToast(audioMuted ? "Звукът е изключен." : "Звукът е активиран.", "info");
         }
-        if (audioMuted) document.getElementById("audioIcon").innerText = "🔇";
+        if (audioMuted) document.getElementById("audioIcon").innerHTML = SVG_ICONS.audioMute;
 
-        // Live Clock
+        // Live Clock (Official Sofia Real-Time Clock)
         function updateLiveClock() {
             const now = new Date();
             const timeStr = now.toLocaleTimeString("bg-BG", { hour12: false });
             document.getElementById("liveClockTime").innerText = timeStr;
-            document.getElementById("hudTimestamp").innerText = timeStr;
             document.getElementById("liveClockDate").innerText = now.toLocaleDateString("bg-BG", { day: 'numeric', month: 'short', year: 'numeric' });
         }
         setInterval(updateLiveClock, 1000);
         updateLiveClock();
 
+        // Intelligent Exam Admission Countdown Timer
+        function updateExamCountdown() {
+            const badge = document.getElementById("hudCountdownBadge");
+            if (!badge) return;
+
+            if (cameraStopped) {
+                badge.className = "text-[11px] font-mono font-semibold text-slate-300 bg-slate-800/80 backdrop-blur px-2.5 py-1 rounded-full shadow flex items-center gap-1.5";
+                badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-slate-400"></span><span>Верификацията е приключена</span>`;
+                return;
+            }
+
+            if (!currentExamStartTime) {
+                badge.className = "text-[11px] font-mono font-semibold text-white/90 bg-black/60 backdrop-blur px-2.5 py-1 rounded-full shadow flex items-center gap-1.5";
+                badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-slate-500"></span><span>Няма насрочен изпит</span>`;
+                return;
+            }
+
+            const now = new Date();
+            const diffMs = currentExamStartTime.getTime() - now.getTime();
+            const diffSec = Math.floor(diffMs / 1000);
+
+            // 1. Преди допускателния период (> 40 мин преди часа на изпита)
+            // Отброява дни:часове:минути или часове:минути:секунди до отварянето на допуска
+            if (diffSec > 2400) {
+                const untilAdmissionSec = diffSec - 2400;
+                const days = Math.floor(untilAdmissionSec / 86400);
+                const hours = Math.floor((untilAdmissionSec % 86400) / 3600);
+                const minutes = Math.floor((untilAdmissionSec % 3600) / 60);
+                const seconds = untilAdmissionSec % 60;
+
+                let timeStr = "";
+                if (days > 0) {
+                    timeStr = `${days}д ${hours}ч ${minutes}м`;
+                } else if (hours > 0) {
+                    timeStr = `${hours}ч ${minutes}м ${seconds}с`;
+                } else {
+                    timeStr = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                }
+
+                badge.className = "text-[11px] font-mono font-semibold text-indigo-200 bg-indigo-950/80 border border-indigo-500/30 backdrop-blur px-2.5 py-1 rounded-full shadow flex items-center gap-1.5";
+                badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-indigo-400"></span><span>До допуск: ${timeStr}</span>`;
+            }
+            // 2. Активен интервал за допускане (40 мин до 5 мин преди часа на изпита)
+            // Започва отброяване на 35-те минути за допускане през терминала
+            else if (diffSec >= 300) {
+                const remainingAdmissionSec = diffSec - 300;
+                const minutes = Math.floor(remainingAdmissionSec / 60);
+                const seconds = remainingAdmissionSec % 60;
+                const timeStr = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+                if (minutes < 5) {
+                    badge.className = "text-[11px] font-mono font-bold text-amber-200 bg-amber-950/80 border border-amber-500/40 backdrop-blur px-2.5 py-1 rounded-full shadow flex items-center gap-1.5";
+                    badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span><span>Допуск: ${timeStr}</span>`;
+                } else {
+                    badge.className = "text-[11px] font-mono font-bold text-emerald-200 bg-emerald-950/80 border border-emerald-500/40 backdrop-blur px-2.5 py-1 rounded-full shadow flex items-center gap-1.5";
+                    badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400"></span><span>Допуск: ${timeStr}</span>`;
+                }
+            }
+            // 3. Последни 5 минути преди началото на изпита (раздаване на тестовете от квесторите)
+            else if (diffSec > 0) {
+                const minutes = Math.floor(diffSec / 60);
+                const seconds = diffSec % 60;
+                const timeStr = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+                badge.className = "text-[11px] font-mono font-bold text-purple-200 bg-purple-950/80 border border-purple-500/40 backdrop-blur px-2.5 py-1 rounded-full shadow flex items-center gap-1.5";
+                badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-purple-400 animate-pulse"></span><span>Раздаване на тестове: ${timeStr}</span>`;
+            }
+            // 4. Изпитът е започнал / в ход
+            else {
+                badge.className = "text-[11px] font-mono font-semibold text-slate-300 bg-slate-900/80 border border-slate-700 backdrop-blur px-2.5 py-1 rounded-full shadow flex items-center gap-1.5";
+                badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-blue-400"></span><span>Изпитът е в ход</span>`;
+            }
+        }
+        setInterval(updateExamCountdown, 1000);
+        updateExamCountdown();
+
         // Theme Toggle
         function applyTheme(isDark) {
             if (isDark) {
                 document.body.classList.add("dark-mode");
-                document.getElementById("themeIcon").innerText = "🌙";
+                document.getElementById("themeIcon").innerHTML = SVG_ICONS.themeMoon;
                 localStorage.setItem("theme", "dark");
             } else {
                 document.body.classList.remove("dark-mode");
-                document.getElementById("themeIcon").innerText = "☀️";
+                document.getElementById("themeIcon").innerHTML = SVG_ICONS.themeSun;
                 localStorage.setItem("theme", "light");
             }
         }
@@ -591,12 +774,15 @@
                 type === 'warning' ? 'bg-amber-600 text-white border-amber-500' :
                 'bg-slate-800 text-white border-slate-700'
             }`;
+            const iconSvg = type === 'success' ? SVG_ICONS.toastSuccess : (type === 'error' ? SVG_ICONS.toastError : SVG_ICONS.toastInfo);
             toast.innerHTML = `
                 <div class="flex items-center gap-2">
-                    <span>${type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ'}</span>
+                    <span class="flex items-center">${iconSvg}</span>
                     <span>${message}</span>
                 </div>
-                <button onclick="this.parentElement.remove()" class="text-white/80 hover:text-white ml-3 text-xs">✕</button>
+                <button onclick="this.parentElement.remove()" class="text-white/80 hover:text-white ml-3 text-xs cursor-pointer">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
             `;
             container.appendChild(toast);
             requestAnimationFrame(() => {
@@ -629,7 +815,11 @@
 
         function updateCameraUi(armed, isStopped = false) {
             cameraArmed = armed;
+            cameraStopped = Boolean(isStopped);
+            const hudLiveBadge = document.getElementById("hudLiveBadge");
+
             if (armed) {
+                if (hudLiveBadge) hudLiveBadge.classList.remove("hidden");
                 cameraStatusBadge.className = "flex items-center text-xs text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full font-bold uppercase border border-emerald-500/30";
                 cameraStatusDot.className = "w-2 h-2 bg-emerald-400 rounded-full mr-1.5 animate-ping";
                 cameraStatusText.innerText = "System Armed (Live)";
@@ -640,7 +830,10 @@
                 }
                 videoStream.classList.remove("hidden");
                 videoOfflineRadar.classList.add("hidden");
+                updateExamCountdown();
             } else {
+                if (hudLiveBadge) hudLiveBadge.classList.add("hidden");
+                updateExamCountdown();
                 const radarTitle = document.getElementById("radarTitle");
                 const radarDesc = document.getElementById("radarDesc");
                 const radarActionBtn = document.getElementById("radarActionBtn");
@@ -792,6 +985,8 @@
                 alertBox.className = "p-4 rounded-xl text-center border font-bold text-base bg-emerald-500/20 border-emerald-500 text-emerald-600 dark:text-emerald-400";
                 pill.className = "text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30";
                 pill.innerText = "ДОСТЪПЪТ РАЗРЕШЕН";
+                const actionContainer = document.getElementById("twinAlertActionContainer");
+                if (actionContainer) actionContainer.classList.add("hidden");
             } else if (data.status_type === "danger") {
                 card.classList.add("border-red-500/60", "shadow-red-500/10");
                 alertBox.className = "p-4 rounded-xl text-center border font-bold text-base bg-red-500/20 border-red-500 text-red-600 dark:text-red-400";
@@ -802,11 +997,173 @@
                 alertBox.className = "p-4 rounded-xl text-center border font-bold text-base bg-amber-500/20 border-amber-500 text-amber-600 dark:text-amber-400";
                 pill.className = "text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30";
                 pill.innerText = "ВНИМАНИЕ";
+                if (data.status_text && data.status_text.includes("БЛИЗНАК")) {
+                    const actionContainer = document.getElementById("twinAlertActionContainer");
+                    if (actionContainer) actionContainer.classList.remove("hidden");
+                }
             } else {
                 card.classList.add("border-[var(--border)]");
                 alertBox.className = "p-4 bg-[var(--input)] border border-[var(--border)] rounded-xl text-center font-bold text-base text-[var(--foreground)]";
                 pill.className = "text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-[var(--input)] text-[var(--muted-foreground)] border border-[var(--border)]";
                 pill.innerText = "ОЧАКВАНЕ";
+            }
+        }
+
+        // Twin Disambiguation Controller
+        let currentTwinData = null;
+        let qrScanCountdownTimer = null;
+
+        function openTwinDisambiguationModal(data = null) {
+            if (data) {
+                currentTwinData = data;
+            }
+            const actionContainer = document.getElementById("twinAlertActionContainer");
+            if (actionContainer) {
+                actionContainer.classList.remove("hidden");
+            }
+            const input = document.getElementById("twinManualQrInput");
+            if (input) {
+                input.value = "";
+                setTimeout(() => input.focus(), 100);
+            }
+        }
+
+        function closeTwinDisambiguationModal() {
+            const actionContainer = document.getElementById("twinAlertActionContainer");
+            if (actionContainer) {
+                actionContainer.classList.add("hidden");
+            }
+        }
+
+        async function startCameraQrScan() {
+            try {
+                const res = await fetch(`/api/v1/exams/${encodeURIComponent(roomNumber)}/toggle-qr-scan-mode`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ enabled: true, duration_seconds: 120 })
+                });
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    updateQrScanModeUi(true, data.expires_in_seconds || 120);
+                    showToast("Камерата на залата е активирана за сканиране на QR код (2 мин).", "info");
+                } else {
+                    showToast(data.detail || data.error || "Неуспешно активиране на сканирането", "error");
+                }
+            } catch (e) {
+                showToast("Мрежова грешка при активиране на QR сканиране", "error");
+            }
+        }
+
+        async function stopCameraQrScan() {
+            try {
+                const res = await fetch(`/api/v1/exams/${encodeURIComponent(roomNumber)}/toggle-qr-scan-mode`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ enabled: false })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    updateQrScanModeUi(false);
+                    showToast("Сканирането на QR код е прекратено. Нормалният режим е възстановен.", "info");
+                }
+            } catch (e) {
+                showToast("Грешка при спиране на QR сканирането", "error");
+            }
+        }
+
+        function updateQrScanModeUi(enabled, expiresInSeconds = 0) {
+            const pulseDot = document.getElementById("twinScanPulseDot");
+            const label = document.getElementById("twinScanModeLabel");
+            const timerBadge = document.getElementById("twinScanTimerBadge");
+            const btnStart = document.getElementById("btnStartCameraQr");
+            const btnStop = document.getElementById("btnStopCameraQr");
+            const instruction = document.getElementById("twinScanInstruction");
+
+            if (qrScanCountdownTimer) {
+                clearInterval(qrScanCountdownTimer);
+                qrScanCountdownTimer = null;
+            }
+
+            if (enabled) {
+                if (pulseDot) pulseDot.className = "w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping";
+                if (label) label.innerText = "Камерата сканира за QR код";
+                if (timerBadge) timerBadge.classList.remove("hidden");
+                if (btnStart) btnStart.classList.add("hidden");
+                if (btnStop) btnStop.classList.remove("hidden");
+                if (instruction) instruction.innerText = "Задръжте екрана на мобилното приложение с генерирания QR код директно пред камерата на залата.";
+
+                let remaining = expiresInSeconds;
+                if (timerBadge) timerBadge.innerText = `${remaining}s`;
+                qrScanCountdownTimer = setInterval(() => {
+                    remaining--;
+                    if (remaining <= 0) {
+                        clearInterval(qrScanCountdownTimer);
+                        qrScanCountdownTimer = null;
+                        updateQrScanModeUi(false);
+                    } else {
+                        if (timerBadge) timerBadge.innerText = `${remaining}s`;
+                    }
+                }, 1000);
+            } else {
+                if (pulseDot) pulseDot.className = "w-2.5 h-2.5 rounded-full bg-slate-400";
+                if (label) label.innerText = "Камера на залата: Нормален режим";
+                if (timerBadge) timerBadge.classList.add("hidden");
+                if (btnStart) btnStart.classList.remove("hidden");
+                if (btnStop) btnStop.classList.add("hidden");
+                if (instruction) instruction.innerText = "Активирайте камерата на залата за 2 минути, за да прочете автоматично QR кода от екрана на студента.";
+            }
+        }
+
+        async function submitTwinManualQr() {
+            const input = document.getElementById("twinManualQrInput");
+            const payload = (input ? input.value : "").trim();
+            if (!payload) {
+                showToast("Моля, въведете 6-цифрен код от приложението, факултетен номер или сканирайте QR код.", "warning");
+                return;
+            }
+
+            const btn = document.getElementById("btnSubmitTwinManual");
+            if (btn) {
+                btn.disabled = true;
+                btn.innerText = "Проверка...";
+            }
+
+            try {
+                const res = await fetch(`/api/v1/exams/${encodeURIComponent(roomNumber)}/verify-twin-qr`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ qr_payload: payload })
+                });
+                const data = await res.json();
+                if (res.ok && data.admitted) {
+                    playSuccessChime();
+                    showToast(`Успешно потвърден близнак: ${data.student_name}! Достъпът е разрешен.`, "success");
+                    closeTwinDisambiguationModal();
+                    updateQrScanModeUi(false);
+                    const actionContainer = document.getElementById("twinAlertActionContainer");
+                    if (actionContainer) actionContainer.classList.add("hidden");
+                    if (input) input.value = "";
+                    fetchRoster();
+                } else {
+                    playAlertTone();
+                    showToast(data.detail || data.error || "Невалиден код или пропуск за близнак", "error");
+                }
+            } catch (e) {
+                showToast("Грешка при връзката със сървъра", "error");
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerText = "Потвърди";
+                }
             }
         }
 
@@ -843,10 +1200,46 @@
                 fetchRoster();
             });
 
+            sseSource.addEventListener("twin_disambiguation_required", (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    openTwinDisambiguationModal(data);
+                    const actionContainer = document.getElementById("twinAlertActionContainer");
+                    if (actionContainer) actionContainer.classList.remove("hidden");
+                } catch (err) {
+                    console.warn("SSE twin_disambiguation_required parse error:", err);
+                }
+            });
+
+            sseSource.addEventListener("qr_scan_mode_changed", (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    updateQrScanModeUi(Boolean(data.enabled), data.expires_in_seconds || 0);
+                } catch (err) {
+                    console.warn("SSE qr_scan_mode_changed parse error:", err);
+                }
+            });
+
+            sseSource.addEventListener("twin_qr_verified", (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    playSuccessChime();
+                    showToast(`Успешно потвърден близнак чрез камерата: ${data.student_name}!`, "success");
+                    closeTwinDisambiguationModal();
+                    updateQrScanModeUi(false);
+                    const actionContainer = document.getElementById("twinAlertActionContainer");
+                    if (actionContainer) actionContainer.classList.add("hidden");
+                    fetchRoster();
+                } catch (err) {
+                    console.warn("SSE twin_qr_verified parse error:", err);
+                }
+            });
+
             sseSource.onerror = (err) => {
                 console.warn("SSE връзката прекъсна, EventSource ще се свърже автоматично отново...");
             };
         }
+
 
         // Permitted Students Hall Roster Fetching & Rendering
         async function fetchRoster() {
@@ -867,6 +1260,16 @@
                 if (data.assigned_examiner) {
                     document.getElementById("topExaminerName").innerText = data.assigned_examiner;
                 }
+
+                // Update Exam Countdown Target
+                if (data.exam_info && data.exam_info.iso_date_time) {
+                    currentExamStartTime = new Date(data.exam_info.iso_date_time);
+                } else if (data.exam_info && data.exam_info.start_timestamp) {
+                    currentExamStartTime = new Date(data.exam_info.start_timestamp * 1000);
+                } else {
+                    currentExamStartTime = null;
+                }
+                updateExamCountdown();
 
                 // Update Metrics & Progress Bar
                 const m = data.metrics || {};
@@ -963,7 +1366,8 @@
                     chipBgClass = "bg-emerald-500/10 border-emerald-500/40 hover:border-emerald-500 text-emerald-900 dark:text-emerald-100";
                     badgeHtml = `
                         <span class="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded-md">
-                            <span>✓ Допуснат</span>
+                            <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            <span>Допуснат</span>
                             ${st.admitted_at ? `<span class="font-mono text-[9px]">(${st.admitted_at})</span>` : ''}
                         </span>
                     `;
@@ -971,17 +1375,20 @@
                     chipBgClass = "bg-red-500/10 border-red-500/40 hover:border-red-500 text-red-900 dark:text-red-100";
                     badgeHtml = `
                         <span class="inline-flex items-center gap-1 text-[10px] font-bold text-red-600 dark:text-red-400 bg-red-500/20 px-2 py-0.5 rounded-md">
-                            <span>✕ Без право</span>
+                            <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                            <span>Без право</span>
                         </span>
                     `;
                 } else {
                     chipBgClass = "bg-[var(--input)] border-[var(--border)] hover:border-indigo-400 text-[var(--foreground)]";
                     badgeHtml = `
                         <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-[var(--muted-foreground)] bg-[var(--card)] px-2 py-0.5 rounded-md border border-[var(--border)]">
-                            <span>⚪ Чакащ</span>
+                            <span class="w-2 h-2 rounded-full bg-slate-400 shrink-0"></span>
+                            <span>Чакащ</span>
                         </span>
                     `;
                 }
+
 
                 return `
                     <div 
@@ -1118,14 +1525,15 @@
             const admitBtn = document.getElementById("dossierAdmitActionBtn");
 
             if (student.is_admitted) {
-                statusBox.className = "p-3 rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold text-center";
-                statusBox.innerHTML = `✓ Допуснат в залата в ${student.admitted_at || 'днескашната сесия'}`;
+                statusBox.className = "p-3 rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold text-center flex items-center justify-center gap-1.5";
+                statusBox.innerHTML = `<svg class="w-4 h-4 text-emerald-500 inline shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg><span>Допуснат в залата в ${student.admitted_at || 'днескашната сесия'}</span>`;
                 admitBtn.classList.add("hidden");
             } else {
-                statusBox.className = "p-3 rounded-xl border border-[var(--border)] bg-[var(--input)] text-[var(--muted-foreground)] text-xs font-bold text-center";
-                statusBox.innerHTML = `⚪ Студентът очаква допуск на входа`;
+                statusBox.className = "p-3 rounded-xl border border-[var(--border)] bg-[var(--input)] text-[var(--muted-foreground)] text-xs font-bold text-center flex items-center justify-center gap-1.5";
+                statusBox.innerHTML = `<span class="w-2 h-2 rounded-full bg-slate-400 inline-block shrink-0"></span><span>Студентът очаква допуск на входа</span>`;
                 admitBtn.classList.remove("hidden");
             }
+
 
             // Инициали
             const initials = (student.full_name || "С")

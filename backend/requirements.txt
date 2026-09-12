@@ -23,7 +23,9 @@ pgvector
 face_recognition
 numpy
 opencv-python-headless
---extra-index-url https://download.pytorch.org/whl/cpu
+pyzbar
+--index-url https://download.pytorch.org/whl/cpu
+--extra-index-url https://pypi.org/simple
 torch
 torchvision
 
