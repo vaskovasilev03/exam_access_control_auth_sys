@@ -210,37 +210,91 @@
         </div>
 
         <!-- Filter & Search Toolbar -->
-        <div class="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius)] p-4 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
-            <!-- Search Bar -->
-            <div class="relative w-full md:w-80">
-                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[var(--muted-foreground)]">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                    </svg>
+        <div class="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius)] p-4 shadow-sm space-y-3">
+            <!-- Main Row: Search & Status Toggles -->
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <!-- Search Bar -->
+                <div class="relative w-full md:w-80">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[var(--muted-foreground)]">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                    </div>
+                    <input 
+                        type="text" 
+                        id="roomSearchInput" 
+                        placeholder="Търси зала, предмет, преподавател, специалност..." 
+                        class="w-full pl-9 pr-4 py-2 text-xs bg-[var(--input)] border border-[var(--border)] rounded-lg text-[var(--foreground)] placeholder-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] transition"
+                        oninput="applyFilters()"
+                    >
                 </div>
-                <input 
-                    type="text" 
-                    id="roomSearchInput" 
-                    placeholder="Търси зала, предмет, преподавател..." 
-                    class="w-full pl-9 pr-4 py-2 text-xs bg-[var(--input)] border border-[var(--border)] rounded-lg text-[var(--foreground)] placeholder-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] transition"
-                    oninput="applyFilters()"
-                >
+
+                <!-- Status Filter Buttons -->
+                <div class="flex items-center gap-1.5 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
+                    <button onclick="setFilter('all')" id="filterAllBtn" class="px-3 py-1.5 text-xs font-bold rounded-lg transition bg-indigo-600 text-white cursor-pointer shrink-0">
+                        Всички зали
+                    </button>
+                    <button onclick="setFilter('free')" id="filterFreeBtn" class="px-3 py-1.5 text-xs font-bold rounded-lg transition bg-[var(--input)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer shrink-0">
+                        Свободни
+                    </button>
+                    <button onclick="setFilter('mine')" id="filterMineBtn" class="px-3 py-1.5 text-xs font-bold rounded-lg transition bg-[var(--input)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer shrink-0">
+                        Моите зали
+                    </button>
+                    <button onclick="setFilter('camera')" id="filterCameraBtn" class="px-3 py-1.5 text-xs font-bold rounded-lg transition bg-[var(--input)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer shrink-0">
+                        Камера на живо
+                    </button>
+                </div>
             </div>
 
-            <!-- Filter Buttons -->
-            <div class="flex items-center gap-1.5 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
-                <button onclick="setFilter('all')" id="filterAllBtn" class="px-3 py-1.5 text-xs font-bold rounded-lg transition bg-indigo-600 text-white cursor-pointer">
-                    Всички зали
-                </button>
-                <button onclick="setFilter('free')" id="filterFreeBtn" class="px-3 py-1.5 text-xs font-bold rounded-lg transition bg-[var(--input)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer">
-                    Свободни
-                </button>
-                <button onclick="setFilter('mine')" id="filterMineBtn" class="px-3 py-1.5 text-xs font-bold rounded-lg transition bg-[var(--input)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer">
-                    Моите зали
-                </button>
-                <button onclick="setFilter('camera')" id="filterCameraBtn" class="px-3 py-1.5 text-xs font-bold rounded-lg transition bg-[var(--input)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer">
-                    Камера на живо
-                </button>
+            <!-- Academic Filters Row -->
+            <div class="border-t border-[var(--border)] pt-3">
+                <div class="flex flex-wrap items-center gap-2">
+                    <div class="flex items-center gap-1.5 text-xs font-semibold text-[var(--muted-foreground)] mr-1">
+                        <svg class="w-3.5 h-3.5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
+                        </svg>
+                        <span>Академичен филтър:</span>
+                    </div>
+
+                    <!-- Сесия -->
+                    <select id="academicSessionSelect" onchange="onAcademicFilterChange()" class="text-xs bg-[var(--input)] border border-[var(--border)] rounded-lg px-2.5 py-1.5 text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] transition cursor-pointer">
+                        <option value="">Всички сесии</option>
+                    </select>
+
+                    <!-- Факултет -->
+                    <select id="academicFacultySelect" onchange="onAcademicFilterChange()" class="text-xs bg-[var(--input)] border border-[var(--border)] rounded-lg px-2.5 py-1.5 text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] transition cursor-pointer">
+                        <option value="">Всички факултети</option>
+                    </select>
+
+                    <!-- Специалност -->
+                    <select id="academicSpecialtySelect" onchange="onAcademicFilterChange()" class="text-xs bg-[var(--input)] border border-[var(--border)] rounded-lg px-2.5 py-1.5 text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] transition cursor-pointer">
+                        <option value="">Всички специалности</option>
+                    </select>
+
+                    <!-- Курс -->
+                    <select id="academicCourseSelect" onchange="onAcademicFilterChange()" class="text-xs bg-[var(--input)] border border-[var(--border)] rounded-lg px-2.5 py-1.5 text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] transition cursor-pointer">
+                        <option value="">Всички курсове</option>
+                    </select>
+
+                    <!-- Група -->
+                    <div class="relative w-28">
+                        <input 
+                            type="text" 
+                            id="academicGroupInput" 
+                            placeholder="Група..." 
+                            class="w-full text-xs bg-[var(--input)] border border-[var(--border)] rounded-lg px-2.5 py-1.5 text-[var(--foreground)] placeholder-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] transition"
+                            oninput="onAcademicGroupInput()"
+                        >
+                    </div>
+
+                    <!-- Изчисти филтрите бутон -->
+                    <button onclick="resetAcademicFilters()" id="resetAcademicFiltersBtn" class="hidden text-xs font-semibold text-rose-500 hover:text-rose-600 dark:hover:text-rose-400 px-2 py-1 rounded-md hover:bg-rose-500/10 transition cursor-pointer flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                        <span>Изчисти</span>
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -297,6 +351,15 @@
         let allRooms = [];
         let currentFilter = 'all';
         let currentExaminerSub = null;
+        let academicFilters = {
+            session_type: '',
+            faculty: '',
+            specialty: '',
+            course: '',
+            group: ''
+        };
+        let availableFiltersLoaded = false;
+        let groupDebounceTimer = null;
 
         // Декодиране на текущия квестор от JWT
         try {
@@ -394,13 +457,107 @@
             }, 4000);
         }
 
+        // Academic Filter UI Management
+        function updateAcademicFiltersFromUI() {
+            academicFilters.session_type = document.getElementById("academicSessionSelect").value || '';
+            academicFilters.faculty = document.getElementById("academicFacultySelect").value || '';
+            academicFilters.specialty = document.getElementById("academicSpecialtySelect").value || '';
+            academicFilters.course = document.getElementById("academicCourseSelect").value || '';
+            academicFilters.group = (document.getElementById("academicGroupInput").value || '').trim();
+
+            const hasActive = Boolean(
+                academicFilters.session_type ||
+                academicFilters.faculty ||
+                academicFilters.specialty ||
+                academicFilters.course ||
+                academicFilters.group
+            );
+
+            const resetBtn = document.getElementById("resetAcademicFiltersBtn");
+            if (resetBtn) {
+                if (hasActive) {
+                    resetBtn.classList.remove("hidden");
+                } else {
+                    resetBtn.classList.add("hidden");
+                }
+            }
+        }
+
+        function onAcademicFilterChange() {
+            updateAcademicFiltersFromUI();
+            fetchRoomsOverview(false);
+        }
+
+        function onAcademicGroupInput() {
+            clearTimeout(groupDebounceTimer);
+            groupDebounceTimer = setTimeout(() => {
+                updateAcademicFiltersFromUI();
+                fetchRoomsOverview(false);
+            }, 350);
+        }
+
+        function resetAcademicFilters() {
+            document.getElementById("academicSessionSelect").value = '';
+            document.getElementById("academicFacultySelect").value = '';
+            document.getElementById("academicSpecialtySelect").value = '';
+            document.getElementById("academicCourseSelect").value = '';
+            document.getElementById("academicGroupInput").value = '';
+            updateAcademicFiltersFromUI();
+            fetchRoomsOverview(true);
+        }
+
+        function populateDropdown(elemId, items, selectedVal, placeholderText) {
+            const select = document.getElementById(elemId);
+            if (!select) return;
+
+            const current = selectedVal !== undefined && selectedVal !== null ? String(selectedVal) : select.value;
+            let html = `<option value="">${placeholderText}</option>`;
+            (items || []).forEach(item => {
+                let val = item;
+                let label = item;
+                if (typeof item === 'object' && item !== null) {
+                    val = item.value;
+                    label = item.label;
+                }
+                const isSelected = String(val) === String(current) ? 'selected' : '';
+                html += `<option value="${val}" ${isSelected}>${label}</option>`;
+            });
+            select.innerHTML = html;
+        }
+
+        function populateFilterDropdowns(available) {
+            if (!available || availableFiltersLoaded) return;
+
+            populateDropdown("academicSessionSelect", available.sessions, academicFilters.session_type, "Всички сесии");
+            populateDropdown("academicFacultySelect", available.faculties, academicFilters.faculty, "Всички факултети");
+            populateDropdown("academicSpecialtySelect", available.specialties, academicFilters.specialty, "Всички специалности");
+
+            const coursesWithLabels = (available.courses || []).map(c => ({
+                value: c,
+                label: `Курс ${c}`
+            }));
+            populateDropdown("academicCourseSelect", coursesWithLabels, academicFilters.course, "Всички курсове");
+
+            availableFiltersLoaded = true;
+        }
+
         // Fetch Rooms Overview
         async function fetchRoomsOverview(isManual = false) {
             const icon = document.getElementById("refreshIcon");
             if (isManual && icon) icon.classList.add("rotate-180");
 
             try {
-                const res = await fetch("/api/v1/examiner/rooms-overview", {
+                const params = new URLSearchParams();
+                if (academicFilters.session_type) params.append('session_type', academicFilters.session_type);
+                if (academicFilters.faculty) params.append('faculty', academicFilters.faculty);
+                if (academicFilters.specialty) params.append('specialty', academicFilters.specialty);
+                if (academicFilters.course) params.append('course', academicFilters.course);
+                if (academicFilters.group) params.append('group', academicFilters.group);
+
+                const queryString = params.toString();
+                const endpoint = `/api/v1/examiner/rooms-overview${queryString ? '?' + queryString : ''}`;
+
+                const res = await fetch(endpoint, {
                     headers: { "Authorization": `Bearer ${token}` }
                 });
 
@@ -411,6 +568,10 @@
 
                 const data = await res.json();
                 allRooms = data.rooms || [];
+
+                if (data.available_filters) {
+                    populateFilterDropdowns(data.available_filters);
+                }
 
                 // Update KPIs
                 const metrics = data.metrics || {};
@@ -443,9 +604,9 @@
 
             Object.entries(buttons).forEach(([key, btn]) => {
                 if (key === filter) {
-                    btn.className = "px-3 py-1.5 text-xs font-bold rounded-lg transition bg-indigo-600 text-white cursor-pointer";
+                    btn.className = "px-3 py-1.5 text-xs font-bold rounded-lg transition bg-indigo-600 text-white cursor-pointer shrink-0";
                 } else {
-                    btn.className = "px-3 py-1.5 text-xs font-bold rounded-lg transition bg-[var(--input)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer";
+                    btn.className = "px-3 py-1.5 text-xs font-bold rounded-lg transition bg-[var(--input)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer shrink-0";
                 }
             });
 
@@ -460,7 +621,9 @@
                 const matchesQuery = 
                     (room.room_number || "").toLowerCase().includes(query) ||
                     (room.subject || "").toLowerCase().includes(query) ||
-                    (room.lecturer || "").toLowerCase().includes(query);
+                    (room.lecturer || "").toLowerCase().includes(query) ||
+                    (room.faculty || "").toLowerCase().includes(query) ||
+                    (room.specialty || "").toLowerCase().includes(query);
 
                 if (!matchesQuery) return false;
 
@@ -505,7 +668,7 @@
                     actionBtnHtml = `
                         <button onclick="enterRoom('${room.room_number}')" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-4 rounded-xl shadow-md shadow-indigo-600/20 transition flex items-center justify-center gap-2 text-xs cursor-pointer">
                             <span>Продължи наблюдението</span>
-                            <span>→</span>
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
                         </button>
                     `;
                 } else if (room.is_occupied) {
@@ -535,7 +698,7 @@
                     actionBtnHtml = `
                         <button onclick="enterRoom('${room.room_number}')" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-4 rounded-xl shadow-md shadow-emerald-600/20 transition flex items-center justify-center gap-2 text-xs cursor-pointer">
                             <span>Влез в залата</span>
-                            <span>→</span>
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
                         </button>
                     `;
                 }
@@ -553,11 +716,30 @@
                     </span>
                 `;
 
+                // Академичен етикет
+                const cohortPill = (room.faculty && room.faculty !== '—') ? `
+                    <div class="flex items-center gap-1.5 flex-wrap text-[11px]">
+                        <span class="px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-bold border border-indigo-500/20">
+                            ${room.faculty} • ${room.specialty}
+                        </span>
+                        ${room.course ? `
+                            <span class="px-2 py-0.5 rounded bg-[var(--input)] text-[var(--muted-foreground)] font-semibold border border-[var(--border)]">
+                                Курс ${room.course}
+                            </span>
+                        ` : ''}
+                        ${(room.group && room.group !== '—') ? `
+                            <span class="px-2 py-0.5 rounded bg-[var(--input)] text-[var(--muted-foreground)] font-medium border border-[var(--border)]">
+                                Гр. ${room.group}
+                            </span>
+                        ` : ''}
+                    </div>
+                ` : '';
+
                 return `
                     <div class="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius)] p-5 shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-4">
                         <!-- Header: Room Badge & Camera Status -->
                         <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-2">
+                            <div class="flex items-center gap-2 flex-wrap">
                                 <span class="px-3 py-1 rounded-lg bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 font-extrabold text-sm border border-indigo-500/20">
                                     Зала ${room.room_number}
                                 </span>
@@ -569,6 +751,8 @@
                             </div>
                             ${cameraHtml}
                         </div>
+
+                        ${cohortPill}
 
                         <!-- Discipline & Lecturer -->
                         <div class="space-y-1">

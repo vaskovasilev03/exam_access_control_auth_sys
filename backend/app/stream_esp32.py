@@ -390,8 +390,16 @@ def process_twin_qr_admission(qr_data: str, room_number: str, db: Session = None
         valid_registration = db.query(ExamRegistration).join(Exam).filter(
             ExamRegistration.student_id == student.id,
             Exam.room_number == room_number,
-            func.date(Exam.date_time) == current_now.date()
-        ).first()
+            func.date(Exam.date_time) == current_now.date(),
+            Exam.date_time >= current_now - timedelta(minutes=15)
+        ).order_by(Exam.date_time.asc()).first()
+
+        if not valid_registration:
+            valid_registration = db.query(ExamRegistration).join(Exam).filter(
+                ExamRegistration.student_id == student.id,
+                Exam.room_number == room_number,
+                func.date(Exam.date_time) == current_now.date()
+            ).order_by(Exam.date_time.desc()).first()
 
         if not valid_registration:
             anywhere_today = db.query(ExamRegistration).join(Exam).filter(
@@ -418,6 +426,11 @@ def process_twin_qr_admission(qr_data: str, room_number: str, db: Session = None
                 return {
                     "admitted": False,
                     "error": f"Твърде рано! Допускането за изпита започва в {window_start.strftime('%H:%M')} ч. (40 мин преди началото)."
+                }
+            elif current_now > exam_time + timedelta(hours=3):
+                return {
+                    "admitted": False,
+                    "error": f"Приключил! Изпитът е приключил (насрочен за {exam_time.strftime('%H:%M')} ч.)."
                 }
             else:
                 return {
@@ -724,8 +737,16 @@ def analyze_frame_outside_ui(jpg_bytes: bytes, room_number: str, known_face_enco
             valid_registration = db.query(ExamRegistration).join(Exam).filter(
                 ExamRegistration.student_id == student_found.id,
                 Exam.room_number == room_number,
-                func.date(Exam.date_time) == current_now.date()
-            ).first()
+                func.date(Exam.date_time) == current_now.date(),
+                Exam.date_time >= current_now - timedelta(minutes=15)
+            ).order_by(Exam.date_time.asc()).first()
+
+            if not valid_registration:
+                valid_registration = db.query(ExamRegistration).join(Exam).filter(
+                    ExamRegistration.student_id == student_found.id,
+                    Exam.room_number == room_number,
+                    func.date(Exam.date_time) == current_now.date()
+                ).order_by(Exam.date_time.desc()).first()
             
             is_time_valid = False
             window_start = None
@@ -764,11 +785,16 @@ def analyze_frame_outside_ui(jpg_bytes: bytes, room_number: str, known_face_enco
             elif valid_registration and not is_time_valid:
                 if window_start and current_now < window_start:
                     state["status_text"] = f"Твърде рано! Допускането започва в {window_start.strftime('%H:%M')} ч."
+                    state["status_type"] = "warning"
+                elif exam_time and current_now > exam_time + timedelta(hours=3):
+                    state["status_text"] = f"Приключил (насрочен за {exam_time.strftime('%H:%M')} ч.)"
+                    state["status_type"] = "danger"
                 elif window_end:
                     state["status_text"] = f"Допускането през терминала приключи в {window_end.strftime('%H:%M')} ч. (Към квестор)"
+                    state["status_type"] = "warning"
                 else:
                     state["status_text"] = f"Интервал за достъп нарушен, изпитът започва в {valid_registration.exam.date_time.strftime('%H:%M')}."
-                state["status_type"] = "warning"
+                    state["status_type"] = "warning"
             else:
                 anywhere_today = db.query(ExamRegistration).join(Exam).filter(
                     ExamRegistration.student_id == student_found.id,

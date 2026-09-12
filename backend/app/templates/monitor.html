@@ -733,7 +733,12 @@
                 badge.className = "text-[11px] font-mono font-bold text-purple-200 bg-purple-950/80 border border-purple-500/40 backdrop-blur px-2.5 py-1 rounded-full shadow flex items-center gap-1.5";
                 badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-purple-400 animate-pulse"></span><span>Раздаване на тестове: ${timeStr}</span>`;
             }
-            // 4. Изпитът е започнал / в ход
+            // 4. Повече от 3 часа след началния час на изпита -> Приключил (в червено)
+            else if (diffSec <= -10800) {
+                badge.className = "text-[11px] font-mono font-bold text-red-200 bg-red-950/80 border border-red-500/40 backdrop-blur px-2.5 py-1 rounded-full shadow flex items-center gap-1.5";
+                badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-red-500"></span><span>Приключил</span>`;
+            }
+            // 5. Изпитът е започнал / в ход (до 3 часа след старта му)
             else {
                 badge.className = "text-[11px] font-mono font-semibold text-slate-300 bg-slate-900/80 border border-slate-700 backdrop-blur px-2.5 py-1 rounded-full shadow flex items-center gap-1.5";
                 badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-blue-400"></span><span>Изпитът е в ход</span>`;

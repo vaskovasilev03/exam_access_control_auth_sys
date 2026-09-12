@@ -19,7 +19,7 @@ from fastapi import FastAPI, Depends, Response, File, UploadFile, HTTPException,
 from fastapi.responses import StreamingResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session, object_session
-from sqlalchemy import func
+from sqlalchemy import func, or_, cast, String
 from datetime import datetime, timedelta
 
 from pydantic import ValidationError
@@ -2753,59 +2753,135 @@ def get_debugger_students(
 
 @app.get("/api/v1/examiner/rooms-overview")
 def get_examiner_rooms_overview(
+    session_type: Optional[str] = None,
+    faculty: Optional[str] = None,
+    specialty: Optional[str] = None,
+    course: Optional[str] = None,
+    group: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_examiner)
 ):
     """
     Връща списък с всички активни изпитни зали, състояние на камерата,
     брой допуснати и чакащи студенти, както и информация кой квестор наблюдава залата в реално време.
+    Поддържа незадължително филтриране по сесия, факултет, специалност, курс и група.
     """
     _cleanup_expired_assignments()
 
+    has_academic_filter = any([
+        bool(session_type and session_type != "all"),
+        bool(faculty and faculty != "all"),
+        bool(specialty and specialty != "all"),
+        bool(course and course != "all"),
+        bool(group and group.strip() and group != "all")
+    ])
+
+    def apply_academic_filters(q):
+        if session_type and session_type != "all":
+            q = q.filter(
+                or_(
+                    Exam.session_type == session_type,
+                    cast(Exam.session_type, String).ilike(f"%{session_type}%")
+                )
+            )
+        if faculty and faculty != "all":
+            q = q.filter(Exam.faculty == faculty)
+        if specialty and specialty != "all":
+            q = q.filter(Exam.specialty == specialty)
+        if course and course != "all":
+            try:
+                c_int = int(course)
+                q = q.filter(Exam.course == c_int)
+            except ValueError:
+                pass
+        if group and group.strip() and group != "all":
+            q = q.filter(Exam.group.ilike(f"%{group.strip()}%"))
+        return q
+
     # 1. Извличаме всички уникални зали от планираните изпити
-    exam_rooms = db.query(Exam.room_number).distinct().all()
+    exam_rooms_query = db.query(Exam.room_number)
+    if has_academic_filter:
+        exam_rooms_query = apply_academic_filters(exam_rooms_query)
+    exam_rooms = exam_rooms_query.distinct().all()
     all_rooms_set = {r[0] for r in exam_rooms if r[0]}
 
-    # Добавяме и зали, регистрирани хардуерно от ESP32 камерите
-    for r in ACTIVE_CAMERAS.keys():
-        if r:
-            all_rooms_set.add(r)
+    # Добавяме и зали, регистрирани хардуерно от ESP32 камерите (само ако няма строг академичен филтър)
+    if not has_academic_filter:
+        for r in ACTIVE_CAMERAS.keys():
+            if r:
+                all_rooms_set.add(r)
 
     # Подреждаме залите възходящо
     sorted_rooms = sorted(list(all_rooms_set))
-    now = datetime.now()
-
+    now = datetime.now(timezone)
     rooms_list = []
     total_all_students = 0
     total_all_admitted = 0
     total_cameras_online = 0
 
     for room_num in sorted_rooms:
-        # Търсим днешен изпит или най-скоро планирания изпит за тази зала
-        primary_exam = db.query(Exam).filter(
-            Exam.room_number == room_num,
-            func.date(Exam.date_time) == now.date()
-        ).first()
+        # Търсим днешен активен или предстоящ изпит за тази зала (до 15 мин след старта му)
+        primary_exam = apply_academic_filters(
+            db.query(Exam).filter(
+                Exam.room_number == room_num,
+                func.date(Exam.date_time) == now.date(),
+                Exam.date_time >= now - timedelta(minutes=15)
+            )
+        ).order_by(Exam.date_time.asc()).first()
 
         if not primary_exam:
-            primary_exam = db.query(Exam).filter(
-                Exam.room_number == room_num
+            primary_exam = apply_academic_filters(
+                db.query(Exam).filter(
+                    Exam.room_number == room_num,
+                    func.date(Exam.date_time) == now.date()
+                )
             ).order_by(Exam.date_time.desc()).first()
+
+        if not primary_exam:
+            primary_exam = apply_academic_filters(
+                db.query(Exam).filter(
+                    Exam.room_number == room_num,
+                    Exam.date_time >= now
+                )
+            ).order_by(Exam.date_time.asc()).first()
+
+        if not primary_exam:
+            primary_exam = apply_academic_filters(
+                db.query(Exam).filter(
+                    Exam.room_number == room_num
+                )
+            ).order_by(Exam.date_time.desc()).first()
+
+        if has_academic_filter and not primary_exam:
+            continue
 
         total_expected = 0
         admitted_count = 0
         subject = "Няма активен изпит"
         lecturer = "—"
         exam_date_time = "—"
-        session_type = "—"
+        session_type_val = "—"
+        exam_faculty = None
+        exam_specialty = None
+        exam_course = None
+        exam_group = None
 
         if primary_exam:
             subject = primary_exam.subject
             lecturer = primary_exam.lecturer or "—"
+            exam_faculty = primary_exam.faculty
+            exam_specialty = primary_exam.specialty
+            exam_course = primary_exam.course
+            exam_group = primary_exam.group
             if primary_exam.date_time:
-                exam_date_time = primary_exam.date_time.strftime("%d.%m.%Y %H:%M")
+                exam_dt = primary_exam.date_time
+                if exam_dt.tzinfo is None:
+                    exam_dt = exam_dt.replace(tzinfo=timezone)
+                else:
+                    exam_dt = exam_dt.astimezone(timezone)
+                exam_date_time = exam_dt.strftime("%d.%m.%Y %H:%M")
             if primary_exam.session_type:
-                session_type = primary_exam.session_type.value if hasattr(primary_exam.session_type, 'value') else str(primary_exam.session_type)
+                session_type_val = primary_exam.session_type.value if hasattr(primary_exam.session_type, 'value') else str(primary_exam.session_type)
 
             regs = db.query(ExamRegistration).filter(ExamRegistration.exam_id == primary_exam.id).all()
             total_expected = len(regs)
@@ -2839,7 +2915,11 @@ def get_examiner_rooms_overview(
             "subject": subject,
             "lecturer": lecturer,
             "date_time": exam_date_time,
-            "session_type": session_type,
+            "session_type": session_type_val,
+            "faculty": exam_faculty,
+            "specialty": exam_specialty,
+            "course": exam_course,
+            "group": exam_group,
             "total_expected": total_expected,
             "admitted_count": admitted_count,
             "waiting_count": max(0, total_expected - admitted_count),
@@ -2853,10 +2933,21 @@ def get_examiner_rooms_overview(
             "assigned_examiner_email": assignment.get("examiner_email") if is_occupied else None,
         })
 
+    # Извличане на наличните филтри за UI селекторите
+    available_filters = {
+        "sessions": [
+            {"value": s.value, "label": s.value.capitalize()} for s in SessionType
+        ],
+        "faculties": sorted(list({f[0] for f in db.query(Exam.faculty).distinct().all() if f[0]})),
+        "specialties": sorted(list({s[0] for s in db.query(Exam.specialty).distinct().all() if s[0]})),
+        "courses": sorted(list({c[0] for c in db.query(Exam.course).distinct().all() if c[0]})),
+    }
+
     return {
         "rooms": rooms_list,
+        "available_filters": available_filters,
         "metrics": {
-            "total_rooms": len(sorted_rooms),
+            "total_rooms": len(rooms_list) if has_academic_filter else len(sorted_rooms),
             "active_rooms": len([r for r in rooms_list if r["total_expected"] > 0]),
             "total_students": total_all_students,
             "total_admitted": total_all_admitted,
@@ -2978,11 +3069,24 @@ def get_exam_room_roster(
     _cleanup_expired_assignments()
     assigned_info = ACTIVE_EXAMINER_ASSIGNMENTS.get(room_number)
 
-    now = datetime.now()
+    now = datetime.now(timezone)
     exam = db.query(Exam).filter(
         Exam.room_number == room_number,
-        func.date(Exam.date_time) == now.date()
-    ).first()
+        func.date(Exam.date_time) == now.date(),
+        Exam.date_time >= now - timedelta(minutes=15)
+    ).order_by(Exam.date_time.asc()).first()
+
+    if not exam:
+        exam = db.query(Exam).filter(
+            Exam.room_number == room_number,
+            func.date(Exam.date_time) == now.date()
+        ).order_by(Exam.date_time.desc()).first()
+
+    if not exam:
+        exam = db.query(Exam).filter(
+            Exam.room_number == room_number,
+            Exam.date_time >= now
+        ).order_by(Exam.date_time.asc()).first()
 
     if not exam:
         exam = db.query(Exam).filter(
@@ -3042,7 +3146,15 @@ def get_exam_room_roster(
         else:
             color_state = "gray"
 
-        adm_time_str = reg.admitted_at.strftime("%H:%M:%S") if reg.admitted_at else None
+        if reg.admitted_at:
+            adm_dt = reg.admitted_at
+            if adm_dt.tzinfo is None:
+                adm_dt = adm_dt.replace(tzinfo=timezone)
+            else:
+                adm_dt = adm_dt.astimezone(timezone)
+            adm_time_str = adm_dt.strftime("%H:%M:%S")
+        else:
+            adm_time_str = None
 
         student_data = {
             "student_id": str(st.id),
@@ -3080,13 +3192,23 @@ def get_exam_room_roster(
         reverse=True
     )[:15]
 
+    exam_dt = exam.date_time
+    if exam_dt:
+        if exam_dt.tzinfo is None:
+            exam_dt = exam_dt.replace(tzinfo=timezone)
+        else:
+            exam_dt = exam_dt.astimezone(timezone)
+        formatted_exam_dt = exam_dt.strftime("%d.%m.%Y %H:%M")
+    else:
+        formatted_exam_dt = "—"
+
     return {
         "exam_info": {
             "id": str(exam.id),
             "room_number": exam.room_number,
             "subject": exam.subject,
             "lecturer": exam.lecturer or "—",
-            "date_time": exam.date_time.strftime("%d.%m.%Y %H:%M") if exam.date_time else "—",
+            "date_time": formatted_exam_dt,
             "iso_date_time": exam.date_time.isoformat() if exam.date_time else None,
             "start_timestamp": exam.date_time.timestamp() if exam.date_time else None,
             "session_type": exam.session_type.value if hasattr(exam.session_type, 'value') else str(exam.session_type)
