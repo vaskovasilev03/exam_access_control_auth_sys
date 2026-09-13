@@ -511,6 +511,103 @@ def process_twin_qr_admission(qr_data: str, room_number: str, db: Session = None
             db.close()
 
 
+_YUNET_DETECTOR = None
+_YUNET_PATH = os.path.join(os.path.dirname(__file__), "weights", "face_detection_yunet_2023mar.onnx")
+
+
+def _get_yunet_detector(width: int = 320, height: int = 240):
+    global _YUNET_DETECTOR
+    if not os.path.exists(_YUNET_PATH):
+        return None
+    try:
+        if _YUNET_DETECTOR is None:
+            _YUNET_DETECTOR = cv2.FaceDetectorYN_create(_YUNET_PATH, "", (width, height), 0.55, 0.3, 5000)
+        else:
+            _YUNET_DETECTOR.setInputSize((width, height))
+        return _YUNET_DETECTOR
+    except Exception as e:
+        print(f"[FaceDetector] YuNet init warning: {e}")
+        return None
+
+
+def detect_face_boxes(frame: np.ndarray) -> List[Tuple[int, int, int, int]]:
+    """
+    Високонадеждно засичане на лица, устойчиво на сенки по лицето, слабо осветление и наклон:
+      1. OpenCV DNN YuNet (FaceDetectorYN): дълбока невронна мрежа (~20ms CPU),
+         обучена върху екстремни светлинни условия, силни сенки и широк диапазон от ъгли.
+      2. Fallback: dlib HOG с адаптивно скалиране.
+      3. Fallback: dlib HOG с 1 стъпка на upsampling.
+      4. Fallback: dlib MMOD CNN за екстремни пози при отсъствие на YuNet.
+    Връща координати във формат face_recognition: [(top, right, bottom, left)]
+    """
+    if frame is None or frame.size == 0:
+        return []
+
+    h, w = frame.shape[:2]
+
+    # 1. Първи опит: YuNet (най-бърз и устойчив на сенки/неравномерна светлина)
+    yunet = _get_yunet_detector(w, h)
+    if yunet is not None:
+        try:
+            _, faces = yunet.detect(frame)
+            if faces is not None and len(faces) > 0:
+                boxes = []
+                for f in faces:
+                    x, y, fw, fh = int(f[0]), int(f[1]), int(f[2]), int(f[3])
+                    top = max(0, y)
+                    right = min(w, x + fw)
+                    bottom = min(h, y + fh)
+                    left = max(0, x)
+                    boxes.append((top, right, bottom, left))
+                return boxes
+        except Exception:
+            pass
+
+    # 2. Втори опит: dlib HOG
+    scale = 0.5 if w <= 800 else 0.25
+    inv_scale = 1.0 / scale
+    small = cv2.resize(frame, (0, 0), fx=scale, fy=scale)
+    rgb_small = cv2.cvtColor(small, cv2.COLOR_BGR2RGB)
+    locs = face_recognition.face_locations(rgb_small)
+
+    # 3. Трети опит: dlib HOG с upsampling
+    if not locs and scale <= 0.5:
+        locs = face_recognition.face_locations(rgb_small, number_of_times_to_upsample=1)
+
+    if locs:
+        return [
+            (
+                max(0, int(t * inv_scale)),
+                min(w, int(r * inv_scale)),
+                min(h, int(b * inv_scale)),
+                max(0, int(l * inv_scale))
+            )
+            for (t, r, b, l) in locs
+        ]
+
+    # 4. Четвърти опит: dlib CNN при отсъствие на YuNet
+    try:
+        cnn_scale = 0.25
+        cnn_inv = 4.0
+        cnn_small = cv2.resize(frame, (0, 0), fx=cnn_scale, fy=cnn_scale)
+        cnn_rgb = cv2.cvtColor(cnn_small, cv2.COLOR_BGR2RGB)
+        cnn_locs = face_recognition.face_locations(cnn_rgb, model="cnn")
+        if cnn_locs:
+            return [
+                (
+                    max(0, int(t * cnn_inv)),
+                    min(w, int(r * cnn_inv)),
+                    min(h, int(b * cnn_inv)),
+                    max(0, int(l * cnn_inv))
+                )
+                for (t, r, b, l) in cnn_locs
+            ]
+    except Exception:
+        pass
+
+    return []
+
+
 def analyze_frame_outside_ui(jpg_bytes: bytes, room_number: str, known_face_encodings, known_face_names, state: dict):
 
     """
@@ -570,22 +667,10 @@ def analyze_frame_outside_ui(jpg_bytes: bytes, room_number: str, known_face_enco
                 print(f"[QR Stream Scan Error] {e}")
             return None
 
-        # Стандартно ИИ сканиране за лица (намаляваме кадъра за бърз анализ)
-        h_frame, w_frame = frame.shape[:2]
-        if w_frame <= 800:
-            ai_scale = 0.5
-            inv_scale = 2.0
-        else:
-            ai_scale = 0.25
-            inv_scale = 4.0
+        # Стандартно ИИ сканиране за лица (устойчиво на сенки, контраст и наклон)
+        face_boxes = detect_face_boxes(frame)
 
-        small_frame = cv2.resize(frame, (0, 0), fx=ai_scale, fy=ai_scale)
-        rgb_small_frame = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)
-        face_locations = face_recognition.face_locations(rgb_small_frame)
-        if not face_locations and ai_scale <= 0.5:
-            face_locations = face_recognition.face_locations(rgb_small_frame, number_of_times_to_upsample=1)
-
-        if not face_locations:
+        if not face_boxes:
             state["student_name"] = ""
             state["faculty_number"] = ""
             state["status_text"] = "Няма зачетено лице пред камерата"
@@ -594,14 +679,8 @@ def analyze_frame_outside_ui(jpg_bytes: bytes, room_number: str, known_face_enco
             state["liveness_student_id"] = None
             return None
 
-        # Преобразуваме координатите на лицето обратно към оригиналната резолюция на кадъра
-        top, right, bottom, left = face_locations[0]
-        face_box_orig = (
-            max(0, int(top * inv_scale)),
-            min(w_frame, int(right * inv_scale)),
-            min(h_frame, int(bottom * inv_scale)),
-            max(0, int(left * inv_scale))
-        )
+        # Координатите на първото лице в оригиналната резолюция на кадъра
+        face_box_orig = face_boxes[0]
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
         # Извличаме вектора от пълната резолюция за максимална прецизност
@@ -609,7 +688,21 @@ def analyze_frame_outside_ui(jpg_bytes: bytes, room_number: str, known_face_enco
         if orig_encodings:
             face_encoding = orig_encodings[0]
         else:
-            face_encoding = face_recognition.face_encodings(rgb_small_frame, face_locations)[0]
+            # Fallback с изравняване на контраста за екстремно засенчени лица
+            lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
+            l, a, b = cv2.split(lab)
+            clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8))
+            cl = clahe.apply(l)
+            enhanced_rgb = cv2.cvtColor(cv2.merge((cl, a, b)), cv2.COLOR_LAB2RGB)
+            enh_encs = face_recognition.face_encodings(enhanced_rgb, [face_box_orig])
+            if enh_encs:
+                face_encoding = enh_encs[0]
+            else:
+                state["student_name"] = ""
+                state["faculty_number"] = ""
+                state["status_text"] = "Няма зачетено лице пред камерата"
+                state["status_type"] = "idle"
+                return None
 
         student_found = None
         matching_students = []
@@ -1385,19 +1478,7 @@ async def generate_debug_stream(room_number: str, target_student_id: str, tolera
 
             h_orig, w_orig = frame.shape[:2]
 
-            # Бързо откриване на лица върху смален кадър
-            if w_orig <= 800:
-                dbg_scale = 0.5
-                dbg_inv_scale = 2.0
-            else:
-                dbg_scale = 0.25
-                dbg_inv_scale = 4.0
-
-            small_frame = cv2.resize(frame, (0, 0), fx=dbg_scale, fy=dbg_scale)
-            rgb_small = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)
-            locations = face_recognition.face_locations(rgb_small)
-            if not locations and dbg_scale <= 0.5:
-                locations = face_recognition.face_locations(rgb_small, number_of_times_to_upsample=1)
+            boxes = detect_face_boxes(frame)
 
             face_detected = False
             euclidean_dist = None
@@ -1405,15 +1486,9 @@ async def generate_debug_stream(room_number: str, target_student_id: str, tolera
             is_match = False
             box_orig = None
 
-            if locations and target_embedding is not None:
+            if boxes and target_embedding is not None:
                 face_detected = True
-                top, right, bottom, left = locations[0]
-                box_orig = (
-                    max(0, int(top * dbg_inv_scale)),
-                    min(w_orig, int(right * dbg_inv_scale)),
-                    min(h_orig, int(bottom * dbg_inv_scale)),
-                    max(0, int(left * dbg_inv_scale))
-                )
+                box_orig = boxes[0]
                 rgb_full = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 encs = face_recognition.face_encodings(rgb_full, [box_orig])
                 if encs:
