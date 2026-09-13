@@ -554,10 +554,13 @@ def detect_face_boxes(frame: np.ndarray) -> List[Tuple[int, int, int, int]]:
                 boxes = []
                 for f in faces:
                     x, y, fw, fh = int(f[0]), int(f[1]), int(f[2]), int(f[3])
-                    top = max(0, y)
-                    right = min(w, x + fw)
-                    bottom = min(h, y + fh)
-                    left = max(0, x)
+                    # Разширяване на кутията с 12% марджин (за коректно откриване на ориентири от dlib върху брадичката и челото)
+                    pad_w = int(fw * 0.12)
+                    pad_h = int(fh * 0.12)
+                    top = max(0, y - pad_h)
+                    right = min(w, x + fw + pad_w)
+                    bottom = min(h, y + fh + pad_h)
+                    left = max(0, x - pad_w)
                     boxes.append((top, right, bottom, left))
                 return boxes
         except Exception:
@@ -671,12 +674,23 @@ def analyze_frame_outside_ui(jpg_bytes: bytes, room_number: str, known_face_enco
         face_boxes = detect_face_boxes(frame)
 
         if not face_boxes:
+            misses = state.get("consecutive_face_misses", 0) + 1
+            state["consecutive_face_misses"] = misses
+            last_seen = state.get("last_face_seen_time", 0.0)
+            time_since_last = current_time - last_seen if last_seen > 0 else 999.0
+
+            # Grace period: ако лице е било засечено преди по-малко от 1.8 сек и имаме под 3 последователни пропуска,
+            # филтрираме временния шум (премигване, леко завъртане на глава, корекция на експозиция) и не нулираме интерфейса.
+            if last_seen > 0 and time_since_last < 1.8 and misses < 3:
+                return None
+
             state["student_name"] = ""
             state["faculty_number"] = ""
             state["status_text"] = "Няма зачетено лице пред камерата"
             state["status_type"] = "idle" # Сив/Бял цвят в UI
             state["liveness_scores"] = []
             state["liveness_student_id"] = None
+            state["candidate_student_id"] = None
             return None
 
         # Координатите на първото лице в оригиналната резолюция на кадъра
@@ -698,11 +712,25 @@ def analyze_frame_outside_ui(jpg_bytes: bytes, room_number: str, known_face_enco
             if enh_encs:
                 face_encoding = enh_encs[0]
             else:
+                misses = state.get("consecutive_face_misses", 0) + 1
+                state["consecutive_face_misses"] = misses
+                last_seen = state.get("last_face_seen_time", 0.0)
+                time_since_last = current_time - last_seen if last_seen > 0 else 999.0
+                if last_seen > 0 and time_since_last < 1.8 and misses < 3:
+                    return None
+
                 state["student_name"] = ""
                 state["faculty_number"] = ""
                 state["status_text"] = "Няма зачетено лице пред камерата"
                 state["status_type"] = "idle"
+                state["liveness_scores"] = []
+                state["liveness_student_id"] = None
+                state["candidate_student_id"] = None
                 return None
+
+        # Успешно засечено и векторизирано лице: нулираме брояча на пропуски
+        state["consecutive_face_misses"] = 0
+        state["last_face_seen_time"] = current_time
 
         student_found = None
         matching_students = []
@@ -1036,6 +1064,9 @@ def stop_camera_stream(room_number: str, reason: str = "manual") -> bool:
         AI_ROOM_STATES[room_number]["green_state_end_time"] = 0
         AI_ROOM_STATES[room_number]["qr_scan_mode"] = False
         AI_ROOM_STATES[room_number]["qr_scan_expiry"] = 0.0
+        AI_ROOM_STATES[room_number]["consecutive_face_misses"] = 0
+        AI_ROOM_STATES[room_number]["last_face_seen_time"] = 0.0
+        AI_ROOM_STATES[room_number]["candidate_student_id"] = None
 
     emit_room_event(room_number, "camera_status", {
         "room_number": room_number,
@@ -1110,6 +1141,10 @@ async def ingest_webcam_frame(room_number: str, jpg_bytes: bytes) -> dict:
         return {"success": False, "error": "Invalid frame data"}
 
     current_time = time.time()
+    active_source = CAMERA_SOURCES.get(room_number, "esp32")
+    if active_source == "esp32" and room_number in ACTIVE_CAMERAS:
+        return {"success": False, "error": "Room camera source is set to esp32"}
+
     CAMERA_SOURCES[room_number] = "webcam"
 
     if room_number not in AI_ROOM_STATES:
@@ -1125,7 +1160,10 @@ async def ingest_webcam_frame(room_number: str, jpg_bytes: bytes) -> dict:
             "last_ai_run_time": 0,
             "qr_scan_mode": False,
             "qr_scan_expiry": 0.0,
-            "liveness_buffer_seconds": 2.0
+            "liveness_buffer_seconds": 2.0,
+            "consecutive_face_misses": 0,
+            "last_face_seen_time": 0.0,
+            "candidate_student_id": None,
         }
     state = AI_ROOM_STATES[room_number]
 
@@ -1214,7 +1252,10 @@ async def fetch_frames_from_esp32(room_number: str, esp32_ip: str):
         "last_ai_run_time": 0,
         "qr_scan_mode": False,
         "qr_scan_expiry": 0.0,
-        "liveness_buffer_seconds": 2.0
+        "liveness_buffer_seconds": 2.0,
+        "consecutive_face_misses": 0,
+        "last_face_seen_time": 0.0,
+        "candidate_student_id": None,
     }
     state = AI_ROOM_STATES[room_number]
     
@@ -1258,16 +1299,17 @@ async def fetch_frames_from_esp32(room_number: str, esp32_ip: str):
                     was_offline = offline_event_sent or not CAMERA_HEALTH[room_number].get("is_online", False)
                     CAMERA_HEALTH[room_number]["is_online"] = True
                     CAMERA_HEALTH[room_number]["last_frame_time"] = time.time()
-                    state["status_text"] = "Очакване на обект пред камерата..."
-                    state["status_type"] = "idle"
-                    if was_offline:
-                        print(f"[Camera Connected] Успешна връзка с ESP32 в Зала {room_number} ({esp32_ip})")
-                        emit_room_event(room_number, "camera_status", {
-                            "room_number": room_number, "armed": True, "is_online": True, "esp32_ip": esp32_ip
-                        })
-                        emit_room_event(room_number, "biometric_status", {
-                            "student_name": "", "faculty_number": "", "status_text": state["status_text"], "status_type": "idle"
-                        })
+                    if CAMERA_SOURCES.get(room_number, "esp32") == "esp32":
+                        state["status_text"] = "Очакване на обект пред камерата..."
+                        state["status_type"] = "idle"
+                        if was_offline:
+                            print(f"[Camera Connected] Успешна връзка с ESP32 в Зала {room_number} ({esp32_ip})")
+                            emit_room_event(room_number, "camera_status", {
+                                "room_number": room_number, "armed": True, "is_online": True, "esp32_ip": esp32_ip
+                            })
+                            emit_room_event(room_number, "biometric_status", {
+                                "student_name": "", "faculty_number": "", "status_text": state["status_text"], "status_type": "idle"
+                            })
                     
                     # Нулиране на брояча и състоянието при успешна връзка
                     retry_count = 0
@@ -1313,6 +1355,11 @@ async def fetch_frames_from_esp32(room_number: str, esp32_ip: str):
                                         fps_count = 0
                                         fps_bytes_total = 0
                                         fps_last_time = current_time
+
+                                    # Ако квесторът е активирал локална уебкамера ('webcam'),
+                                    # поддържаме TCP потока на ESP32 чист, но НЕ презаписваме кадри и НЕ стартираме ИИ
+                                    if CAMERA_SOURCES.get(room_number, "esp32") != "esp32":
+                                        continue
 
                                     LATEST_FRAMES[room_number] = jpg_bytes
                                     CAMERA_HEALTH[room_number]["last_frame_time"] = current_time
@@ -1462,7 +1509,7 @@ async def generate_debug_stream(room_number: str, target_student_id: str, tolera
     target_name_ascii = _transliterate_for_cv2(target_name)
     queue = subscribe_client(room_number)
     try:
-        while room_number in ACTIVE_CAMERAS:
+        while room_number in ACTIVE_CAMERAS or CAMERA_SOURCES.get(room_number) == "webcam":
             try:
                 frame_bytes = await asyncio.wait_for(queue.get(), timeout=2.0)
             except asyncio.TimeoutError:

@@ -25,7 +25,11 @@ from app.stream_esp32 import (
     set_room_qr_scan_mode,
     process_twin_qr_admission,
     generate_twin_dynamic_code,
-    decode_qr_from_frame
+    decode_qr_from_frame,
+    detect_face_boxes,
+    set_room_camera_source,
+    get_room_camera_source,
+    CAMERA_SOURCES
 )
 from tests.test_data_isolation import TestDataSnapshot, clean_known_test_data
 
@@ -586,6 +590,86 @@ class StreamLivenessTestCase(unittest.TestCase):
         # 4. Empty / None frame
         self.assertIsNone(decode_qr_from_frame(None))
         self.assertIsNone(decode_qr_from_frame(np.zeros((0, 0, 3), dtype=np.uint8)))
+
+    def test_15_face_detection_temporal_debouncing(self):
+        """
+        Тества темпоралното филтриране и хистерезис при засичане на лица:
+        - Преходни единични пропуски (1-2 кадъра < 1.8s) не нулират състоянието и не изтриват liveness_scores.
+        - Продължителна липса на лице (>=3 кадъра или >=1.8s) коректно преминава в idle 'Няма зачетено лице'.
+        """
+        room = "TEST_DEBOUNCE_ROOM"
+        state = {
+            "student_name": "Тестов Студент Нормален",
+            "faculty_number": "12128801",
+            "status_text": "Проверка на автентичност...",
+            "status_type": "idle",
+            "ai_busy": False,
+            "green_state_end_time": 0,
+            "locked_student_name": "",
+            "locked_fac_num": "",
+            "last_ai_run_time": 0,
+            "qr_scan_mode": False,
+            "qr_scan_expiry": 0.0,
+            "liveness_buffer_seconds": 2.0,
+            "consecutive_face_misses": 0,
+            "last_face_seen_time": time.time(),
+            "liveness_scores": [0.95],
+            "liveness_student_id": str(self.student.id),
+        }
+
+        empty_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        _, empty_bytes = cv2.imencode('.jpg', empty_frame)
+        empty_bytes = empty_bytes.tobytes()
+
+        known_encs = [np.array(self.dummy_embedding)]
+        known_names = [self.student]
+
+        # 1-ви пропуск: в рамките на grace period (<1.8s, misses < 3)
+        res1 = analyze_frame_outside_ui(empty_bytes, room, known_encs, known_names, state)
+        self.assertIsNone(res1)
+        self.assertEqual(state["consecutive_face_misses"], 1)
+        self.assertEqual(state["student_name"], "Тестов Студент Нормален")
+        self.assertEqual(state["status_text"], "Проверка на автентичност...")
+        self.assertEqual(len(state["liveness_scores"]), 1)
+        self.assertEqual(state["liveness_student_id"], str(self.student.id))
+
+        # 2-ри пропуск: все още в рамките на grace period
+        res2 = analyze_frame_outside_ui(empty_bytes, room, known_encs, known_names, state)
+        self.assertIsNone(res2)
+        self.assertEqual(state["consecutive_face_misses"], 2)
+        self.assertEqual(state["student_name"], "Тестов Студент Нормален")
+        self.assertEqual(len(state["liveness_scores"]), 1)
+
+        # 3-ти пропуск: броячът достига лимита (misses >= 3)
+        res3 = analyze_frame_outside_ui(empty_bytes, room, known_encs, known_names, state)
+        self.assertIsNone(res3)
+        self.assertGreaterEqual(state["consecutive_face_misses"], 3)
+        self.assertEqual(state["student_name"], "")
+        self.assertEqual(state["status_text"], "Няма зачетено лице пред камерата")
+        self.assertEqual(state["status_type"], "idle")
+        self.assertEqual(state["liveness_scores"], [])
+        self.assertIsNone(state["liveness_student_id"])
+
+    def test_16_yunet_box_padding_applied(self):
+        """
+        Тества дали detect_face_boxes коректно прилага разширяване на кутията с марджин
+        без да надхвърля границите на изображението [0, w] и [0, h].
+        """
+        with patch("app.stream_esp32._get_yunet_detector") as mock_get_yunet:
+            mock_detector = MagicMock()
+            mock_detector.detect.return_value = (1, np.array([[50, 60, 100, 120, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.95]]))
+            mock_get_yunet.return_value = mock_detector
+
+            dummy_img = np.zeros((480, 640, 3), dtype=np.uint8)
+            boxes = detect_face_boxes(dummy_img)
+            self.assertEqual(len(boxes), 1)
+            top, right, bottom, left = boxes[0]
+
+            # fw=100 -> pad_w = 12, fh=120 -> pad_h = 14
+            self.assertEqual(top, 46)
+            self.assertEqual(bottom, 194)
+            self.assertEqual(left, 38)
+            self.assertEqual(right, 162)
 
 
 if __name__ == "__main__":
