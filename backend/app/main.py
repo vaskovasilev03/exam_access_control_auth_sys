@@ -5,6 +5,7 @@ import re
 import mimetypes
 import asyncio
 import secrets
+import base64
 import jwt
 import face_recognition
 import bcrypt
@@ -15,7 +16,7 @@ import requests
 import pandas as pd
 import httpx
 import fastapi
-from fastapi import FastAPI, Depends, Response, File, UploadFile, HTTPException, Form, APIRouter, BackgroundTasks, Query, Body
+from fastapi import FastAPI, Depends, Response, File, UploadFile, HTTPException, Form, APIRouter, BackgroundTasks, Query, Body, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session, object_session
@@ -49,7 +50,9 @@ from .stream_esp32 import (
     ACTIVE_CAMERAS, CAMERA_TASKS, AI_ROOM_STATES, CAMERA_HEALTH,
     subscribe_room_events, unsubscribe_room_events, emit_room_event,
     set_room_qr_scan_mode, process_twin_qr_admission,
-    generate_debug_stream, DEBUG_TELEMETRY
+    generate_debug_stream, DEBUG_TELEMETRY,
+    ingest_webcam_frame, set_room_camera_source, get_room_camera_source,
+    CAMERA_SOURCES
 )
 from .storage import init_storage, upload_photo_to_cloud, get_photo_from_cloud, BUCKET_NAME
 from .mailer import send_welcome_email, send_allocation_email
@@ -2291,6 +2294,12 @@ async def stream_exam_room(room_number: str, background_tasks: BackgroundTasks, 
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid or expired token.")
 
+    active_source = get_room_camera_source(room_number)
+    if active_source == "webcam":
+        return StreamingResponse(
+            generate_from_memory(room_number),
+            media_type="multipart/x-mixed-replace; boundary=frame"
+        )
 
     if room_number not in ACTIVE_CAMERAS:
         raise HTTPException(
@@ -2321,6 +2330,13 @@ async def get_raw_esp32_stream(
     Използва съществуващия високоскоростен канал от паметта, предотвратявайки
     хардуерно блокиране на ESP32 DMA буферите при паралелни сокети.
     """
+    active_source = get_room_camera_source(room_number)
+    if active_source == "webcam":
+        return StreamingResponse(
+            generate_from_memory(room_number),
+            media_type="multipart/x-mixed-replace; boundary=frame"
+        )
+
     if room_number not in ACTIVE_CAMERAS:
         raise HTTPException(
             status_code=404,
@@ -2335,6 +2351,129 @@ async def get_raw_esp32_stream(
         generate_from_memory(room_number),
         media_type="multipart/x-mixed-replace; boundary=frame"
     )
+
+@app.post("/api/v1/exams/{room_number}/camera-source")
+async def set_camera_source_endpoint(
+    room_number: str,
+    request: fastapi.Request,
+    payload: dict = Body(...),
+    token: Optional[str] = Query(None)
+):
+    """
+    Превключва източника на видео между 'esp32' и 'webcam'.
+    """
+    auth_token = token or request.cookies.get("examiner_token") or request.cookies.get("admin_token")
+    if not auth_token:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            auth_token = auth_header[7:]
+
+    if not auth_token:
+        raise HTTPException(status_code=401, detail="Липсва токен за автентикация.")
+
+    try:
+        token_data = jwt.decode(auth_token, SECRET_KEY, algorithms=[ALGORITHM])
+    except Exception:
+        raise HTTPException(status_code=401, detail="Невалиден токен.")
+
+    if token_data.get("role") not in ["examiner", "superadmin"] and not is_superadmin_user(token_data):
+        raise HTTPException(status_code=403, detail="Достъпът е отказан.")
+
+    source = payload.get("source", "").lower().strip()
+    result = set_room_camera_source(room_number, source)
+    if not result.get("success"):
+        raise HTTPException(status_code=400, detail=result.get("error", "Невалиден източник."))
+    return result
+
+@app.get("/api/v1/exams/{room_number}/camera-source")
+async def get_camera_source_endpoint(room_number: str):
+    """Връща текущо конфигурирания източник на камера за залата."""
+    return {
+        "room_number": room_number,
+        "source": get_room_camera_source(room_number)
+    }
+
+@app.post("/api/v1/exams/{room_number}/webcam-frame")
+async def post_webcam_frame_endpoint(
+    room_number: str,
+    request: fastapi.Request,
+    token: Optional[str] = Query(None)
+):
+    """
+    HTTP POST ендпоинт за поемане на кадри от локалната уебкамера/USB на квестора.
+    Приема директно сурови JPEG байтове в тялото на заявката.
+    """
+    auth_token = token or request.cookies.get("examiner_token") or request.cookies.get("admin_token")
+    if not auth_token:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            auth_token = auth_header[7:]
+
+    if not auth_token:
+        raise HTTPException(status_code=401, detail="Липсва токен за автентикация.")
+
+    try:
+        token_data = jwt.decode(auth_token, SECRET_KEY, algorithms=[ALGORITHM])
+    except Exception:
+        raise HTTPException(status_code=401, detail="Невалиден токен.")
+
+    if token_data.get("role") not in ["examiner", "superadmin"] and not is_superadmin_user(token_data):
+        raise HTTPException(status_code=403, detail="Достъпът е отказан.")
+
+    frame_bytes = await request.body()
+    if not frame_bytes or len(frame_bytes) < 100:
+        raise HTTPException(status_code=400, detail="Невалидни данни за кадър.")
+
+    result = await ingest_webcam_frame(room_number, frame_bytes)
+    return result
+
+@app.websocket("/ws/exams/{room_number}/webcam-stream")
+async def websocket_webcam_stream_endpoint(
+    websocket: WebSocket,
+    room_number: str,
+    token: Optional[str] = Query(None)
+):
+    """
+    Високоскоростен WebSocket за поемане на двоични JPEG кадри от локалната камера/USB.
+    """
+    auth_token = token or websocket.cookies.get("examiner_token") or websocket.cookies.get("admin_token")
+    if not auth_token:
+        await websocket.close(code=1008)
+        return
+
+    try:
+        token_data = jwt.decode(auth_token, SECRET_KEY, algorithms=[ALGORITHM])
+    except Exception:
+        await websocket.close(code=1008)
+        return
+
+    if token_data.get("role") not in ["examiner", "superadmin"] and not is_superadmin_user(token_data):
+        await websocket.close(code=1008)
+        return
+
+    await websocket.accept()
+    try:
+        while True:
+            message = await websocket.receive()
+            if message.get("type") == "websocket.disconnect":
+                break
+            data = message.get("bytes")
+            if not data and message.get("text"):
+                txt = message["text"]
+                if txt.startswith("data:image"):
+                    txt = txt.split(",", 1)[-1]
+                data = base64.b64decode(txt)
+            if data and len(data) > 100:
+                await ingest_webcam_frame(room_number, data)
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        print(f"[WebSocket Webcam Error] Зала {room_number}: {repr(e)}")
+    finally:
+        try:
+            await websocket.close()
+        except Exception:
+            pass
 
 @app.get("/api/v1/exams/{room_number}/debug/students")
 async def get_debug_students(
@@ -2561,16 +2700,24 @@ async def stream_exam_room_events(
             # 1. Моментално начално състояние (Snapshot)
             esp32_ip = ACTIVE_CAMERAS.get(room_number)
             health = CAMERA_HEALTH.get(room_number, {})
-            is_online = bool(
-                esp32_ip and
-                health.get("is_online", False) and
-                (time.time() - health.get("last_frame_time", 0) < 8.0)
-            )
+            current_src = get_room_camera_source(room_number)
+            if current_src == "webcam":
+                is_online = bool(
+                    health.get("is_online", False) and
+                    (time.time() - health.get("last_frame_time", 0) < 6.0)
+                )
+            else:
+                is_online = bool(
+                    esp32_ip and
+                    health.get("is_online", False) and
+                    (time.time() - health.get("last_frame_time", 0) < 8.0)
+                )
             init_cam = {
                 "room_number": room_number,
                 "armed": is_online,
                 "esp32_ip": esp32_ip,
-                "is_online": is_online
+                "is_online": is_online,
+                "source": current_src
             }
             yield f"event: camera_status\ndata: {json.dumps(init_cam)}\n\n"
 
@@ -4040,17 +4187,25 @@ def get_exam_room_camera_status(room_number: str):
     esp32_ip = ACTIVE_CAMERAS.get(room_number)
     health = CAMERA_HEALTH.get(room_number, {})
     is_stopped = health.get("stopped", False)
-    is_online = bool(
-        esp32_ip and 
-        health.get("is_online", False) and 
-        (time.time() - health.get("last_frame_time", 0) < 8.0)
-    )
+    source = get_room_camera_source(room_number)
+    if source == "webcam":
+        is_online = bool(
+            health.get("is_online", False) and
+            (time.time() - health.get("last_frame_time", 0) < 6.0)
+        )
+    else:
+        is_online = bool(
+            esp32_ip and 
+            health.get("is_online", False) and 
+            (time.time() - health.get("last_frame_time", 0) < 8.0)
+        )
     return {
         "room_number": room_number,
         "armed": is_online,
         "esp32_ip": esp32_ip or health.get("esp32_ip"),
         "is_online": is_online,
-        "stopped": is_stopped
+        "stopped": is_stopped,
+        "source": source
     }
 
 @app.post("/api/v1/exams/{room_number}/stop-camera")

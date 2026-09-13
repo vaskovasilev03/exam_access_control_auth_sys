@@ -156,15 +156,33 @@
             
             <!-- Video Viewport Card -->
             <div class="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius)] p-4 shadow-sm flex flex-col justify-between">
-                <div class="flex justify-between items-center mb-3">
-                    <div class="flex items-center gap-2">
-                        <span class="text-xs font-bold uppercase tracking-wider text-[var(--muted-foreground)]">Видео стрийм: ESP32-CAM</span>
-                        <span id="streamResolutionBadge" class="hidden sm:inline-block text-[10px] font-mono px-2 py-0.5 rounded bg-[var(--input)] text-[var(--muted-foreground)] border border-[var(--border)]">
-                            720p • 25 FPS
-                        </span>
+                <div class="flex flex-wrap justify-between items-center gap-2 mb-3">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <!-- Source Selector Segmented Buttons -->
+                        <div class="inline-flex rounded-lg p-0.5 bg-[var(--input)] border border-[var(--border)] text-xs">
+                            <button id="btnSourceEsp32" onclick="switchCameraSource('esp32')" class="px-2.5 py-1 rounded-md text-[var(--foreground)] bg-[var(--card)] shadow-xs font-bold transition flex items-center gap-1.5 cursor-pointer">
+                                <svg class="w-3.5 h-3.5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"></path>
+                                </svg>
+                                <span>ESP32-CAM</span>
+                            </button>
+                            <button id="btnSourceWebcam" onclick="switchCameraSource('webcam')" class="px-2.5 py-1 rounded-md text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition flex items-center gap-1.5 cursor-pointer font-medium">
+                                <svg class="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                </svg>
+                                <span>Уебкамера / USB</span>
+                            </button>
+                        </div>
+
+                        <!-- Device Selection Dropdown -->
+                        <div id="webcamDeviceWrapper" class="hidden">
+                            <select id="webcamDeviceSelect" onchange="changeWebcamDevice(this.value)" class="text-[11px] font-medium bg-[var(--input)] border border-[var(--border)] rounded-md px-2 py-1 text-[var(--foreground)] focus:outline-none focus:ring-1 focus:ring-emerald-500 max-w-[180px] sm:max-w-[220px] truncate cursor-pointer">
+                                <option value="">По подразбиране</option>
+                            </select>
+                        </div>
                     </div>
 
-                    <!-- Camera Armed Status -->
+                    <!-- Camera Armed Status & Fullscreen -->
                     <div class="flex items-center gap-2">
                         <span id="cameraStatusBadge" class="flex items-center text-xs text-red-400 bg-red-500/10 px-2.5 py-0.5 rounded-full font-bold uppercase border border-red-500/30">
                             <span id="cameraStatusDot" class="w-2 h-2 bg-red-400 rounded-full mr-1.5 animate-pulse"></span>
@@ -194,15 +212,21 @@
                         </span>
                     </div>
 
-                    <!-- HUD Overlay: Top Right (Room Tag) -->
+                    <!-- HUD Overlay: Top Right (Room & Source Tag) -->
                     <div class="absolute top-3 right-3 z-20 pointer-events-none">
-                        <span class="text-[11px] font-bold text-white/90 bg-black/60 backdrop-blur px-2.5 py-1 rounded-full shadow border border-white/10">
+                        <span id="hudSourceTag" class="text-[11px] font-bold text-white/90 bg-black/60 backdrop-blur px-2.5 py-1 rounded-full shadow border border-white/10">
                             Терминал: Зала {{ room_number }}
                         </span>
                     </div>
 
-                    <!-- MJPEG Live Stream Image -->
+                    <!-- MJPEG Live Stream Image (ESP32-CAM) -->
                     <img id="videoStream" class="w-full h-full object-cover hidden" src="" alt="Свързване с терминала..." />
+
+                    <!-- Native Local Video for Webcam / USB (0ms lag, 60fps) -->
+                    <video id="localWebcamVideo" autoplay playsinline muted class="w-full h-full object-cover hidden"></video>
+
+                    <!-- Hidden Off-screen Canvas for frame extraction -->
+                    <canvas id="webcamCaptureCanvas" class="hidden"></canvas>
 
                     <!-- Offline / Stopped Graphic -->
                     <div id="videoOfflineRadar" class="flex flex-col items-center justify-center text-center p-6 space-y-3">
@@ -215,9 +239,17 @@
                             <div id="radarTitle" class="text-sm font-bold text-white">Очакване на видео сигнал</div>
                             <div id="radarDesc" class="text-xs text-slate-400 max-w-xs">ESP32-CAM терминалът за Зала {{ room_number }} не излъчва в момента.</div>
                         </div>
-                        <button id="radarActionBtn" onclick="checkCameraStatus(true)" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow transition cursor-pointer">
-                            Провери връзката
-                        </button>
+                        <div class="flex flex-wrap items-center justify-center gap-2 pt-1">
+                            <button id="radarActionBtn" onclick="checkCameraStatus(true)" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow transition cursor-pointer">
+                                Провери връзката
+                            </button>
+                            <button id="radarSwitchWebcamBtn" onclick="switchCameraSource('webcam')" class="px-3 py-1.5 rounded-lg bg-[var(--input)] hover:bg-[var(--accent)] text-[var(--foreground)] text-xs font-semibold border border-[var(--border)] transition cursor-pointer flex items-center gap-1.5">
+                                <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                </svg>
+                                <span>Използвай Уебкамера / USB</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -811,19 +843,243 @@
             }
         }
 
-        // Camera Management
+        // Camera Management & Hardware Source Orchestration
         const videoStream = document.getElementById("videoStream");
+        const localWebcamVideo = document.getElementById("localWebcamVideo");
         const videoOfflineRadar = document.getElementById("videoOfflineRadar");
         const cameraStatusBadge = document.getElementById("cameraStatusBadge");
         const cameraStatusDot = document.getElementById("cameraStatusDot");
         const cameraStatusText = document.getElementById("cameraStatusText");
 
         let radarDebounceTimer = null;
+        let currentCameraSource = "esp32";
+        let webcamStream = null;
+        let webcamSocket = null;
+        let webcamPumpInterval = null;
 
-        function updateCameraUi(armed, isStopped = false) {
+        function applyCameraSourceUi(source, syncServer = true) {
+            if (source !== 'webcam' && source !== 'esp32') return;
+            currentCameraSource = source;
+            const btnEsp32 = document.getElementById("btnSourceEsp32");
+            const btnWebcam = document.getElementById("btnSourceWebcam");
+            const deviceWrapper = document.getElementById("webcamDeviceWrapper");
+            const hudSourceTag = document.getElementById("hudSourceTag");
+
+            if (source === 'webcam') {
+                if (btnEsp32) {
+                    btnEsp32.className = "px-2.5 py-1 rounded-md text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition flex items-center gap-1.5 cursor-pointer font-medium";
+                }
+                if (btnWebcam) {
+                    btnWebcam.className = "px-2.5 py-1 rounded-md text-[var(--foreground)] bg-[var(--card)] shadow-xs font-bold transition flex items-center gap-1.5 cursor-pointer";
+                }
+                if (deviceWrapper) deviceWrapper.classList.remove("hidden");
+                if (hudSourceTag) hudSourceTag.innerText = `Уебкамера: Зала ${roomNumber}`;
+            } else {
+                if (btnEsp32) {
+                    btnEsp32.className = "px-2.5 py-1 rounded-md text-[var(--foreground)] bg-[var(--card)] shadow-xs font-bold transition flex items-center gap-1.5 cursor-pointer";
+                }
+                if (btnWebcam) {
+                    btnWebcam.className = "px-2.5 py-1 rounded-md text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition flex items-center gap-1.5 cursor-pointer font-medium";
+                }
+                if (deviceWrapper) deviceWrapper.classList.add("hidden");
+                if (hudSourceTag) hudSourceTag.innerText = `Терминал: Зала ${roomNumber}`;
+            }
+
+            if (syncServer) {
+                fetch(`/api/v1/exams/${encodeURIComponent(roomNumber)}/camera-source?token=${encodeURIComponent(token)}`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ source })
+                }).catch(err => console.warn("Failed to notify camera source change:", err));
+            }
+        }
+
+        async function switchCameraSource(source) {
+            if (source === currentCameraSource && ((source === 'webcam' && webcamStream) || (source === 'esp32' && cameraArmed))) {
+                return;
+            }
+            applyCameraSourceUi(source, true);
+
+            if (source === 'webcam') {
+                await enumerateWebcamDevices();
+                await startWebcamStream();
+            } else {
+                stopWebcamStream();
+                checkCameraStatus(true);
+            }
+        }
+
+        async function enumerateWebcamDevices() {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(d => d.kind === "videoinput");
+                const select = document.getElementById("webcamDeviceSelect");
+                if (!select) return;
+                const currentVal = select.value;
+                select.innerHTML = '<option value="">По подразбиране</option>';
+                videoDevices.forEach((d, idx) => {
+                    const opt = document.createElement("option");
+                    opt.value = d.deviceId;
+                    opt.text = d.label || `Камера ${idx + 1}`;
+                    select.appendChild(opt);
+                });
+                if (currentVal) select.value = currentVal;
+            } catch (err) {
+                console.warn("Could not enumerate camera devices:", err);
+            }
+        }
+
+        async function changeWebcamDevice(deviceId) {
+            if (currentCameraSource !== 'webcam') return;
+            await startWebcamStream(deviceId || null);
+        }
+
+        async function startWebcamStream(deviceId = null) {
+            stopWebcamStream();
+
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                showToast("Браузърът не поддържа директен достъп до видео камера.", "error");
+                updateCameraUi(false, false, 'webcam');
+                return;
+            }
+
+            try {
+                const constraints = {
+                    video: deviceId 
+                        ? { deviceId: { exact: deviceId }, width: { ideal: 640 }, height: { ideal: 480 } }
+                        : { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
+                    audio: false
+                };
+
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                webcamStream = stream;
+
+                if (localWebcamVideo) {
+                    localWebcamVideo.srcObject = stream;
+                    localWebcamVideo.classList.remove("hidden");
+                    try { await localWebcamVideo.play(); } catch(e) {}
+                }
+
+                if (videoStream) {
+                    videoStream.classList.add("hidden");
+                    videoStream.src = "";
+                    videoStream.removeAttribute("src");
+                }
+                if (videoOfflineRadar) {
+                    videoOfflineRadar.classList.add("hidden");
+                }
+
+                updateCameraUi(true, false, 'webcam');
+                showToast("Локалната камера е активирана успешно.", "success");
+
+                // WebSocket за двоично излъчване на кадрите към сървъра
+                const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+                const wsUrl = `${protocol}//${window.location.host}/ws/exams/${encodeURIComponent(roomNumber)}/webcam-stream?token=${encodeURIComponent(token)}`;
+                try {
+                    webcamSocket = new WebSocket(wsUrl);
+                    webcamSocket.binaryType = "blob";
+                    webcamSocket.onopen = () => {
+                        console.log("[Webcam Stream] WebSocket връзката е активна.");
+                    };
+                    webcamSocket.onerror = (err) => {
+                        console.warn("[Webcam Stream] WebSocket грешка:", err);
+                    };
+                    webcamSocket.onclose = () => {
+                        console.log("[Webcam Stream] WebSocket връзката е прекъсната.");
+                    };
+                } catch(wsErr) {
+                    console.warn("[Webcam Stream] Fallback към HTTP POST за кадри:", wsErr);
+                }
+
+                // Извличане и изпращане на кадри на интервали (~10 FPS)
+                const canvas = document.getElementById("webcamCaptureCanvas");
+                let isSendingFrame = false;
+
+                webcamPumpInterval = setInterval(() => {
+                    if (!webcamStream || !localWebcamVideo || localWebcamVideo.videoWidth === 0) return;
+                    if (isSendingFrame) return;
+
+                    try {
+                        if (!canvas) return;
+                        canvas.width = localWebcamVideo.videoWidth;
+                        canvas.height = localWebcamVideo.videoHeight;
+                        const ctx = canvas.getContext("2d");
+                        ctx.drawImage(localWebcamVideo, 0, 0, canvas.width, canvas.height);
+
+                        isSendingFrame = true;
+                        canvas.toBlob(async (blob) => {
+                            try {
+                                if (!blob || !webcamStream) return;
+                                if (webcamSocket && webcamSocket.readyState === WebSocket.OPEN) {
+                                    webcamSocket.send(blob);
+                                } else {
+                                    await fetch(`/api/v1/exams/${encodeURIComponent(roomNumber)}/webcam-frame?token=${encodeURIComponent(token)}`, {
+                                        method: "POST",
+                                        body: blob,
+                                        headers: {
+                                            "Content-Type": "image/jpeg",
+                                            "Authorization": `Bearer ${token}`
+                                        }
+                                    });
+                                }
+                            } catch (uploadErr) {
+                                console.warn("[Webcam Stream] Frame upload warning:", uploadErr);
+                            } finally {
+                                isSendingFrame = false;
+                            }
+                        }, "image/jpeg", 0.75);
+                    } catch (err) {
+                        isSendingFrame = false;
+                        console.warn("[Webcam Stream] Grab warning:", err);
+                    }
+                }, 100);
+
+            } catch (err) {
+                console.error("Грешка при достъп до уебкамерата:", err);
+                let msg = "Неуспешен достъп до локалната камера.";
+                if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+                    msg = "Достъпът до камерата бе отказан от браузъра. Моля, разрешете достъпа в настройките.";
+                } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
+                    msg = "Не е намерена свързана уебкамера или USB видео устройство.";
+                } else if (err.name === "NotReadableError" || err.name === "TrackStartError") {
+                    msg = "Камерата се използва от друго приложение в момента.";
+                }
+                showToast(msg, "error");
+                updateCameraUi(false, false, 'webcam');
+            }
+        }
+
+        function stopWebcamStream() {
+            if (webcamPumpInterval) {
+                clearInterval(webcamPumpInterval);
+                webcamPumpInterval = null;
+            }
+            if (webcamSocket) {
+                try { webcamSocket.close(); } catch(e) {}
+                webcamSocket = null;
+            }
+            if (webcamStream) {
+                try {
+                    webcamStream.getTracks().forEach(track => track.stop());
+                } catch(e) {}
+                webcamStream = null;
+            }
+            if (localWebcamVideo) {
+                localWebcamVideo.pause();
+                localWebcamVideo.srcObject = null;
+                localWebcamVideo.classList.add("hidden");
+            }
+        }
+
+        function updateCameraUi(armed, isStopped = false, source = null) {
             cameraArmed = armed;
             cameraStopped = Boolean(isStopped);
             const hudLiveBadge = document.getElementById("hudLiveBadge");
+            const effectiveSource = source || currentCameraSource;
 
             if (armed) {
                 if (radarDebounceTimer) {
@@ -833,13 +1089,23 @@
                 if (hudLiveBadge) hudLiveBadge.classList.remove("hidden");
                 cameraStatusBadge.className = "flex items-center text-xs text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full font-bold uppercase border border-emerald-500/30";
                 cameraStatusDot.className = "w-2 h-2 bg-emerald-400 rounded-full mr-1.5 animate-ping";
-                cameraStatusText.innerText = "System Armed (Live)";
+                cameraStatusText.innerText = effectiveSource === 'webcam' ? "System Armed (Уебкамера)" : "System Armed (Live)";
 
-                const streamUrl = `/api/v1/exams/${roomNumber}/stream?token=${token}`;
-                if (videoStream.getAttribute("src") !== streamUrl) {
-                    videoStream.src = streamUrl;
+                if (effectiveSource === 'webcam') {
+                    if (localWebcamVideo) localWebcamVideo.classList.remove("hidden");
+                    if (videoStream) {
+                        videoStream.classList.add("hidden");
+                        videoStream.src = "";
+                        videoStream.removeAttribute("src");
+                    }
+                } else {
+                    if (localWebcamVideo) localWebcamVideo.classList.add("hidden");
+                    const streamUrl = `/api/v1/exams/${roomNumber}/stream?token=${token}`;
+                    if (videoStream.getAttribute("src") !== streamUrl) {
+                        videoStream.src = streamUrl;
+                    }
+                    videoStream.classList.remove("hidden");
                 }
-                videoStream.classList.remove("hidden");
                 videoOfflineRadar.classList.add("hidden");
                 updateExamCountdown();
             } else {
@@ -881,28 +1147,32 @@
                         videoStream.removeAttribute("src");
                     }
                     videoStream.classList.add("hidden");
+                    if (localWebcamVideo) localWebcamVideo.classList.add("hidden");
                     videoOfflineRadar.classList.remove("hidden");
                 } else {
-                    // Кратковременно прекъсване на сигнала: Задържаме последния кадър (Freeze-Frame)
-                    // и показваме статус за повторно свързване
                     cameraStatusBadge.className = "flex items-center text-xs text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full font-bold uppercase border border-amber-500/30";
                     cameraStatusDot.className = "w-2 h-2 bg-amber-400 rounded-full mr-1.5 animate-pulse";
                     cameraStatusText.innerText = "Свързване...";
 
-                    // Дебаунс 4 секунди преди превключване към радарния екран
                     if (!radarDebounceTimer) {
                         radarDebounceTimer = setTimeout(() => {
                             radarDebounceTimer = null;
                             if (!cameraArmed && !cameraStopped) {
                                 cameraStatusBadge.className = "flex items-center text-xs text-red-400 bg-red-500/10 px-2.5 py-0.5 rounded-full font-bold uppercase border border-red-500/30";
                                 cameraStatusDot.className = "w-2 h-2 bg-red-400 rounded-full mr-1.5";
-                                cameraStatusText.innerText = "Камера Офлайн";
+                                cameraStatusText.innerText = effectiveSource === 'webcam' ? "Уебкамера Офлайн" : "Камера Офлайн";
 
-                                if (radarTitle) radarTitle.innerText = "Очакване на видео сигнал";
-                                if (radarDesc) radarDesc.innerText = "ESP32-CAM терминалът за Зала {{ room_number }} не излъчва в момента.";
+                                if (radarTitle) {
+                                    radarTitle.innerText = effectiveSource === 'webcam' ? "Очакване на уебкамера" : "Очакване на видео сигнал";
+                                }
+                                if (radarDesc) {
+                                    radarDesc.innerText = effectiveSource === 'webcam' 
+                                        ? "Локалната уебкамера не излъчва. Моля, разрешете достъпа в браузъра." 
+                                        : "ESP32-CAM терминалът за Зала {{ room_number }} не излъчва в момента.";
+                                }
                                 if (radarActionBtn) {
-                                    radarActionBtn.innerText = "Провери връзката";
-                                    radarActionBtn.setAttribute("onclick", "checkCameraStatus(true)");
+                                    radarActionBtn.innerText = effectiveSource === 'webcam' ? "Стартирай отново" : "Провери връзката";
+                                    radarActionBtn.setAttribute("onclick", effectiveSource === 'webcam' ? "startWebcamStream()" : "checkCameraStatus(true)");
                                 }
                                 if (radarGraphic) {
                                     radarGraphic.innerHTML = `
@@ -917,6 +1187,7 @@
                                     videoStream.removeAttribute("src");
                                 }
                                 videoStream.classList.add("hidden");
+                                if (localWebcamVideo) localWebcamVideo.classList.add("hidden");
                                 videoOfflineRadar.classList.remove("hidden");
                             }
                         }, 4000);
@@ -929,14 +1200,17 @@
             try {
                 const res = await fetch(`/api/v1/exams/${roomNumber}/camera-status`);
                 const data = await res.json();
+                if (data.source && data.source !== currentCameraSource) {
+                    applyCameraSourceUi(data.source, false);
+                }
                 if (data.armed) {
                     offlineCount = 0;
-                    updateCameraUi(true);
+                    updateCameraUi(true, false, data.source);
                     if (isManual) showToast("Камерата е онлайн и свързана.", "success");
                 } else {
                     offlineCount++;
                     if (offlineCount >= 2 || isManual) {
-                        updateCameraUi(false, Boolean(data.stopped));
+                        updateCameraUi(false, Boolean(data.stopped), data.source);
                     }
                     if (isManual) {
                         if (data.stopped) {
@@ -972,6 +1246,7 @@
         // Release Room and Navigate Back
         async function releaseAndLeave(e) {
             if (e) e.preventDefault();
+            stopWebcamStream();
             try {
                 await fetch(`/api/v1/examiner/rooms/${encodeURIComponent(roomNumber)}/release`, {
                     method: "POST",
@@ -984,6 +1259,7 @@
         }
 
         window.addEventListener("beforeunload", () => {
+            stopWebcamStream();
             // Освобождаване на залата при затваряне на таба
             navigator.sendBeacon(`/api/v1/examiner/rooms/${encodeURIComponent(roomNumber)}/release`);
         });
@@ -1217,7 +1493,10 @@
             sseSource.addEventListener("camera_status", (e) => {
                 try {
                     const data = JSON.parse(e.data);
-                    updateCameraUi(Boolean(data.armed), Boolean(data.stopped));
+                    if (data.source && data.source !== currentCameraSource) {
+                        applyCameraSourceUi(data.source, false);
+                    }
+                    updateCameraUi(Boolean(data.armed), Boolean(data.stopped), data.source);
                 } catch (err) {
                     console.warn("SSE camera_status parse error:", err);
                 }

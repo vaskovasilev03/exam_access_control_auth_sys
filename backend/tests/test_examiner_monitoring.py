@@ -417,5 +417,84 @@ class ExaminerMonitoringTestCase(unittest.TestCase):
         )
         self.assertEqual(res2.status_code, 403)
 
+    def test_10_camera_source_toggle_and_webcam_ingest(self):
+        """ Verify toggling camera source between ESP32 and local webcam and uploading webcam frames """
+        import io
+        from PIL import Image
+
+        # 1. Examiner switches to local webcam
+        res = self.client.post(
+            "/api/v1/exams/ROOM_WEBCAM_TEST/camera-source",
+            json={"source": "webcam"},
+            headers={"Authorization": f"Bearer {self.token_ex1}"}
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(res.json()["success"])
+        self.assertEqual(res.json()["source"], "webcam")
+
+        # 2. Verify source via GET
+        res_get = self.client.get("/api/v1/exams/ROOM_WEBCAM_TEST/camera-source")
+        self.assertEqual(res_get.status_code, 200)
+        self.assertEqual(res_get.json()["source"], "webcam")
+
+        # 3. Create dummy JPEG frame
+        img = Image.new("RGB", (320, 240), color=(100, 150, 200))
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG")
+        frame_bytes = buf.getvalue()
+
+        # 4. Upload webcam frame
+        res_frame = self.client.post(
+            "/api/v1/exams/ROOM_WEBCAM_TEST/webcam-frame",
+            content=frame_bytes,
+            headers={
+                "Content-Type": "image/jpeg",
+                "Authorization": f"Bearer {self.token_ex1}"
+            }
+        )
+        self.assertEqual(res_frame.status_code, 200)
+        self.assertTrue(res_frame.json()["success"])
+        self.assertEqual(res_frame.json()["source"], "webcam")
+
+        # 5. Check camera status reflects webcam is armed/online
+        res_status = self.client.get("/api/v1/exams/ROOM_WEBCAM_TEST/camera-status")
+        self.assertEqual(res_status.status_code, 200)
+        status_data = res_status.json()
+        self.assertTrue(status_data["armed"])
+        self.assertTrue(status_data["is_online"])
+        self.assertEqual(status_data["source"], "webcam")
+
+        # 6. Switch back to ESP32
+        res_esp = self.client.post(
+            "/api/v1/exams/ROOM_WEBCAM_TEST/camera-source",
+            json={"source": "esp32"},
+            headers={"Authorization": f"Bearer {self.token_ex1}"}
+        )
+        self.assertEqual(res_esp.status_code, 200)
+        self.assertEqual(res_esp.json()["source"], "esp32")
+
+    def test_11_camera_source_authorization_and_validation(self):
+        """ Verify unauthorized requests and invalid source values are rejected """
+        # No token -> 401
+        res1 = self.client.post("/api/v1/exams/ROOM_TEST/camera-source", json={"source": "webcam"})
+        self.assertEqual(res1.status_code, 401)
+
+        # Student token -> 403
+        student_token = create_access_token({"sub": str(uuid.uuid4()), "role": "student"})
+        res2 = self.client.post(
+            "/api/v1/exams/ROOM_TEST/camera-source",
+            json={"source": "webcam"},
+            headers={"Authorization": f"Bearer {student_token}"}
+        )
+        self.assertEqual(res2.status_code, 403)
+
+        # Invalid source value -> 400
+        res3 = self.client.post(
+            "/api/v1/exams/ROOM_TEST/camera-source",
+            json={"source": "invalid_source"},
+            headers={"Authorization": f"Bearer {self.token_ex1}"}
+        )
+        self.assertEqual(res3.status_code, 400)
+
 if __name__ == "__main__":
     unittest.main()
