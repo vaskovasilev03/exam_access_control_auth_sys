@@ -33,6 +33,7 @@ const unsigned long TIMEOUT_MS = 3000;
 // Глобални променливи за съхранение на конфигурацията
 char fastapi_url[100] = "192.168.68.53:8000"; 
 char room_number[10] = "1151";
+char camera_res[10] = "VGA";
 
 Preferences preferences;
 httpd_handle_t stream_httpd = NULL;
@@ -50,6 +51,12 @@ bool registerCameraToBackend(String target_url, String room, String ip);
 // --- MJPEG STREAM CONFIGURATION ---
 #define PART_BOUNDARY "frame"
 static const char* _STREAM_CONTENT_TYPE = "multipart/x-mixed-replace; boundary=" PART_BOUNDARY;
+static const char* _STREAM_BOUNDARY = "\r\n--" PART_BOUNDARY "\r\n";
+static const char* _STREAM_PART = "Content-Type: image/jpeg\r\nContent-Length: %u\r\n\r\n";
+
+static unsigned long stream_fps_frames = 0;
+static unsigned long stream_fps_last_calc = 0;
+static float stream_live_fps = 0.0;
 
 // --- NON-BLOCKING STREAM HANDLER (esp_http_server) ---
 static esp_err_t stream_handler(httpd_req_t *req) {
@@ -79,9 +86,11 @@ static esp_err_t stream_handler(httpd_req_t *req) {
       _jpg_buf = fb->buf;
     }
 
-    // Обединяваме boundary и заглавната част в един чанк, спестявайки 33% мрежов овърхед
     if (res == ESP_OK) {
-      size_t hlen = snprintf(part_buf, sizeof(part_buf), "\r\n--" PART_BOUNDARY "\r\nContent-Type: image/jpeg\r\nContent-Length: %u\r\n\r\n", _jpg_buf_len);
+      res = httpd_resp_send_chunk(req, _STREAM_BOUNDARY, strlen(_STREAM_BOUNDARY));
+    }
+    if (res == ESP_OK) {
+      size_t hlen = snprintf(part_buf, sizeof(part_buf), _STREAM_PART, _jpg_buf_len);
       res = httpd_resp_send_chunk(req, part_buf, hlen);
     }
     if (res == ESP_OK) {
@@ -101,8 +110,17 @@ static esp_err_t stream_handler(httpd_req_t *req) {
       break;
     }
 
-    // Мигновено преотстъпване към Wi-Fi стека без излишен sleep за максимален FPS
-    taskYIELD();
+    // Изчисляване на живи кадри в секунда (Live FPS)
+    stream_fps_frames++;
+    unsigned long now_ms = millis();
+    if (now_ms - stream_fps_last_calc >= 2000) {
+      stream_live_fps = (stream_fps_frames * 1000.0f) / (now_ms - stream_fps_last_calc);
+      stream_fps_frames = 0;
+      stream_fps_last_calc = now_ms;
+    }
+
+    // 8ms пауза - дава процесорно време на Wi-Fi LwIP стека за гладък трансфер без блокиране (~25+ FPS)
+    vTaskDelay(pdMS_TO_TICKS(8));
   }
 
   if (active_stream_clients > 0) {
@@ -128,11 +146,13 @@ static esp_err_t config_get_handler(httpd_req_t *req) {
                 ".form-card{background:white;max-width:400px;margin:0 auto;padding:20px;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);text-align:left;}"
                 "h2{text-align:center;color:#34495e;margin-bottom:20px;}"
                 "label{font-weight:bold;color:#7f8c8d;display:block;margin-bottom:5px;}"
-                "input[type=text]{width:100%;padding:10px;margin-bottom:20px;border:1px solid #bdc3c7;border-radius:5px;box-sizing:border-box;font-size:16px;}"
+                "input[type=text], select{width:100%;padding:10px;margin-bottom:20px;border:1px solid #bdc3c7;border-radius:5px;box-sizing:border-box;font-size:16px;}"
                 "button{background:#2ecc71;color:white;width:100%;border:0;padding:12px;border-radius:5px;font-size:16px;font-weight:bold;cursor:pointer;}"
                 "button:hover{background:#27ae60;}"
-                ".info{font-size:13px;color:#95a5a6;margin-top:-15px;margin-bottom:15px;}</style></head><body>"
+                ".info{font-size:13px;color:#95a5a6;margin-top:-15px;margin-bottom:15px;}"
+                ".badge{display:inline-block;padding:4px 8px;border-radius:4px;background:#e8f8f5;color:#27ae60;font-weight:bold;font-size:13px;margin-bottom:15px;}</style></head><body>"
                 "<div class='form-card'><h2>Настройка на Терминал</h2>"
+                "<div class='badge'>Видео поток: " + String(stream_live_fps, 1) + " FPS | Клиенти: " + String(active_stream_clients) + "</div>"
                 "<form method='POST' action='/config'>"
                 "<label>Номер на изпитна зала:</label>"
                 "<input type='text' name='room' value='" + String(room_number) + "'>"
@@ -140,7 +160,13 @@ static esp_err_t config_get_handler(httpd_req_t *req) {
                 "<label>FastAPI Сървър (ip:port):</label>"
                 "<input type='text' name='api' value='" + String(fastapi_url) + "'>"
                 "<p class='info'>Текущ: " + String(fastapi_url) + "</p>"
-                "<button type='submit'>Запази и Регистрирай</button>"
+                "<label>Резолюция на камерата (FPS):</label>"
+                "<select name='res'>"
+                "<option value='VGA'" + String(strcmp(camera_res, "VGA") == 0 ? " selected" : "") + ">VGA (640x480) - Стандартна</option>"
+                "<option value='HVGA'" + String(strcmp(camera_res, "HVGA") == 0 ? " selected" : "") + ">HVGA (480x320) - Висока скорост (25+ FPS)</option>"
+                "<option value='QVGA'" + String(strcmp(camera_res, "QVGA") == 0 ? " selected" : "") + ">QVGA (320x240) - Максимална скорост</option>"
+                "</select>"
+                "<button type='submit'>Запази и Приложи</button>"
                 "</form></div></body></html>";
 
   httpd_resp_set_type(req, "text/html");
@@ -208,6 +234,27 @@ static esp_err_t config_post_handler(httpd_req_t *req) {
       preferences.begin("exam-gate", false);
       preferences.putString("api_url", String(fastapi_url));
       preferences.end();
+    }
+  }
+
+  if (httpd_query_key_value(content, "res", param, sizeof(param)) == ESP_OK) {
+    url_decode(decoded, param);
+    if (strlen(decoded) > 0) {
+      strncpy(camera_res, decoded, sizeof(camera_res) - 1);
+      camera_res[sizeof(camera_res) - 1] = '\0';
+      preferences.begin("exam-gate", false);
+      preferences.putString("res", String(camera_res));
+      preferences.end();
+      sensor_t *s = esp_camera_sensor_get();
+      if (s != NULL) {
+        if (strcmp(camera_res, "HVGA") == 0) {
+          s->set_framesize(s, FRAMESIZE_HVGA);
+        } else if (strcmp(camera_res, "QVGA") == 0) {
+          s->set_framesize(s, FRAMESIZE_QVGA);
+        } else {
+          s->set_framesize(s, FRAMESIZE_VGA);
+        }
+      }
     }
   }
 
@@ -385,6 +432,8 @@ void setup() {
   saved_room.toCharArray(room_number, 10);
   String saved_url = preferences.getString("api_url", "192.168.68.53:8000");
   saved_url.toCharArray(fastapi_url, 100);
+  String saved_res = preferences.getString("res", "VGA");
+  saved_res.toCharArray(camera_res, 10);
   preferences.end();
 
   // --- CAMERA INITIALIZATION ---
@@ -409,18 +458,25 @@ void setup() {
   config.pin_reset = RESET_GPIO_NUM; 
   config.xclk_freq_hz = 20000000;
   config.pixel_format = PIXFORMAT_JPEG;
-  config.frame_size = FRAMESIZE_VGA; 
+  
+  if (strcmp(camera_res, "HVGA") == 0) {
+    config.frame_size = FRAMESIZE_HVGA;
+  } else if (strcmp(camera_res, "QVGA") == 0) {
+    config.frame_size = FRAMESIZE_QVGA;
+  } else {
+    config.frame_size = FRAMESIZE_VGA;
+  }
   config.jpeg_quality = 16; 
 
   if (psramFound()) {
     config.fb_count = 2; 
     config.fb_location = CAMERA_FB_IN_PSRAM;
-    config.grab_mode = CAMERA_GRAB_WHEN_EMPTY; // Истински паралелен ping-pong буфер за максимален FPS
-    Serial.println("[CAMERA] PSRAM detected, using dual frame buffers with pipelined DMA.");
+    config.grab_mode = CAMERA_GRAB_LATEST; // Предотвратява натрупване на лаг, винаги предава най-новия кадър
+    Serial.println("[CAMERA] PSRAM detected, using dual frame buffers with CAMERA_GRAB_LATEST.");
   } else {
     config.fb_count = 1; 
     config.fb_location = CAMERA_FB_IN_DRAM;
-    config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
+    config.grab_mode = CAMERA_GRAB_LATEST;
     Serial.println("[CAMERA] Warning: PSRAM not detected, fallback to single buffer.");
   }
 
@@ -431,7 +487,11 @@ void setup() {
     Serial.println("[CAMERA] Camera init OK!");
     sensor_t *s = esp_camera_sensor_get();
     if (s != NULL) {
-      s->set_gainceiling(s, GAINCEILING_2X); // Предотвратява падане на кадрите при стайно осветление
+      // 8X gain ceiling позволява на сензора да поддържа висока скорост на затвора (1/30s - 1/50s) при стайно осветление
+      s->set_gainceiling(s, GAINCEILING_8X);
+      s->set_exposure_ctrl(s, 1); // Автоматична експозиция
+      s->set_gain_ctrl(s, 1);     // Автоматично усилване
+      s->set_brightness(s, 1);    // Лек софтуерен баланс
     }
   }
 

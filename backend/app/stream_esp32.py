@@ -1019,6 +1019,9 @@ async def fetch_frames_from_esp32(room_number: str, esp32_ip: str):
                     offline_event_sent = False
 
                     bytes_buffer = b""
+                    fps_count = 0
+                    fps_bytes_total = 0
+                    fps_last_time = time.time()
                     async for chunk in response.aiter_bytes():
                         if room_number not in ACTIVE_CAMERAS:
                             break
@@ -1043,6 +1046,18 @@ async def fetch_frames_from_esp32(room_number: str, esp32_ip: str):
                                 
                                 if len(jpg_bytes) > 200:
                                     current_time = time.time()
+                                    fps_count += 1
+                                    fps_bytes_total += len(jpg_bytes)
+                                    if current_time - fps_last_time >= 5.0:
+                                        elapsed = current_time - fps_last_time
+                                        actual_fps = fps_count / elapsed
+                                        avg_frame_kb = (fps_bytes_total / fps_count) / 1024.0 if fps_count > 0 else 0
+                                        bandwidth_kbps = (fps_bytes_total / 1024.0) / elapsed if elapsed > 0 else 0
+                                        print(f"[Stream FPS] Ingesting {actual_fps:.2f} FPS | Avg Frame: {avg_frame_kb:.1f} KB | Bandwidth: {bandwidth_kbps:.1f} KB/s for Room {room_number}")
+                                        fps_count = 0
+                                        fps_bytes_total = 0
+                                        fps_last_time = current_time
+
                                     LATEST_FRAMES[room_number] = jpg_bytes
                                     CAMERA_HEALTH[room_number]["last_frame_time"] = current_time
                                     CAMERA_HEALTH[room_number]["is_online"] = True
