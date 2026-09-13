@@ -191,63 +191,90 @@ def generate_twin_dynamic_code(student_id: str, student_id_number: str, dt: date
 
 def decode_qr_from_frame(frame: np.ndarray) -> Optional[str]:
     """
-    Разчитане на QR код от видео кадър чрез многоетапна обработка:
-      1. PyZbar върху чист BGR кадър (най-бърз и надежден)
-      2. PyZbar върху Grayscale + CLAHE контрастно изравняване (премахва отблясъци от телефонни екрани)
-      3. PyZbar върху бинаризиран образ (Otsu threshold)
-      4. OpenCV QRCodeDetectorAruco (нов алгоритъм в OpenCV 5.0)
-      5. Резервен глобален QR_DETECTOR (поддържа мокове в тестове)
+    Разчитане на QR код от видео кадър чрез многостепенна високочувствителна обработка:
+      1. PyZbar върху чист BGR кадър (най-бърз директен прочит)
+      2. PyZbar върху Grayscale кадър
+      3. PyZbar с адаптивен Gaussian threshold (за силна подсветка от екрана)
+      4. PyZbar върху инвертиран кадър (за телефони в Dark Mode / Тъмен режим)
+      5. PyZbar с CLAHE контрастно изравняване (за справяне с отблясъци)
+      6. PyZbar върху изострен образ (Unsharp Masking срещу замъгляване при близко разстояние)
+      7. PyZbar върху централен кроп (фокус върху екрана на телефона)
+      8. OpenCV QRCodeDetectorAruco & стандартен QR_DETECTOR (резервни детектори)
     """
     if frame is None or frame.size == 0:
         return None
 
-    # 1. PyZbar върху BGR кадър
-    try:
-        import pyzbar.pyzbar as pyzbar
-        results = pyzbar.decode(frame)
+    def _extract(results):
         if results:
             for r in results:
                 if r.data:
                     text = r.data.decode("utf-8", errors="ignore").strip()
                     if text:
                         return text
-    except Exception:
-        pass
+        return None
 
-    # 2. PyZbar с адаптивно контрастно изравняване (за отблясъци от телефонни екрани)
+    # Опитваме с PyZbar (основен бърз и надежден декодер)
     try:
+        import pyzbar.pyzbar as pyzbar
+
+        # 1. PyZbar върху чист BGR кадър
+        res = _extract(pyzbar.decode(frame))
+        if res:
+            return res
+
+        # 2. PyZbar върху Grayscale
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        import pyzbar.pyzbar as pyzbar
-        results = pyzbar.decode(gray)
-        if results:
-            for r in results:
-                if r.data:
-                    text = r.data.decode("utf-8", errors="ignore").strip()
-                    if text:
-                        return text
+        res = _extract(pyzbar.decode(gray))
+        if res:
+            return res
 
+        # 3. Адаптивен Gaussian Threshold (елиминира локални отблясъци от телефонни екрани)
+        thresh = cv2.adaptiveThreshold(
+            gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 21, 5
+        )
+        res = _extract(pyzbar.decode(thresh))
+        if res:
+            return res
+
+        # 4. Инвертиран образ за телефони в Dark Mode (бял код на черен фон)
+        inverted = cv2.bitwise_not(gray)
+        res = _extract(pyzbar.decode(inverted))
+        if res:
+            return res
+
+        # 5. CLAHE адаптивно контрастно изравняване
         clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8))
         enhanced = clahe.apply(gray)
-        results = pyzbar.decode(enhanced)
-        if results:
-            for r in results:
-                if r.data:
-                    text = r.data.decode("utf-8", errors="ignore").strip()
-                    if text:
-                        return text
+        res = _extract(pyzbar.decode(enhanced))
+        if res:
+            return res
 
-        _, otsu = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        results = pyzbar.decode(otsu)
-        if results:
-            for r in results:
-                if r.data:
-                    text = r.data.decode("utf-8", errors="ignore").strip()
-                    if text:
-                        return text
+        # 6. Изостряне (Unsharp Masking) срещу размазване при близко поднасяне на телефона
+        gaussian = cv2.GaussianBlur(gray, (0, 0), 2.0)
+        sharpened = cv2.addWeighted(gray, 1.5, gaussian, -0.5, 0)
+        res = _extract(pyzbar.decode(sharpened))
+        if res:
+            return res
+
+        # 7. Централен кроп (студентът центрира телефона в обсега на камерата)
+        h, w = gray.shape
+        cy1, cy2 = int(h * 0.10), int(h * 0.90)
+        cx1, cx2 = int(w * 0.10), int(w * 0.90)
+        center_crop = gray[cy1:cy2, cx1:cx2]
+        res = _extract(pyzbar.decode(center_crop))
+        if res:
+            return res
+
+        # 8. Централен кроп с 1.4x мащабиране за по-висока детайлност на малки QR кодове
+        scaled = cv2.resize(center_crop, (0, 0), fx=1.4, fy=1.4, interpolation=cv2.INTER_CUBIC)
+        res = _extract(pyzbar.decode(scaled))
+        if res:
+            return res
+
     except Exception:
         pass
 
-    # 3. OpenCV ArUco detector (наличен в OpenCV 5.0)
+    # 9. OpenCV ArUco detector (наличен в OpenCV 5.0)
     try:
         aruco_detector = cv2.QRCodeDetectorAruco()
         data, _, _ = aruco_detector.detectAndDecode(frame)
@@ -256,7 +283,7 @@ def decode_qr_from_frame(frame: np.ndarray) -> Optional[str]:
     except Exception:
         pass
 
-    # 4. Резервен QR_DETECTOR (поддържа и тестови пачове)
+    # 10. Резервен глобален QR_DETECTOR (поддържа тестови мокове)
     try:
         data, _, _ = QR_DETECTOR.detectAndDecode(frame)
         if data and str(data).strip():

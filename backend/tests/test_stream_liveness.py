@@ -24,7 +24,8 @@ from app.stream_esp32 import (
     analyze_frame_outside_ui,
     set_room_qr_scan_mode,
     process_twin_qr_admission,
-    generate_twin_dynamic_code
+    generate_twin_dynamic_code,
+    decode_qr_from_frame
 )
 from tests.test_data_isolation import TestDataSnapshot, clean_known_test_data
 
@@ -555,6 +556,36 @@ class StreamLivenessTestCase(unittest.TestCase):
         self.assertIn("has_frame", tel_data)
         self.assertIn("face_detected", tel_data)
         self.assertIn("tolerance", tel_data)
+
+    def test_decode_qr_from_frame_modes(self):
+        """Verify multi-pass QR decoder handles normal, inverted (Dark Mode), and central crop frames."""
+        enc = cv2.QRCodeEncoder.create()
+        test_payload = "EXAM_ROOM_TOKEN_987654"
+        qr_mat = enc.encode(test_payload)
+        self.assertIsNotNone(qr_mat)
+
+        # Scale up to simulate real camera resolution
+        qr_img = cv2.resize(qr_mat, (320, 320), interpolation=cv2.INTER_NEAREST)
+        qr_bgr = cv2.cvtColor(qr_img, cv2.COLOR_GRAY2BGR)
+
+        # 1. Standard BGR
+        decoded = decode_qr_from_frame(qr_bgr)
+        self.assertEqual(decoded, test_payload)
+
+        # 2. Inverted (Dark Mode phone screen)
+        inv_bgr = cv2.bitwise_not(qr_bgr)
+        decoded_inv = decode_qr_from_frame(inv_bgr)
+        self.assertEqual(decoded_inv, test_payload)
+
+        # 3. Embedded in larger frame with padding (simulating camera pointing at phone)
+        canvas = np.zeros((480, 640, 3), dtype=np.uint8)
+        canvas[80:400, 160:480] = qr_bgr
+        decoded_canvas = decode_qr_from_frame(canvas)
+        self.assertEqual(decoded_canvas, test_payload)
+
+        # 4. Empty / None frame
+        self.assertIsNone(decode_qr_from_frame(None))
+        self.assertIsNone(decode_qr_from_frame(np.zeros((0, 0, 3), dtype=np.uint8)))
 
 
 if __name__ == "__main__":

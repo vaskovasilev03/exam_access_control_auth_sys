@@ -35,7 +35,8 @@ char fastapi_url[100] = "192.168.68.53:8000";
 char room_number[10] = "1151";
 
 Preferences preferences;
-httpd_handle_t camera_httpd = NULL;
+httpd_handle_t stream_httpd = NULL;
+httpd_handle_t config_httpd = NULL;
 
 // Сърцебиене и автоматичен повторен опит за регистрация
 bool is_registered = false;
@@ -49,8 +50,6 @@ bool registerCameraToBackend(String target_url, String room, String ip);
 // --- MJPEG STREAM CONFIGURATION ---
 #define PART_BOUNDARY "frame"
 static const char* _STREAM_CONTENT_TYPE = "multipart/x-mixed-replace; boundary=" PART_BOUNDARY;
-static const char* _STREAM_BOUNDARY = "\r\n--" PART_BOUNDARY "\r\n";
-static const char* _STREAM_PART = "Content-Type: image/jpeg\r\nContent-Length: %u\r\n\r\n";
 
 // --- NON-BLOCKING STREAM HANDLER (esp_http_server) ---
 static esp_err_t stream_handler(httpd_req_t *req) {
@@ -80,11 +79,9 @@ static esp_err_t stream_handler(httpd_req_t *req) {
       _jpg_buf = fb->buf;
     }
 
+    // Обединяваме boundary и заглавната част в един чанк, спестявайки 33% мрежов овърхед
     if (res == ESP_OK) {
-      res = httpd_resp_send_chunk(req, _STREAM_BOUNDARY, strlen(_STREAM_BOUNDARY));
-    }
-    if (res == ESP_OK) {
-      size_t hlen = snprintf(part_buf, sizeof(part_buf), _STREAM_PART, _jpg_buf_len);
+      size_t hlen = snprintf(part_buf, sizeof(part_buf), "\r\n--" PART_BOUNDARY "\r\nContent-Type: image/jpeg\r\nContent-Length: %u\r\n\r\n", _jpg_buf_len);
       res = httpd_resp_send_chunk(req, part_buf, hlen);
     }
     if (res == ESP_OK) {
@@ -104,8 +101,8 @@ static esp_err_t stream_handler(httpd_req_t *req) {
       break;
     }
 
-    // Висока плавност и минимално забавяне (~25+ FPS)
-    vTaskDelay(pdMS_TO_TICKS(10));
+    // Мигновено преотстъпване към Wi-Fi стека без излишен sleep за максимален FPS
+    taskYIELD();
   }
 
   if (active_stream_clients > 0) {
@@ -232,28 +229,29 @@ static esp_err_t config_post_handler(httpd_req_t *req) {
   return httpd_resp_send(req, success_html.c_str(), success_html.length());
 }
 
-// --- START ESP_HTTP_SERVER ---
+// --- START DUAL HTTP SERVERS (PORT 80 FOR WEB UI, PORT 81 FOR STREAM) ---
 void startCameraServer() {
-  httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-  config.server_port = 81;
-  config.ctrl_port = 32768;
-  config.max_open_sockets = 7;
-  config.stack_size = 8192;           // 8KB стек за предотвратяване на task overflow при стрийминг
-  config.send_wait_timeout = 5;        // 5 сек send таймаут
-  config.recv_wait_timeout = 5;        // 5 сек recv таймаут
-  config.lru_purge_enable = true;      // КРИТИЧНО: Затваря най-стария неактивен сокет при липса на свободни слотове!
+  // 1. УЕБ СЪРВЪР ЗА НАСТРОЙКИ (ПОРТ 80)
+  // Напълно независим FreeRTOS таск - винаги отговаря мигновено, дори когато стриймът върви на пълен FPS!
+  httpd_config_t config_web = HTTPD_DEFAULT_CONFIG();
+  config_web.server_port = 80;
+  config_web.ctrl_port = 32767;
+  config_web.max_open_sockets = 4;
+  config_web.lru_purge_enable = true;
 
-  httpd_uri_t stream_uri = {
-    .uri       = "/stream",
-    .method    = HTTP_GET,
-    .handler   = stream_handler,
-    .user_ctx  = NULL
-  };
+  // 2. СТРИЙМИНГ СЪРВЪР (ПОРТ 81)
+  // Изолиран FreeRTOS таск единствено за високоефективния MJPEG видео поток
+  httpd_config_t config_stream = HTTPD_DEFAULT_CONFIG();
+  config_stream.server_port = 81;
+  config_stream.ctrl_port = 32768;
+  config_stream.max_open_sockets = 5;
+  config_stream.stack_size = 8192;
+  config_stream.lru_purge_enable = true;
 
-  httpd_uri_t stop_uri = {
-    .uri       = "/stop",
+  httpd_uri_t root_uri = {
+    .uri       = "/",
     .method    = HTTP_GET,
-    .handler   = stop_handler,
+    .handler   = config_get_handler,
     .user_ctx  = NULL
   };
 
@@ -271,14 +269,40 @@ void startCameraServer() {
     .user_ctx  = NULL
   };
 
-  if (httpd_start(&camera_httpd, &config) == ESP_OK) {
-    httpd_register_uri_handler(camera_httpd, &stream_uri);
-    httpd_register_uri_handler(camera_httpd, &stop_uri);
-    httpd_register_uri_handler(camera_httpd, &config_get_uri);
-    httpd_register_uri_handler(camera_httpd, &config_post_uri);
-    Serial.println("[HTTPD] esp_http_server successfully started on port 81");
+  httpd_uri_t stop_uri = {
+    .uri       = "/stop",
+    .method    = HTTP_GET,
+    .handler   = stop_handler,
+    .user_ctx  = NULL
+  };
+
+  httpd_uri_t stream_uri = {
+    .uri       = "/stream",
+    .method    = HTTP_GET,
+    .handler   = stream_handler,
+    .user_ctx  = NULL
+  };
+
+  // Стартиране на Порт 80 (Web UI)
+  if (httpd_start(&config_httpd, &config_web) == ESP_OK) {
+    httpd_register_uri_handler(config_httpd, &root_uri);
+    httpd_register_uri_handler(config_httpd, &config_get_uri);
+    httpd_register_uri_handler(config_httpd, &config_post_uri);
+    httpd_register_uri_handler(config_httpd, &stop_uri);
+    Serial.println("[HTTPD] Web Config Server started on Port 80 (http://<ip>/config)");
   } else {
-    Serial.println("[HTTPD] ERROR: Failed to start esp_http_server!");
+    Serial.println("[HTTPD] ERROR: Failed to start Web Config Server on Port 80!");
+  }
+
+  // Стартиране на Порт 81 (Stream + резервен /config)
+  if (httpd_start(&stream_httpd, &config_stream) == ESP_OK) {
+    httpd_register_uri_handler(stream_httpd, &stream_uri);
+    httpd_register_uri_handler(stream_httpd, &config_get_uri);
+    httpd_register_uri_handler(stream_httpd, &config_post_uri);
+    httpd_register_uri_handler(stream_httpd, &stop_uri);
+    Serial.println("[HTTPD] Video Stream Server started on Port 81 (http://<ip>:81/stream)");
+  } else {
+    Serial.println("[HTTPD] ERROR: Failed to start Stream Server on Port 81!");
   }
 }
 
@@ -391,8 +415,8 @@ void setup() {
   if (psramFound()) {
     config.fb_count = 2; 
     config.fb_location = CAMERA_FB_IN_PSRAM;
-    config.grab_mode = CAMERA_GRAB_LATEST;
-    Serial.println("[CAMERA] PSRAM detected, using dual frame buffers.");
+    config.grab_mode = CAMERA_GRAB_WHEN_EMPTY; // Истински паралелен ping-pong буфер за максимален FPS
+    Serial.println("[CAMERA] PSRAM detected, using dual frame buffers with pipelined DMA.");
   } else {
     config.fb_count = 1; 
     config.fb_location = CAMERA_FB_IN_DRAM;
@@ -405,6 +429,10 @@ void setup() {
     Serial.printf("[CAMERA] Camera init failed with error 0x%x\n", err);
   } else {
     Serial.println("[CAMERA] Camera init OK!");
+    sensor_t *s = esp_camera_sensor_get();
+    if (s != NULL) {
+      s->set_gainceiling(s, GAINCEILING_2X); // Предотвратява падане на кадрите при стайно осветление
+    }
   }
 
   // --- WIFI MANAGER ---
@@ -421,9 +449,10 @@ void setup() {
 
   String current_ip = WiFi.localIP().toString();
   Serial.println("[WIFI] Connected!");
-  Serial.print("[CONFIG] Web URL: http://"); Serial.print(current_ip); Serial.println(":81/config");
+  Serial.print("[CONFIG] Web URL: http://"); Serial.print(current_ip); Serial.println("/config");
+  Serial.print("[STREAM] Stream URL: http://"); Serial.print(current_ip); Serial.println(":81/stream");
 
-  // 1. СТАРТИРАМЕ ПЪРВО HTTPD СЪРВЪРА, ЗА ДА Е ГОТОВ ЗА СТРИЙМВАНЕ
+  // 1. СТАРТИРАМЕ ПЪРВО HTTPD СЪРВЪРИТЕ (ПОРТ 80 И ПОРТ 81)
   startCameraServer();
 
   // 2. СЛЕД ТОВА СЕ РЕГИСТРИРАМЕ ПРЕД FASTAPI С ДО 3 ОПИТА

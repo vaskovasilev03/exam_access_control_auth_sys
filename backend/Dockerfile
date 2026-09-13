@@ -8,7 +8,7 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 RUN apt-get update && apt-get install -y \
-    build-essential cmake libopenblas-dev liblapack-dev libx11-dev libgl1 libglib2.0-0 libzbar0 \
+    build-essential cmake libopenblas-dev liblapack-dev libx11-dev libgl1 libglib2.0-0 libzbar0* \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -35,7 +35,7 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 RUN apt-get update && apt-get install -y \
-    libopenblas0 liblapack3 libx11-6 libgl1 libglib2.0-0 libzbar0 \
+    libopenblas0 liblapack3 libx11-6 libgl1 libglib2.0-0 libzbar0* \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /code
