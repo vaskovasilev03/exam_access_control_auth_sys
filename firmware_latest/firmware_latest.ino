@@ -153,7 +153,7 @@ static esp_err_t config_get_handler(httpd_req_t *req) {
                 ".info{font-size:13px;color:#95a5a6;margin-top:-15px;margin-bottom:15px;}"
                 ".badge{display:inline-block;padding:4px 8px;border-radius:4px;background:#e8f8f5;color:#27ae60;font-weight:bold;font-size:13px;margin-bottom:15px;}</style></head><body>"
                 "<div class='form-card'><h2>Настройка на Терминал</h2>"
-                "<div class='badge'>Видео поток: " + String(stream_live_fps, 1) + " FPS | Клиенти: " + String(active_stream_clients) + "</div>"
+                "<div class='badge'>Видео поток: " + String(stream_live_fps, 1) + " FPS | Wi-Fi: " + String(WiFi.RSSI()) + " dBm | Клиенти: " + String(active_stream_clients) + "</div>"
                 "<form method='POST' action='/config'>"
                 "<label>Номер на изпитна зала:</label>"
                 "<input type='text' name='room' value='" + String(room_number) + "'>"
@@ -314,7 +314,7 @@ void startCameraServer() {
   httpd_config_t config_stream = HTTPD_DEFAULT_CONFIG();
   config_stream.server_port = 81;
   config_stream.ctrl_port = 32768;
-  config_stream.max_open_sockets = 5;
+  config_stream.max_open_sockets = 3;
   config_stream.stack_size = 8192;
   config_stream.lru_purge_enable = true;
 
@@ -530,7 +530,13 @@ void setup() {
   WiFiManager wm;
   wm.autoConnect("Exam-Gate-Config-WiFi");
 
-  // КРИТИЧНО ЗА ВИДЕО СТРИЙМ: ИЗКЛЮЧВАМЕ WI-FI POWER-SAVE РЕЖИМА!
+  // КРИТИЧНО ЗА СТАБИЛНОСТ И СКОРОСТ НА СТРИЙМА:
+  // 1. Изключваме SoftAP точката за достъп след свързване към рутера.
+  // Без това ESP32 работи в хибриден WIFI_AP_STA режим и прескача канали, причинявайки над 50% загуба на пакети и 600ms лаг!
+  WiFi.enableAP(false);
+  WiFi.mode(WIFI_STA);
+
+  // 2. ИЗКЛЮЧВАМЕ WI-FI POWER-SAVE РЕЖИМА!
   // Без това ESP32 заспива радио модула, пингът скача на 2000ms и има 20% загуба на пакети.
   WiFi.setSleep(false);
   esp_wifi_set_ps(WIFI_PS_NONE);

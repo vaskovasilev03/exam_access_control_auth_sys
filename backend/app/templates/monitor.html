@@ -332,16 +332,16 @@
                         </div>
                     </div>
 
-                    <!-- Method 2: Manual Code or Faculty Number Entry -->
+                    <!-- Method 2: Manual 6-digit Passcode Entry -->
                     <div class="p-3 rounded-xl bg-[var(--input)] border border-[var(--border)] space-y-2">
                         <label class="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block">
-                            Ръчно въвеждане: 6-цифрен код или Факултетен №
+                            Ръчно въвеждане: 6-цифрен динамичен код
                         </label>
                         <div class="flex items-center gap-2">
                             <input 
                                 type="text" 
                                 id="twinManualQrInput" 
-                                placeholder="6-цифрен код от приложението или факултетен №..." 
+                                placeholder="Въведете 6-цифрения код от приложението..." 
                                 class="flex-1 px-3 py-2 text-xs font-mono bg-[var(--card)] border border-[var(--border)] rounded-lg text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-purple-500 transition"
                                 onkeydown="if(event.key==='Enter') submitTwinManualQr()"
                             >

@@ -472,20 +472,15 @@ class StreamLivenessTestCase(unittest.TestCase):
         ).first()
         self.assertIsNotNone(log)
 
-    def test_11_verify_twin_manual_faculty_number_success(self):
-        """ Examiner enters student's Faculty Number and successfully admits twin """
+    def test_11_verify_twin_manual_faculty_number_rejected(self):
+        """ Faculty number is strictly disallowed as a passcode for twins """
         res = self.client.post(
             f"/api/v1/exams/{ROOM}/verify-twin-qr",
             headers={"Authorization": f"Bearer {self.examiner_token}"},
             json={"qr_payload": self.twin_student.student_id_number}
         )
-        self.assertEqual(res.status_code, 200)
-        data = res.json()
-        self.assertTrue(data.get("admitted"))
-        self.assertEqual(data.get("student_name"), self.twin_student.full_name)
-
-        self.db.refresh(self.reg_twin)
-        self.assertTrue(self.reg_twin.is_admitted)
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("Невалиден", res.json().get("detail", ""))
 
     def test_12_verify_twin_manual_invalid_code_fails(self):
         """ Entering an invalid 6-digit code returns HTTP 400 """

@@ -40,9 +40,45 @@ class AuthRepository {
       
       return data;
     } on DioException catch (e) {
-      final errorMsg = e.response?.data['detail'] ?? 'Грешка при връзка със сървъра';
+      final errorMsg = _extractErrorMessage(e, defaultMessage: 'Няма връзка със сървъра!');
       throw Exception(errorMsg);
     }
+  }
+
+  String _extractErrorMessage(DioException e, {String defaultMessage = 'Грешка при връзка със сървъра'}) {
+    // 1. При мрежови таймаути или липса на връзка/offline сървър
+    if (e.type == DioExceptionType.connectionTimeout ||
+        e.type == DioExceptionType.sendTimeout ||
+        e.type == DioExceptionType.receiveTimeout ||
+        e.type == DioExceptionType.connectionError ||
+        e.type == DioExceptionType.unknown ||
+        e.response == null) {
+      return 'Няма връзка със сървъра!';
+    }
+
+    // 2. Безопасно извличане на съобщение за грешка от сървъра
+    final data = e.response?.data;
+    if (data is Map && data['detail'] != null) {
+      final detail = data['detail'];
+      if (detail is String && detail.trim().isNotEmpty) {
+        return detail.trim();
+      }
+      if (detail is List && detail.isNotEmpty) {
+        final first = detail.first;
+        if (first is Map && first['msg'] != null) {
+          return first['msg'].toString();
+        }
+        return detail.toString();
+      }
+      return detail.toString();
+    } else if (data is String && data.trim().isNotEmpty) {
+      if (data.contains('<html') || data.contains('<body') || data.contains('<!DOCTYPE')) {
+        return 'Няма връзка със сървъра!';
+      }
+      return data.trim();
+    }
+
+    return defaultMessage;
   }
 
   Future<void> changePassword(String newPassword, {String? oldPassword}) async {
@@ -65,7 +101,7 @@ class AuthRepository {
         await _storageService.saveCredentials(creds.studentId!, newPassword);
       }
     } on DioException catch (e) {
-      final errorMsg = e.response?.data['detail'] ?? 'Неуспешна смяна на парола';
+      final errorMsg = _extractErrorMessage(e, defaultMessage: 'Неуспешна смяна на парола');
       throw Exception(errorMsg);
     }
   }
@@ -78,7 +114,7 @@ class AuthRepository {
       );
       return StudentProfileModel.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
-      final errorMsg = e.response?.data['detail'] ?? 'Грешка при зареждане на профила';
+      final errorMsg = _extractErrorMessage(e, defaultMessage: 'Грешка при зареждане на профила');
       throw Exception(errorMsg);
     }
   }
@@ -92,7 +128,7 @@ class AuthRepository {
       final list = response.data as List<dynamic>;
       return list.map((item) => ExamItemModel.fromJson(item as Map<String, dynamic>)).toList();
     } on DioException catch (e) {
-      final errorMsg = e.response?.data['detail'] ?? 'Грешка при зареждане на изпитния график';
+      final errorMsg = _extractErrorMessage(e, defaultMessage: 'Грешка при зареждане на изпитния график');
       throw Exception(errorMsg);
     }
   }
@@ -103,7 +139,7 @@ class AuthRepository {
       final list = response.data as List<dynamic>;
       return list.map((item) => StudentSummaryModel.fromJson(item as Map<String, dynamic>)).toList();
     } on DioException catch (e) {
-      final errorMsg = e.response?.data['detail'] ?? 'Грешка при зареждане на списъка със студенти';
+      final errorMsg = _extractErrorMessage(e, defaultMessage: 'Грешка при зареждане на списъка със студенти');
       throw Exception(errorMsg);
     }
   }

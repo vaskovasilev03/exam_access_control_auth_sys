@@ -167,6 +167,8 @@ class _DossierReviewViewState extends State<DossierReviewView> {
                         backgroundColor: UiThemeTokens.primary,
                         foregroundColor: UiThemeTokens.primaryForeground,
                         elevation: 0,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        minimumSize: const Size(0, 44),
                         shape: RoundedRectangleBorder(
                           borderRadius: UiThemeTokens.borderRadius,
                         ),
@@ -263,6 +265,8 @@ class _DossierReviewViewState extends State<DossierReviewView> {
                 backgroundColor: UiThemeTokens.primary,
                 foregroundColor: UiThemeTokens.primaryForeground,
                 elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                minimumSize: const Size(0, 44),
                 shape: RoundedRectangleBorder(
                   borderRadius: UiThemeTokens.borderRadius,
                 ),

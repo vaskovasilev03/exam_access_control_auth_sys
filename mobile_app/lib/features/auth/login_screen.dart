@@ -16,6 +16,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _facNumController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _obscurePassword = true;
   bool _isLoading = false;
   String? _errorText;
 
@@ -77,7 +78,16 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _errorText = e.toString().replaceAll('Exception: ', ''));
+        String msg = e.toString().replaceAll('Exception: ', '').trim();
+        if (msg.contains('SocketException') ||
+            msg.contains('Failed host lookup') ||
+            msg.contains('Connection refused') ||
+            msg.contains('connection error') ||
+            msg.contains('subtype of type') ||
+            msg.contains('Network is unreachable')) {
+          msg = 'Няма връзка със сървъра!';
+        }
+        setState(() => _errorText = msg);
       }
     } finally {
       if (mounted) {
@@ -166,8 +176,18 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 14),
                     TextField(
                       controller: _passwordController,
-                      obscureText: true,
-                      decoration: const InputDecoration(labelText: 'Парола / Временен код'),
+                      obscureText: _obscurePassword,
+                      decoration: InputDecoration(
+                        labelText: 'Парола / Временен код',
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                            size: 20,
+                            color: UiThemeTokens.mutedForeground,
+                          ),
+                          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                        ),
+                      ),
                     ),
                     if (_errorText != null) ...[
                       const SizedBox(height: 14),

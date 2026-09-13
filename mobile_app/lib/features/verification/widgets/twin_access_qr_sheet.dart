@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
@@ -27,15 +28,55 @@ class _TwinAccessQrSheetState extends State<TwinAccessQrSheet> {
   late DateTime _generatedAt;
   QrCode? _qrCode;
   String _passcode = '';
+  Timer? _timer;
+  int _secondsRemaining = 300;
+  int _lastBucket = -1;
 
   @override
   void initState() {
     super.initState();
     _generateCode();
+    _initTimer();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _initTimer() {
+    _updateRemainingTime();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      _updateRemainingTime();
+    });
+  }
+
+  void _updateRemainingTime() {
+    final now = DateTime.now().toUtc();
+    final epochSec = now.millisecondsSinceEpoch ~/ 1000;
+    final bucket = epochSec ~/ 300;
+    final remaining = 300 - (epochSec % 300);
+
+    if (_lastBucket != -1 && bucket != _lastBucket) {
+      // 5-минутният прозорец изтече: автоматично регенериране без натискане
+      _generateCode();
+    } else {
+      if (_secondsRemaining != remaining) {
+        setState(() {
+          _secondsRemaining = remaining;
+        });
+      }
+    }
   }
 
   void _generateCode() {
     _generatedAt = DateTime.now();
+    final epochSec = _generatedAt.toUtc().millisecondsSinceEpoch ~/ 1000;
+    _lastBucket = epochSec ~/ 300;
+    _secondsRemaining = 300 - (epochSec % 300);
+
     _passcode = _generateDynamicPasscode(
       widget.profile.id,
       widget.profile.studentIdNumber,
@@ -47,7 +88,13 @@ class _TwinAccessQrSheetState extends State<TwinAccessQrSheet> {
       version: QrVersions.auto,
       errorCorrectionLevel: QrErrorCorrectLevel.L,
     );
-    _qrCode = validation.isValid ? validation.qrCode : null;
+    if (mounted) {
+      setState(() {
+        _qrCode = validation.isValid ? validation.qrCode : null;
+      });
+    } else {
+      _qrCode = validation.isValid ? validation.qrCode : null;
+    }
   }
 
   String _generateDynamicPasscode(String studentId, String studentIdNumber, DateTime dt) {
@@ -70,6 +117,12 @@ class _TwinAccessQrSheetState extends State<TwinAccessQrSheet> {
     setState(() {
       _generateCode();
     });
+  }
+
+  String _formatRemainingTime(int totalSeconds) {
+    final m = totalSeconds ~/ 60;
+    final s = totalSeconds % 60;
+    return '$m:${s.toString().padLeft(2, '0')} мин.';
   }
 
   String _buildQrPayload() {
@@ -160,7 +213,7 @@ class _TwinAccessQrSheetState extends State<TwinAccessQrSheet> {
                             ),
                             const SizedBox(width: 5),
                             Text(
-                              'Потвърден близнак / Верифициран достъп',
+                              'Верифициран достъп',
                               style: UiThemeTokens.getSansFont(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
@@ -280,30 +333,65 @@ class _TwinAccessQrSheetState extends State<TwinAccessQrSheet> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: UiThemeTokens.border),
-                      ),
-                      child: Text(
-                        _formattedPasscode(_passcode),
-                        style: UiThemeTokens.getMonoFont(
-                          fontSize: 26,
-                          fontWeight: FontWeight.w900,
-                          color: UiThemeTokens.foreground,
-                          letterSpacing: 4,
+                    const SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: UiThemeTokens.border),
+                          ),
+                          child: Text(
+                            _formattedPasscode(_passcode),
+                            style: UiThemeTokens.getMonoFont(
+                              fontSize: 26,
+                              fontWeight: FontWeight.w900,
+                              color: UiThemeTokens.foreground,
+                              letterSpacing: 4,
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 14),
+                        Tooltip(
+                          message: 'Оставащо време до автоматично обновяване: ${_formatRemainingTime(_secondsRemaining)}',
+                          child: SizedBox(
+                            width: 34,
+                            height: 34,
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                CircularProgressIndicator(
+                                  value: _secondsRemaining / 300.0,
+                                  strokeWidth: 3.2,
+                                  backgroundColor: UiThemeTokens.border,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    _secondsRemaining <= 30
+                                        ? UiThemeTokens.destructive
+                                        : UiThemeTokens.primary,
+                                  ),
+                                ),
+                                Icon(
+                                  Icons.lock_clock_outlined,
+                                  size: 15,
+                                  color: _secondsRemaining <= 30
+                                      ? UiThemeTokens.destructive
+                                      : UiThemeTokens.mutedForeground,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
                     Text(
-                      'Валиден 5 мин. • Алтернатива: Фак. № ${widget.profile.studentIdNumber}',
+                      'Валиден още ${_formatRemainingTime(_secondsRemaining)}',
                       style: UiThemeTokens.getSansFont(
                         fontSize: 11,
-                        color: UiThemeTokens.mutedForeground,
+                        color: _secondsRemaining <= 30 ? UiThemeTokens.destructive : UiThemeTokens.mutedForeground,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -419,6 +507,9 @@ class _TwinAccessQrSheetState extends State<TwinAccessQrSheet> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: UiThemeTokens.primary,
                           foregroundColor: UiThemeTokens.primaryForeground,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          minimumSize: const Size(0, 44),
                           shape: RoundedRectangleBorder(
                             borderRadius: UiThemeTokens.borderRadius,
                           ),

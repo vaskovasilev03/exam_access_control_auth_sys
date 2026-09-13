@@ -9,6 +9,10 @@ import face_recognition
 import numpy as np
 import json
 import hashlib
+
+# Ограничаваме нишките на OpenCV до 2, за да предотвратим блокиране на всички процесорни ядра и GIL
+cv2.setNumThreads(2)
+
 from typing import Optional, Dict, Any, Tuple, List
 from datetime import datetime, timedelta
 from sqlalchemy import func
@@ -297,10 +301,10 @@ def decode_qr_from_frame(frame: np.ndarray) -> Optional[str]:
 
 def process_twin_qr_admission(qr_data: str, room_number: str, db: Session = None, state: dict = None) -> dict:
     """
-    Валидира дигиталния пропуск за близнак по три метода:
+    Валидира дигиталния пропуск за близнак по два валидни метода:
       1) Динамичен QR JSON payload (TWIN_EXAM_PASS)
       2) 6-цифрен динамичен код от мобилното приложение (валиден за 5 мин)
-      3) Факултетен номер на близнака (за ръчно въвеждане от квестор)
+    Забранява използването на статичен факултетен номер като заместващ код.
     Проверява правото на достъп, изпитното разписание и допуска студента.
     """
     if not qr_data:
@@ -383,18 +387,11 @@ def process_twin_qr_admission(qr_data: str, room_number: str, db: Session = None
                     if code_num in (c_now, c_prev):
                         return {"admitted": False, "error": f"ГРЕШНА ЗАЛА! Студентът {cand.full_name} има изпит в друга зала днес"}
 
-                # Ако не е динамичен код, проверяваме дали не е 6-цифрен факултетен номер
-                student_by_fac = db.query(Student).filter(Student.student_id_number == raw_str).first()
-                if student_by_fac and student_by_fac.is_twin_exception:
-                    student = student_by_fac
-                else:
-                    return {"admitted": False, "error": "Невалиден или изтекъл 6-цифрен код за верификация"}
+                return {"admitted": False, "error": "Невалиден или изтекъл 6-цифрен динамичен код за верификация"}
 
-        # Вариант 3: Факултетен номер (ръчно въведен от квестора)
+        # Не се допуска въвеждане на факултетен номер като заместващ код за достъп
         else:
-            student = db.query(Student).filter(Student.student_id_number == raw_str).first()
-            if not student:
-                return {"admitted": False, "error": f"Не е намерен студент с факултетен номер: {raw_str}"}
+            return {"admitted": False, "error": "Невалиден формат на код. Моля, въведете 6-цифрения динамичен код от приложението."}
 
         # Общи проверки за намерения студент
         if not student:
@@ -563,19 +560,18 @@ def detect_face_boxes(frame: np.ndarray) -> List[Tuple[int, int, int, int]]:
                     left = max(0, x - pad_w)
                     boxes.append((top, right, bottom, left))
                 return boxes
+            # Ако YuNet работи изправно и не засече лице, кадърът е празен.
+            # Не изпълняваме тежката dlib HOG/CNN каскада (~650ms), което спестява 90% CPU.
+            return []
         except Exception:
             pass
 
-    # 2. Втори опит: dlib HOG
+    # 2. Резервен опит (само ако YuNet липсва или хвърли грешка): dlib HOG
     scale = 0.5 if w <= 800 else 0.25
     inv_scale = 1.0 / scale
     small = cv2.resize(frame, (0, 0), fx=scale, fy=scale)
     rgb_small = cv2.cvtColor(small, cv2.COLOR_BGR2RGB)
     locs = face_recognition.face_locations(rgb_small)
-
-    # 3. Трети опит: dlib HOG с upsampling
-    if not locs and scale <= 0.5:
-        locs = face_recognition.face_locations(rgb_small, number_of_times_to_upsample=1)
 
     if locs:
         return [
@@ -587,26 +583,6 @@ def detect_face_boxes(frame: np.ndarray) -> List[Tuple[int, int, int, int]]:
             )
             for (t, r, b, l) in locs
         ]
-
-    # 4. Четвърти опит: dlib CNN при отсъствие на YuNet
-    try:
-        cnn_scale = 0.25
-        cnn_inv = 4.0
-        cnn_small = cv2.resize(frame, (0, 0), fx=cnn_scale, fy=cnn_scale)
-        cnn_rgb = cv2.cvtColor(cnn_small, cv2.COLOR_BGR2RGB)
-        cnn_locs = face_recognition.face_locations(cnn_rgb, model="cnn")
-        if cnn_locs:
-            return [
-                (
-                    max(0, int(t * cnn_inv)),
-                    min(w, int(r * cnn_inv)),
-                    min(h, int(b * cnn_inv)),
-                    max(0, int(l * cnn_inv))
-                )
-                for (t, r, b, l) in cnn_locs
-            ]
-    except Exception:
-        pass
 
     return []
 
@@ -1384,8 +1360,12 @@ async def fetch_frames_from_esp32(room_number: str, esp32_ip: str):
                                             "student_name": "", "faculty_number": "", "status_text": state["status_text"], "status_type": "idle"
                                         })
                                     
-                                    # Пускаме ИИ анализа на заден план с балансирана честота (~700ms)
-                                    if not state.get("ai_busy", False) and (current_time - state.get("last_ai_run_time", 0) > 0.70):
+                                    # Адаптивно планиране на ИИ анализа:
+                                    # Когато наскоро е засичано лице или студент, сканираме през 0.60s за мигновен достъп.
+                                    # При празна зала (idle), сканираме през 1.20s, спестявайки процесорно време за видео потока.
+                                    has_recent_face = (current_time - state.get("last_face_seen_time", 0.0) < 3.0)
+                                    ai_interval = 0.60 if has_recent_face else 1.20
+                                    if not state.get("ai_busy", False) and (current_time - state.get("last_ai_run_time", 0) > ai_interval):
                                         state["ai_busy"] = True
                                         state["last_ai_run_time"] = current_time
                                         asyncio.create_task(run_heavy_ai_async(jpg_bytes, room_number, known_face_encodings, known_face_names))

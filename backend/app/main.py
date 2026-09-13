@@ -2301,6 +2301,12 @@ async def stream_exam_room(room_number: str, background_tasks: BackgroundTasks, 
             media_type="multipart/x-mixed-replace; boundary=frame"
         )
 
+    if CAMERA_HEALTH.get(room_number, {}).get("stopped", False):
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Камерата за зала {room_number} е ръчно спряна от квестор."
+        )
+
     if room_number not in ACTIVE_CAMERAS:
         raise HTTPException(
             status_code=400, 
@@ -2335,6 +2341,12 @@ async def get_raw_esp32_stream(
         return StreamingResponse(
             generate_from_memory(room_number),
             media_type="multipart/x-mixed-replace; boundary=frame"
+        )
+
+    if CAMERA_HEALTH.get(room_number, {}).get("stopped", False):
+        raise HTTPException(
+            status_code=404,
+            detail=f"Камерата за зала {room_number} е ръчно спряна от квестор."
         )
 
     if room_number not in ACTIVE_CAMERAS:
@@ -4133,6 +4145,21 @@ async def register_camera(data: CameraRegisterSchema):
     При включване платката казва в коя зала се намира и какво IP е взела.
     Поддържа и периодично сърцебиене (heartbeat) без прекъсване на активния стрийм.
     """
+    health = CAMERA_HEALTH.get(data.room_number, {})
+    is_stopped = health.get("stopped", False)
+
+    # 1. Ако залата е ръчно спряна от квестор (manual stop), пазим само IP адреса в режим на готовност.
+    # НЕ стартираме фоновото четене и НЕ възобновяваме стрийма, докато квесторът изрично не натисне "Активирай отново".
+    if is_stopped:
+        health["esp32_ip"] = data.esp32_ip
+        print(f"[Hardware register] Камерата на {data.esp32_ip} се регистрира за Зала {data.room_number}, но залата е ръчно СПРЯНА от квестор. Стриймът остава спрян.")
+        return {
+            "status": "stopped",
+            "room_number": data.room_number,
+            "esp32_ip": data.esp32_ip,
+            "message": "Камерата е регистрирана в режим готовност (спряна от квестор)."
+        }
+
     current_ip = ACTIVE_CAMERAS.get(data.room_number)
     old_task = CAMERA_TASKS.get(data.room_number)
     task_alive = old_task and not old_task.done()
@@ -4162,7 +4189,8 @@ async def register_camera(data: CameraRegisterSchema):
     CAMERA_HEALTH[data.room_number] = {
         "last_frame_time": time.time(),
         "is_online": True,
-        "esp32_ip": data.esp32_ip
+        "esp32_ip": data.esp32_ip,
+        "stopped": False
     }
     CAMERA_TASKS[data.room_number] = asyncio.create_task(fetch_frames_from_esp32(data.room_number, data.esp32_ip))
 
@@ -4217,7 +4245,17 @@ async def stop_exam_room_camera(
     Позволява на квестора ръчно да приключи верификацията и да изключи камерата за дадената зала.
     Спира фоновия таск, освобождава паметта и уведомява свързаните клиенти през SSE.
     """
+    health = CAMERA_HEALTH.get(room_number, {})
+    esp32_ip = health.get("esp32_ip") or ACTIVE_CAMERAS.get(room_number)
     stop_camera_stream(room_number, reason="manual")
+    
+    if esp32_ip:
+        try:
+            async with httpx.AsyncClient(timeout=1.0) as client:
+                await client.get(f"http://{esp32_ip}/stop")
+        except Exception:
+            pass
+
     return {
         "status": "success",
         "room_number": room_number,

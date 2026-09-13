@@ -100,14 +100,34 @@ class _AdminExamsViewState extends State<AdminExamsView> {
       if (_selectedStream != null && e.stream != _selectedStream) return false;
       return true;
     });
-    final set = filtered
-        .map((e) => e.group)
-        .where((g) => g != null && g.isNotEmpty)
-        .cast<String>()
-        .toSet()
-        .toList();
-    set.sort();
-    return set;
+
+    final groupSet = <String>{};
+    for (final e in filtered) {
+      final raw = e.group;
+      if (raw == null || raw.trim().isEmpty) continue;
+      final parts = raw.split(',');
+      for (final p in parts) {
+        final cleaned = p
+            .replaceAll('група', '')
+            .replaceAll('гр.', '')
+            .replaceAll('гр', '')
+            .trim();
+        if (cleaned.isNotEmpty) {
+          groupSet.add(cleaned);
+        }
+      }
+    }
+
+    final list = groupSet.toList();
+    list.sort((a, b) {
+      final aInt = int.tryParse(a);
+      final bInt = int.tryParse(b);
+      if (aInt != null && bInt != null) {
+        return aInt.compareTo(bInt);
+      }
+      return a.compareTo(b);
+    });
+    return list;
   }
 
   List<ExamItemModel> get _filteredExams {
@@ -115,7 +135,12 @@ class _AdminExamsViewState extends State<AdminExamsView> {
 
     return widget.exams.where((exam) {
       if (_selectedSessionType != null) {
-        if (exam.sessionType?.toLowerCase() != _selectedSessionType!.toLowerCase()) {
+        final examSession = (exam.sessionType ?? '').toLowerCase().trim();
+        final selectedSession = _selectedSessionType!.toLowerCase().trim();
+        final matches = examSession == selectedSession ||
+            examSession.contains(selectedSession) ||
+            selectedSession.contains(examSession);
+        if (!matches) {
           return false;
         }
       }
@@ -124,8 +149,16 @@ class _AdminExamsViewState extends State<AdminExamsView> {
       if (_selectedCourse != null && exam.course != _selectedCourse) return false;
       if (_selectedStream != null && exam.stream != _selectedStream) return false;
       if (_selectedGroup != null) {
-        // Поддържа група разделена със запетая напр. "37, 38"
-        final examGroups = (exam.group ?? '').split(',').map((g) => g.trim());
+        final raw = exam.group ?? '';
+        final examGroups = raw
+            .split(',')
+            .map((g) => g
+                .replaceAll('група', '')
+                .replaceAll('гр.', '')
+                .replaceAll('гр', '')
+                .trim())
+            .where((g) => g.isNotEmpty)
+            .toSet();
         if (!examGroups.contains(_selectedGroup)) return false;
       }
 
@@ -156,9 +189,9 @@ class _AdminExamsViewState extends State<AdminExamsView> {
   Color _getSessionTypeColor(String? type) {
     if (type == null) return UiThemeTokens.primary;
     final lower = type.toLowerCase();
-    if (lower.contains('летн') || lower.contains('summer')) {
+    if (lower.contains('летн') || lower.contains('лятна') || lower.contains('summer')) {
       return Colors.blue.shade600;
-    } else if (lower.contains('зимн') || lower.contains('winter')) {
+    } else if (lower.contains('зимн') || lower.contains('зимна') || lower.contains('winter')) {
       return Colors.indigo.shade600;
     } else if (lower.contains('поправителн') || lower.contains('resit')) {
       return Colors.orange.shade700;
@@ -169,12 +202,12 @@ class _AdminExamsViewState extends State<AdminExamsView> {
   }
 
   String _formatSessionTypeLabel(String? type) {
-    if (type == null || type.isEmpty) return 'Редовна';
-    final lower = type.toLowerCase();
-    if (lower.contains('летн')) return 'Редовна Лятна';
-    if (lower.contains('зимн')) return 'Редовна Зимна';
-    if (lower.contains('поправителн')) return 'Поправителна';
-    if (lower.contains('ликвидационн')) return 'Ликвидационна';
+    if (type == null || type.isEmpty) return 'Сесия';
+    final lower = type.toLowerCase().trim();
+    if (lower.contains('летн') || lower.contains('лятна') || lower.contains('summer')) return 'Редовна Лятна';
+    if (lower.contains('зимн') || lower.contains('зимна') || lower.contains('winter')) return 'Редовна Зимна';
+    if (lower.contains('поправителн') || lower.contains('resit')) return 'Поправителна';
+    if (lower.contains('ликвидационн') || lower.contains('liquidation')) return 'Ликвидационна';
     return type;
   }
 
@@ -584,9 +617,9 @@ class _AdminExamsViewState extends State<AdminExamsView> {
       initialValue: _selectedSessionType,
       onSelected: (val) => setState(() => _selectedSessionType = val),
       itemBuilder: (context) => [
-        const PopupMenuItem(value: null, child: Text('Тип: Всички')),
-        const PopupMenuItem(value: 'редовна лятна', child: Text('Редовна Лятна')),
-        const PopupMenuItem(value: 'редовна зимна', child: Text('Редовна Зимна')),
+        const PopupMenuItem(value: null, child: Text('Сесия: Всички')),
+        const PopupMenuItem(value: 'лятна', child: Text('Редовна Лятна')),
+        const PopupMenuItem(value: 'зимна', child: Text('Редовна Зимна')),
         const PopupMenuItem(value: 'поправителна', child: Text('Поправителна')),
         const PopupMenuItem(value: 'ликвидационна', child: Text('Ликвидационна')),
       ],

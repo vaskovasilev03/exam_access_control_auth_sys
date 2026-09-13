@@ -136,6 +136,8 @@ class _VerificationWizardScreenState extends State<VerificationWizardScreen> {
                       backgroundColor: UiThemeTokens.destructive,
                       foregroundColor: Colors.white,
                       elevation: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      minimumSize: const Size(0, 44),
                       shape: RoundedRectangleBorder(
                         borderRadius: UiThemeTokens.borderRadius,
                       ),
