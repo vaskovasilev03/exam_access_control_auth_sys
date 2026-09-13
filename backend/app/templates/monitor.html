@@ -883,6 +883,7 @@
                 }
                 if (deviceWrapper) deviceWrapper.classList.add("hidden");
                 if (hudSourceTag) hudSourceTag.innerText = `Терминал: Зала ${roomNumber}`;
+                stopWebcamStream();
             }
 
             if (syncServer) {
@@ -998,10 +999,19 @@
                 // Извличане и изпращане на кадри на интервали (~10 FPS)
                 const canvas = document.getElementById("webcamCaptureCanvas");
                 let isSendingFrame = false;
+                let lastHttpFallbackTime = 0;
 
                 webcamPumpInterval = setInterval(() => {
                     if (!webcamStream || !localWebcamVideo || localWebcamVideo.videoWidth === 0) return;
                     if (isSendingFrame) return;
+
+                    const wsOpen = (webcamSocket && webcamSocket.readyState === WebSocket.OPEN);
+                    const now = Date.now();
+
+                    // Ако WebSocket не е активен и ползваме резервния HTTP POST, ограничаваме до ~2.5 FPS (400ms), за да няма претоварване
+                    if (!wsOpen && (now - lastHttpFallbackTime < 400)) {
+                        return;
+                    }
 
                     try {
                         if (!canvas) return;
@@ -1017,6 +1027,7 @@
                                 if (webcamSocket && webcamSocket.readyState === WebSocket.OPEN) {
                                     webcamSocket.send(blob);
                                 } else {
+                                    lastHttpFallbackTime = Date.now();
                                     await fetch(`/api/v1/exams/${encodeURIComponent(roomNumber)}/webcam-frame?token=${encodeURIComponent(token)}`, {
                                         method: "POST",
                                         body: blob,

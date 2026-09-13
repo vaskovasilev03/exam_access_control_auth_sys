@@ -571,9 +571,19 @@ def analyze_frame_outside_ui(jpg_bytes: bytes, room_number: str, known_face_enco
             return None
 
         # Стандартно ИИ сканиране за лица (намаляваме кадъра за бърз анализ)
-        small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
+        h_frame, w_frame = frame.shape[:2]
+        if w_frame <= 800:
+            ai_scale = 0.5
+            inv_scale = 2.0
+        else:
+            ai_scale = 0.25
+            inv_scale = 4.0
+
+        small_frame = cv2.resize(frame, (0, 0), fx=ai_scale, fy=ai_scale)
         rgb_small_frame = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)
         face_locations = face_recognition.face_locations(rgb_small_frame)
+        if not face_locations and ai_scale <= 0.5:
+            face_locations = face_recognition.face_locations(rgb_small_frame, number_of_times_to_upsample=1)
 
         if not face_locations:
             state["student_name"] = ""
@@ -586,12 +596,11 @@ def analyze_frame_outside_ui(jpg_bytes: bytes, room_number: str, known_face_enco
 
         # Преобразуваме координатите на лицето обратно към оригиналната резолюция на кадъра
         top, right, bottom, left = face_locations[0]
-        h_frame, w_frame = frame.shape[:2]
         face_box_orig = (
-            max(0, int(top * 4)),
-            min(w_frame, int(right * 4)),
-            min(h_frame, int(bottom * 4)),
-            max(0, int(left * 4))
+            max(0, int(top * inv_scale)),
+            min(w_frame, int(right * inv_scale)),
+            min(h_frame, int(bottom * inv_scale)),
+            max(0, int(left * inv_scale))
         )
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
@@ -873,7 +882,23 @@ async def run_heavy_ai_async(jpg_bytes: bytes, room_number: str, known_face_enco
         state["ai_busy"] = False
 
 
-def _load_known_faces():
+_KNOWN_FACES_CACHE = {
+    "encodings": None,
+    "students": None,
+    "last_loaded": 0.0
+}
+
+
+def _load_known_faces(ttl_seconds: float = 30.0):
+    global _KNOWN_FACES_CACHE
+    now = time.time()
+    if (
+        _KNOWN_FACES_CACHE["encodings"] is not None
+        and _KNOWN_FACES_CACHE["students"] is not None
+        and (now - _KNOWN_FACES_CACHE["last_loaded"] < ttl_seconds)
+    ):
+        return _KNOWN_FACES_CACHE["encodings"], _KNOWN_FACES_CACHE["students"]
+
     db = SessionLocal()
     try:
         students_in_db = db.query(Student).filter(
@@ -882,6 +907,9 @@ def _load_known_faces():
         ).all()
         known_face_encodings = [np.array(s.face_embedding) for s in students_in_db]
         known_students = students_in_db
+        _KNOWN_FACES_CACHE["encodings"] = known_face_encodings
+        _KNOWN_FACES_CACHE["students"] = known_students
+        _KNOWN_FACES_CACHE["last_loaded"] = now
         return known_face_encodings, known_students
     finally:
         db.close()
@@ -1358,9 +1386,18 @@ async def generate_debug_stream(room_number: str, target_student_id: str, tolera
             h_orig, w_orig = frame.shape[:2]
 
             # Бързо откриване на лица върху смален кадър
-            small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
+            if w_orig <= 800:
+                dbg_scale = 0.5
+                dbg_inv_scale = 2.0
+            else:
+                dbg_scale = 0.25
+                dbg_inv_scale = 4.0
+
+            small_frame = cv2.resize(frame, (0, 0), fx=dbg_scale, fy=dbg_scale)
             rgb_small = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)
             locations = face_recognition.face_locations(rgb_small)
+            if not locations and dbg_scale <= 0.5:
+                locations = face_recognition.face_locations(rgb_small, number_of_times_to_upsample=1)
 
             face_detected = False
             euclidean_dist = None
@@ -1372,10 +1409,10 @@ async def generate_debug_stream(room_number: str, target_student_id: str, tolera
                 face_detected = True
                 top, right, bottom, left = locations[0]
                 box_orig = (
-                    max(0, int(top * 4)),
-                    min(w_orig, int(right * 4)),
-                    min(h_orig, int(bottom * 4)),
-                    max(0, int(left * 4))
+                    max(0, int(top * dbg_inv_scale)),
+                    min(w_orig, int(right * dbg_inv_scale)),
+                    min(h_orig, int(bottom * dbg_inv_scale)),
+                    max(0, int(left * dbg_inv_scale))
                 )
                 rgb_full = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 encs = face_recognition.face_encodings(rgb_full, [box_orig])

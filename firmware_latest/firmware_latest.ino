@@ -34,6 +34,7 @@ const unsigned long TIMEOUT_MS = 3000;
 char fastapi_url[100] = "192.168.68.53:8000"; 
 char room_number[10] = "1151";
 char camera_res[10] = "VGA";
+int camera_ae_level = -1;
 
 Preferences preferences;
 httpd_handle_t stream_httpd = NULL;
@@ -166,6 +167,13 @@ static esp_err_t config_get_handler(httpd_req_t *req) {
                 "<option value='HVGA'" + String(strcmp(camera_res, "HVGA") == 0 ? " selected" : "") + ">HVGA (480x320) - Висока скорост (25+ FPS)</option>"
                 "<option value='QVGA'" + String(strcmp(camera_res, "QVGA") == 0 ? " selected" : "") + ">QVGA (320x240) - Максимална скорост</option>"
                 "</select>"
+                "<label>Компенсация на осветеността (AE Level):</label>"
+                "<select name='ae'>"
+                "<option value='-1'" + String(camera_ae_level == -1 ? " selected" : "") + ">-1: Балансирана (Препоръчителна срещу изгаряне)</option>"
+                "<option value='0'" + String(camera_ae_level == 0 ? " selected" : "") + ">0: Неутрална</option>"
+                "<option value='-2'" + String(camera_ae_level == -2 ? " selected" : "") + ">-2: Силно осветено помещение</option>"
+                "<option value='1'" + String(camera_ae_level == 1 ? " selected" : "") + ">+1: Слабо осветено помещение</option>"
+                "</select>"
                 "<button type='submit'>Запази и Приложи</button>"
                 "</form></div></body></html>";
 
@@ -198,7 +206,7 @@ static void url_decode(char *dst, const char *src) {
 
 // --- CONFIG PAGE (POST) ---
 static esp_err_t config_post_handler(httpd_req_t *req) {
-  char content[256];
+  char content[512];
   int remaining = req->content_len;
 
   if (remaining >= (int)sizeof(content)) {
@@ -254,6 +262,21 @@ static esp_err_t config_post_handler(httpd_req_t *req) {
         } else {
           s->set_framesize(s, FRAMESIZE_VGA);
         }
+      }
+    }
+  }
+
+  if (httpd_query_key_value(content, "ae", param, sizeof(param)) == ESP_OK) {
+    url_decode(decoded, param);
+    int new_ae = atoi(decoded);
+    if (new_ae >= -2 && new_ae <= 2) {
+      camera_ae_level = new_ae;
+      preferences.begin("exam-gate", false);
+      preferences.putInt("ae_lvl", camera_ae_level);
+      preferences.end();
+      sensor_t *s = esp_camera_sensor_get();
+      if (s != NULL) {
+        s->set_ae_level(s, camera_ae_level);
       }
     }
   }
@@ -434,6 +457,7 @@ void setup() {
   saved_url.toCharArray(fastapi_url, 100);
   String saved_res = preferences.getString("res", "VGA");
   saved_res.toCharArray(camera_res, 10);
+  camera_ae_level = preferences.getInt("ae_lvl", -1);
   preferences.end();
 
   // --- CAMERA INITIALIZATION ---
@@ -466,7 +490,7 @@ void setup() {
   } else {
     config.frame_size = FRAMESIZE_VGA;
   }
-  config.jpeg_quality = 16; 
+  config.jpeg_quality = 12; // По-висока детайлност за прецизно лицево разпознаване
 
   if (psramFound()) {
     config.fb_count = 2; 
@@ -487,11 +511,18 @@ void setup() {
     Serial.println("[CAMERA] Camera init OK!");
     sensor_t *s = esp_camera_sensor_get();
     if (s != NULL) {
-      // 8X gain ceiling позволява на сензора да поддържа висока скорост на затвора (1/30s - 1/50s) при стайно осветление
-      s->set_gainceiling(s, GAINCEILING_8X);
+      // 4X gain ceiling предотвратява преекспонирането и изгарянето на лицата в бяло
+      s->set_gainceiling(s, GAINCEILING_4X);
       s->set_exposure_ctrl(s, 1); // Автоматична експозиция
       s->set_gain_ctrl(s, 1);     // Автоматично усилване
-      s->set_brightness(s, 1);    // Лек софтуерен баланс
+      s->set_brightness(s, 0);    // Неутрална яркост (без изкуствено избелване)
+      s->set_contrast(s, 0);      // Балансиран контраст
+      s->set_aec2(s, 1);          // Активира усъвършенстван DSP алгоритъм за авто-експозиция
+      s->set_ae_level(s, camera_ae_level); // Компенсация срещу изгаряне/преекспониране на лицето
+      s->set_bpc(s, 1);           // Корекция на тъмни дефектни пиксели
+      s->set_wpc(s, 1);           // Корекция на бели дефектни пиксели
+      s->set_raw_gma(s, 1);       // Gamma крива за по-широк динамичен диапазон
+      s->set_lenc(s, 1);          // Lens correction срещу винетиране
     }
   }
 

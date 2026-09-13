@@ -1,6 +1,7 @@
 # --- Основни за FastAPI Бекенда & Сигурност ---
 fastapi
 uvicorn
+websockets
 pydantic[email]
 python-multipart
 python-dotenv
