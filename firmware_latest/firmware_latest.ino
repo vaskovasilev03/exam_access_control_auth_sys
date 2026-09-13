@@ -5,6 +5,7 @@
 #include "esp_http_server.h"
 #include <HTTPClient.h>
 #include <Preferences.h>
+#include "esp_wifi.h"
 
 // --- ESP32-CAM (AI-Thinker Pinout) ---
 #define PWDN_GPIO_NUM  -1
@@ -38,9 +39,10 @@ httpd_handle_t camera_httpd = NULL;
 
 // Сърцебиене и автоматичен повторен опит за регистрация
 bool is_registered = false;
+volatile int active_stream_clients = 0;
 unsigned long last_register_attempt = 0;
-const unsigned long REGISTER_RETRY_INTERVAL = 10000; // 10 сек опит при провал
-const unsigned long HEARTBEAT_INTERVAL = 45000;      // 45 сек периодично поддържане
+const unsigned long REGISTER_RETRY_INTERVAL = 5000;   // 5 сек бърз повторен опит при неуспешна регистрация
+const unsigned long HEARTBEAT_INTERVAL = 30000;       // 30 сек keep-alive когато няма активен клиент
 
 bool registerCameraToBackend(String target_url, String room, String ip);
 
@@ -64,7 +66,9 @@ static esp_err_t stream_handler(httpd_req_t *req) {
   }
   httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
 
-  Serial.println("[STREAM] Client connected (esp_http_server).");
+  active_stream_clients++;
+  is_registered = true; // Бекендът чете кадри и знае, че сме активни
+  Serial.printf("[STREAM] Client connected (esp_http_server). Active clients: %d\n", active_stream_clients);
 
   while (true) {
     fb = esp_camera_fb_get();
@@ -91,17 +95,23 @@ static esp_err_t stream_handler(httpd_req_t *req) {
       esp_camera_fb_return(fb);
       fb = NULL;
       _jpg_buf = NULL;
+    } else if (_jpg_buf) {
+      free(_jpg_buf);
+      _jpg_buf = NULL;
     }
 
     if (res != ESP_OK) {
       break;
     }
 
-    // Оптимално забавяне (~25-30 FPS). Предотвратява препълване на TCP буфера при Wi-Fi латентност.
-    vTaskDelay(pdMS_TO_TICKS(12));
+    // Висока плавност и минимално забавяне (~25+ FPS)
+    vTaskDelay(pdMS_TO_TICKS(10));
   }
 
-  Serial.println("[STREAM] Client disconnected (esp_http_server).");
+  if (active_stream_clients > 0) {
+    active_stream_clients--;
+  }
+  Serial.printf("[STREAM] Client disconnected (esp_http_server). Remaining clients: %d\n", active_stream_clients);
   return res;
 }
 
@@ -125,7 +135,7 @@ static esp_err_t config_get_handler(httpd_req_t *req) {
                 "button{background:#2ecc71;color:white;width:100%;border:0;padding:12px;border-radius:5px;font-size:16px;font-weight:bold;cursor:pointer;}"
                 "button:hover{background:#27ae60;}"
                 ".info{font-size:13px;color:#95a5a6;margin-top:-15px;margin-bottom:15px;}</style></head><body>"
-                "<div class='form-card'><h2>⚙️ Настройка на Терминал</h2>"
+                "<div class='form-card'><h2>Настройка на Терминал</h2>"
                 "<form method='POST' action='/config'>"
                 "<label>Номер на изпитна зала:</label>"
                 "<input type='text' name='room' value='" + String(room_number) + "'>"
@@ -133,7 +143,7 @@ static esp_err_t config_get_handler(httpd_req_t *req) {
                 "<label>FastAPI Сървър (ip:port):</label>"
                 "<input type='text' name='api' value='" + String(fastapi_url) + "'>"
                 "<p class='info'>Текущ: " + String(fastapi_url) + "</p>"
-                "<button type='submit'>💾 Запази и Регистрирай</button>"
+                "<button type='submit'>Запази и Регистрирай</button>"
                 "</form></div></body></html>";
 
   httpd_resp_set_type(req, "text/html");
@@ -211,7 +221,7 @@ static esp_err_t config_post_handler(httpd_req_t *req) {
                         "<style>body{font-family:Arial;text-align:center;padding-top:50px;background:#f4f6f7;}"
                         ".card{background:white;padding:30px;border-radius:10px;display:inline-block;box-shadow:0 4px 6px rgba(0,0,0,0.1);}"
                         "h2{color:#2ecc71;}</style></head><body><div class='card'>"
-                        "<h2>✅ Настройките са запазени!</h2>"
+                        "<h2>Настройките са запазени!</h2>"
                         "<p>Камерата е регистрирана за: <b>Зала " + String(room_number) + "</b></p>"
                         "<p>Адрес на сървъра: <b>" + String(fastapi_url) + "</b></p>"
                         "<p>Системата е в готовност (ARMED).</p>"
@@ -227,8 +237,11 @@ void startCameraServer() {
   httpd_config_t config = HTTPD_DEFAULT_CONFIG();
   config.server_port = 81;
   config.ctrl_port = 32768;
-  config.max_open_sockets = 5;
-  config.lru_purge_enable = true; // Затваря неактивни сокети автоматично
+  config.max_open_sockets = 7;
+  config.stack_size = 8192;           // 8KB стек за предотвратяване на task overflow при стрийминг
+  config.send_wait_timeout = 5;        // 5 сек send таймаут
+  config.recv_wait_timeout = 5;        // 5 сек recv таймаут
+  config.lru_purge_enable = true;      // КРИТИЧНО: Затваря най-стария неактивен сокет при липса на свободни слотове!
 
   httpd_uri_t stream_uri = {
     .uri       = "/stream",
@@ -272,30 +285,66 @@ void startCameraServer() {
 // --- ROBUST FASTAPI REGISTRATION ---
 bool registerCameraToBackend(String target_url, String room, String ip) {
   if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("[REGISTER] WiFi not connected, skipping registration.");
     return false;
   }
 
+  // 1. Почистваме адреса от грешно въведени префикси, наклонени черти и интервали
+  String clean_url = target_url;
+  clean_url.trim();
+  if (clean_url.startsWith("http://")) {
+    clean_url = clean_url.substring(7);
+  } else if (clean_url.startsWith("https://")) {
+    clean_url = clean_url.substring(8);
+  }
+  while (clean_url.endsWith("/")) {
+    clean_url = clean_url.substring(0, clean_url.length() - 1);
+  }
+
+  String host_port = clean_url;
+  String path = "/api/v1/exams/register-camera";
+  int slash_pos = clean_url.indexOf('/');
+  if (slash_pos != -1) {
+    host_port = clean_url.substring(0, slash_pos);
+    path = clean_url.substring(slash_pos);
+  }
+
+  String final_url = "http://" + host_port + path;
+
+  // Използваме експлицитен WiFiClient за максимална стабилност и чисто затваряне на сокетите
+  WiFiClient client;
+  client.setTimeout(2500);
+
   HTTPClient http;
-  http.begin(target_url); 
+  if (!http.begin(client, final_url)) {
+    Serial.println("[REGISTER] http.begin() failed!");
+    return false;
+  }
+
   http.addHeader("Content-Type", "application/json"); 
-  http.setTimeout(8000); // 8-секунди таймаут за предотвратяване на фалшиви отпадания
+  http.setTimeout(2500); // 2.5 сек таймаут за бърз отговор без блокиране на стрийма
   
   String jsonPayload = "{\"room_number\":\"" + room + "\", \"esp32_ip\":\"" + ip + "\"}";
-  Serial.println("[REGISTER] Auto-registering to: " + target_url);
+  Serial.println("[REGISTER] Auto-registering to: " + final_url);
   
   int httpResponseCode = http.POST(jsonPayload);
   bool success = false;
   
-  if (httpResponseCode > 0) {
+  if (httpResponseCode == 200 || httpResponseCode == 201) {
     Serial.printf("[REGISTER] Registration SUCCESS (Code: %d)!\n", httpResponseCode);
     success = true;
     is_registered = true;
   } else {
     Serial.printf("[REGISTER] Error connecting to FastAPI: %d\n", httpResponseCode);
-    is_registered = false;
+    if (active_stream_clients > 0) {
+      is_registered = true; // Бекендът вече чете кадри от нас
+    } else {
+      is_registered = false;
+    }
   }
   
   http.end();
+  client.stop();
   last_register_attempt = millis();
   return success;
 }
@@ -320,10 +369,10 @@ void setup() {
   config.ledc_timer = LEDC_TIMER_0;
   config.pin_d0 = Y2_GPIO_NUM; 
   config.pin_d1 = Y3_GPIO_NUM; 
-  config.pin_d2 = Y4_GPIO_NUM;
+  config.pin_d2 = Y4_GPIO_NUM; 
   config.pin_d3 = Y5_GPIO_NUM; 
   config.pin_d4 = Y6_GPIO_NUM; 
-  config.pin_d5 = Y7_GPIO_NUM;
+  config.pin_d5 = Y7_GPIO_NUM; 
   config.pin_d6 = Y8_GPIO_NUM; 
   config.pin_d7 = Y9_GPIO_NUM; 
   config.pin_xclk = XCLK_GPIO_NUM;
@@ -338,9 +387,18 @@ void setup() {
   config.pixel_format = PIXFORMAT_JPEG;
   config.frame_size = FRAMESIZE_VGA; 
   config.jpeg_quality = 16; 
-  config.fb_count = 2; 
-  config.fb_location = CAMERA_FB_IN_PSRAM;
-  config.grab_mode = CAMERA_GRAB_LATEST;
+
+  if (psramFound()) {
+    config.fb_count = 2; 
+    config.fb_location = CAMERA_FB_IN_PSRAM;
+    config.grab_mode = CAMERA_GRAB_LATEST;
+    Serial.println("[CAMERA] PSRAM detected, using dual frame buffers.");
+  } else {
+    config.fb_count = 1; 
+    config.fb_location = CAMERA_FB_IN_DRAM;
+    config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
+    Serial.println("[CAMERA] Warning: PSRAM not detected, fallback to single buffer.");
+  }
 
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
@@ -353,6 +411,14 @@ void setup() {
   WiFiManager wm;
   wm.autoConnect("Exam-Gate-Config-WiFi");
 
+  // КРИТИЧНО ЗА ВИДЕО СТРИЙМ: ИЗКЛЮЧВАМЕ WI-FI POWER-SAVE РЕЖИМА!
+  // Без това ESP32 заспива радио модула, пингът скача на 2000ms и има 20% загуба на пакети.
+  WiFi.setSleep(false);
+  esp_wifi_set_ps(WIFI_PS_NONE);
+
+  // Изчакваме кратък толеранс за установяване на рутирането и ARP таблицата
+  delay(500);
+
   String current_ip = WiFi.localIP().toString();
   Serial.println("[WIFI] Connected!");
   Serial.print("[CONFIG] Web URL: http://"); Serial.print(current_ip); Serial.println(":81/config");
@@ -360,9 +426,15 @@ void setup() {
   // 1. СТАРТИРАМЕ ПЪРВО HTTPD СЪРВЪРА, ЗА ДА Е ГОТОВ ЗА СТРИЙМВАНЕ
   startCameraServer();
 
-  // 2. СЛЕД ТОВА СЕ РЕГИСТРИРАМЕ ПРЕД FASTAPI
+  // 2. СЛЕД ТОВА СЕ РЕГИСТРИРАМЕ ПРЕД FASTAPI С ДО 3 ОПИТА
   String full_backend_path = "http://" + String(fastapi_url) + "/api/v1/exams/register-camera";
-  registerCameraToBackend(full_backend_path, String(room_number), current_ip);
+  for (int attempt = 1; attempt <= 3; attempt++) {
+    Serial.printf("[BOOT-REGISTER] Registration attempt %d of 3...\n", attempt);
+    if (registerCameraToBackend(full_backend_path, String(room_number), current_ip)) {
+      break;
+    }
+    delay(1000);
+  }
 
   Serial.println("[SYSTEM] System ARMED.");
 }
@@ -370,15 +442,17 @@ void setup() {
 void loop() {
   unsigned long now = millis();
 
-  // Автоматичен повторен опит при неуспешна първоначална регистрация
-  if (!is_registered) {
+  // Опитваме регистрация само ако камерата не е регистрирана и няма активен стрийм клиент.
+  // Когато стриймът върви (active_stream_clients > 0), не правим HTTP заявки, за да няма лаг във видеото.
+  if (!is_registered && active_stream_clients == 0) {
     if (now - last_register_attempt > REGISTER_RETRY_INTERVAL) {
       Serial.println("[RETRY] Retrying camera registration with FastAPI...");
       String full_backend_path = "http://" + String(fastapi_url) + "/api/v1/exams/register-camera";
       registerCameraToBackend(full_backend_path, String(room_number), WiFi.localIP().toString());
     }
-  } else {
-    // Периодично потвърждаване на регистрацията (Heartbeat)
+  } else if (is_registered && active_stream_clients == 0) {
+    // Периодичен Heartbeat на всеки 30 сек само ако никой не е свързан към стрийма
+    // (напр. ако бекендът е бил рестартиран)
     if (now - last_register_attempt > HEARTBEAT_INTERVAL) {
       String full_backend_path = "http://" + String(fastapi_url) + "/api/v1/exams/register-camera";
       registerCameraToBackend(full_backend_path, String(room_number), WiFi.localIP().toString());

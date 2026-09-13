@@ -913,6 +913,9 @@ async def fetch_frames_from_esp32(room_number: str, esp32_ip: str):
     url = f"http://{esp32_ip}:81/stream"
     print(f"[Stream Worker] Стартиране на фоново четене от Зала {room_number} ({url})")
     
+    # Кратко забавяне (300ms), за да позволим на ESP32 чиста обработка на отговора от регистрацията
+    await asyncio.sleep(0.3)
+    
     known_face_encodings, known_face_names = _load_known_faces()
     last_db_refresh = time.time()
     
@@ -943,6 +946,7 @@ async def fetch_frames_from_esp32(room_number: str, esp32_ip: str):
     timeout = httpx.Timeout(connect=5.0, read=15.0, write=5.0, pool=10.0)
     retry_count = 0
     disconnect_start_time = None
+    offline_event_sent = False
     
     while room_number in ACTIVE_CAMERAS:
         try:
@@ -954,17 +958,21 @@ async def fetch_frames_from_esp32(room_number: str, esp32_ip: str):
             async with httpx.AsyncClient(timeout=timeout) as client:
                 async with client.stream("GET", url) as response:
                     if response.status_code != 200:
-                        print(f"[Camera Warning] Сървърът на ESP32 в Зала {room_number} върна код {response.status_code}. Презареждане след 2 сек...")
-                        was_on = CAMERA_HEALTH[room_number].get("is_online", False)
-                        CAMERA_HEALTH[room_number]["is_online"] = False
-                        if was_on:
+                        now_ts = time.time()
+                        if disconnect_start_time is None:
+                            disconnect_start_time = now_ts
+                        disconnected_duration = now_ts - disconnect_start_time
+                        print(f"[Camera Warning] Сървърът на ESP32 в Зала {room_number} върна код {response.status_code} (прекъсване: {disconnected_duration:.1f}s)")
+                        if disconnected_duration >= 4.0 and not offline_event_sent:
+                            CAMERA_HEALTH[room_number]["is_online"] = False
+                            offline_event_sent = True
                             emit_room_event(room_number, "camera_status", {
                                 "room_number": room_number, "armed": False, "is_online": False, "esp32_ip": esp32_ip
                             })
-                        await asyncio.sleep(2)
+                        await asyncio.sleep(0.5)
                         continue
                     
-                    was_offline = not CAMERA_HEALTH[room_number].get("is_online", False)
+                    was_offline = offline_event_sent or not CAMERA_HEALTH[room_number].get("is_online", False)
                     CAMERA_HEALTH[room_number]["is_online"] = True
                     CAMERA_HEALTH[room_number]["last_frame_time"] = time.time()
                     state["status_text"] = "Очакване на обект пред камерата..."
@@ -978,9 +986,10 @@ async def fetch_frames_from_esp32(room_number: str, esp32_ip: str):
                             "student_name": "", "faculty_number": "", "status_text": state["status_text"], "status_type": "idle"
                         })
                     
-                    # Нулиране на брояча при успешна връзка
+                    # Нулиране на брояча и състоянието при успешна връзка
                     retry_count = 0
                     disconnect_start_time = None
+                    offline_event_sent = False
 
                     bytes_buffer = b""
                     async for chunk in response.aiter_bytes():
@@ -1046,36 +1055,47 @@ async def fetch_frames_from_esp32(room_number: str, esp32_ip: str):
                 disconnect_start_time = now_ts
                 print(f"[Camera Disconnected] Загубена връзка с ESP32 в Зала {room_number}: {repr(e)}")
 
-            was_online = CAMERA_HEALTH[room_number].get("is_online", False)
-            CAMERA_HEALTH[room_number]["is_online"] = False
-            LATEST_FRAMES.pop(room_number, None)  # Изчистваме стария замръзнал кадър
-            state["student_name"] = "—"
-            state["faculty_number"] = "—"
-            state["status_text"] = "Камерата е офлайн (няма връзка)"
-            state["status_type"] = "danger"
+            disconnected_duration = now_ts - disconnect_start_time
 
-            if was_online:
-                emit_room_event(room_number, "camera_status", {
-                    "room_number": room_number, "armed": False, "is_online": False, "esp32_ip": esp32_ip
-                })
-                emit_room_event(room_number, "biometric_status", {
-                    "student_name": "—", "faculty_number": "—", "status_text": state["status_text"], "status_type": "danger"
-                })
+            # Grace Period (4.0 секунди):
+            # Не излъчваме веднага офлайн статус и пазим последния кадър (freeze-frame),
+            # за да не премигва интерфейсът при кратковременни микро-смущения на Wi-Fi връзката.
+            if disconnected_duration >= 4.0:
+                CAMERA_HEALTH[room_number]["is_online"] = False
+                state["student_name"] = "—"
+                state["faculty_number"] = "—"
+                state["status_text"] = "Камерата е офлайн (няма връзка)"
+                state["status_type"] = "danger"
+
+                if not offline_event_sent:
+                    offline_event_sent = True
+                    emit_room_event(room_number, "camera_status", {
+                        "room_number": room_number, "armed": False, "is_online": False, "esp32_ip": esp32_ip
+                    })
+                    emit_room_event(room_number, "biometric_status", {
+                        "student_name": "—", "faculty_number": "—", "status_text": state["status_text"], "status_type": "danger"
+                    })
+
+            # Изчистваме стария кадър само след продължителна липса на връзка (над 10 сек)
+            if disconnected_duration >= 10.0:
+                LATEST_FRAMES.pop(room_number, None)
 
             # Автоматично освобождаване на ресурсите след 120 сек без връзка
-            if (now_ts - disconnect_start_time) > 120.0:
+            if disconnected_duration > 120.0:
                 print(f"[Auto-Deactivate] ESP32 в Зала {room_number} не отговаря над 2 минути. Освобождаване на ресурсите.")
                 stop_camera_stream(room_number, reason="timeout")
                 break
 
-            # Progressive backoff за предотвратяване на спам в логовете и излишен мрежов трафик
+            # Instant Reconnect при първите 2 опита, последван от плавен progressive backoff
             retry_count += 1
-            if retry_count <= 3:
+            if retry_count <= 2:
+                sleep_sec = 0.2
+            elif retry_count <= 5:
+                sleep_sec = 1.0
+            elif retry_count <= 8:
                 sleep_sec = 2.0
-            elif retry_count <= 6:
-                sleep_sec = 5.0
             else:
-                sleep_sec = 10.0
+                sleep_sec = 5.0
 
             await asyncio.sleep(sleep_sec)
 
