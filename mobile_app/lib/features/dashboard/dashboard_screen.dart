@@ -531,7 +531,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             authRepository: widget.authRepository!,
             infoMessage: successMsg.isNotEmpty
                 ? successMsg
-                : 'Профилът и биометричните ви данни бяха заличени успешно (GDPR Чл. 17).',
+                : 'Профилът и биометричните ви данни бяха заличени успешно.',
           ),
         ),
         (route) => false,
@@ -1452,7 +1452,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     const SizedBox(width: 8),
                     Flexible(
                       child: Text(
-                        'Изтрий профила и биометричните ми данни (GDPR Чл. 17)',
+                        'Изтриване на профила',
                         textAlign: TextAlign.center,
                         style: UiThemeTokens.getSansFont(
                           fontSize: 13,
