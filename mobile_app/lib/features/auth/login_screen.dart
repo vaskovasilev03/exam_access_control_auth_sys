@@ -6,8 +6,13 @@ import '../dashboard/dashboard_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   final AuthRepository authRepository;
+  final String? infoMessage;
 
-  const LoginScreen({super.key, required this.authRepository});
+  const LoginScreen({
+    super.key,
+    required this.authRepository,
+    this.infoMessage,
+  });
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -23,6 +28,32 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.infoMessage != null && widget.infoMessage!.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.check_circle_outline, color: Colors.white, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      widget.infoMessage!,
+                      style: UiThemeTokens.getSansFont(color: Colors.white, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.green.shade800,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: UiThemeTokens.borderRadius),
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+      });
+    }
     _checkSavedCredentials();
   }
 

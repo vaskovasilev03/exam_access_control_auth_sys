@@ -126,7 +126,7 @@ void main() {
 
       // Verify header and badge
       expect(find.text('Дигитален изпитен пропуск'), findsOneWidget);
-      expect(find.text('Потвърден близнак / Верифициран достъп'), findsOneWidget);
+      expect(find.text('Верифициран достъп'), findsOneWidget);
 
       // Verify student details displayed
       expect(find.text('Александър Димитров'), findsOneWidget);

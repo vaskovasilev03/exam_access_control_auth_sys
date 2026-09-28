@@ -185,6 +185,76 @@ class StudentManagementTestCase(unittest.TestCase):
         log_updated = self.db.query(AdminLog).filter(AdminLog.id == log_id).first()
         self.assertTrue(log_updated.notification_sent, "When all students in log are active, notification_sent must be True")
 
+    @patch("app.main.delete_student_cloud_files")
+    def test_04_gdpr_delete_account(self, mock_delete_cloud):
+        mock_delete_cloud.return_value = 2
+
+        # Create student with password, biometrics, and registrations
+        import bcrypt
+        student = Student(
+            full_name="GDPR Тестов Студент",
+            student_id_number="99900001",
+            email="gdpr_test@tu-sofia.bg",
+            faculty="ФКСТ",
+            specialty="КСИ",
+            course=3,
+            stream=1,
+            group=40,
+            hashed_password=bcrypt.hashpw(b"TempPass123!", bcrypt.gensalt()).decode('utf-8'),
+            face_embedding=[0.1] * 128,
+            photo_path="/access-control-bucket/99900001_face.jpg",
+            student_book_photo_path="/access-control-bucket/99900001_book.jpg",
+            status="APPROVED",
+            gdpr_consent_given=True,
+            must_change_password=False,
+            is_active=True
+        )
+        self.db.add(student)
+        self.db.commit()
+
+        # Login as student to get JWT token
+        login_res = client.post("/students/login", json={
+            "student_id_number": "99900001",
+            "password": "TempPass123!"
+        })
+        self.assertEqual(login_res.status_code, 200)
+        student_token = login_res.json()["access_token"]
+        student_headers = {"Authorization": f"Bearer {student_token}"}
+
+        # Perform GDPR deletion
+        del_res = client.delete("/students/delete-account", headers=student_headers)
+        self.assertEqual(del_res.status_code, 200)
+        self.assertEqual(del_res.json()["status"], "success")
+
+        # Verify MinIO cloud delete was called
+        mock_delete_cloud.assert_called_once()
+
+        # Verify Student record still exists in the database
+        self.db.expire_all()
+        student_db = self.db.query(Student).filter(Student.student_id_number == "99900001").first()
+        self.assertIsNotNone(student_db, "Student record must remain in the database")
+        self.assertEqual(student_db.status, "PENDING")
+        self.assertIsNone(student_db.face_embedding)
+        self.assertIsNone(student_db.photo_path)
+        self.assertIsNone(student_db.student_book_photo_path)
+        self.assertFalse(student_db.gdpr_consent_given)
+        self.assertIsNone(student_db.gdpr_consent_timestamp)
+        self.assertTrue(student_db.must_change_password)
+
+        # Verify old password no longer works
+        old_login = client.post("/students/login", json={
+            "student_id_number": "99900001",
+            "password": "TempPass123!"
+        })
+        self.assertEqual(old_login.status_code, 401)
+
+        # Verify AdminLog has been written
+        gdpr_log = self.db.query(AdminLog).filter(
+            AdminLog.action_type == "STUDENT_GDPR_ERASURE",
+            AdminLog.details.like("%99900001%")
+        ).first()
+        self.assertIsNotNone(gdpr_log, "STUDENT_GDPR_ERASURE audit log must be recorded")
+
 if __name__ == "__main__":
     unittest.main()
 

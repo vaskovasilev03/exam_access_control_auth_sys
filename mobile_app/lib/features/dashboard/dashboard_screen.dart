@@ -394,6 +394,174 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  Future<void> _handleDeleteAccount() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: UiThemeTokens.background,
+        shape: RoundedRectangleBorder(
+          borderRadius: UiThemeTokens.borderRadius,
+          side: const BorderSide(color: UiThemeTokens.border),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: UiThemeTokens.destructive, size: 24),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Изтриване на профила',
+                style: UiThemeTokens.getSansFont(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Сигурни ли сте? Това действие ще изтрие необратимо вашето лицево досие, книжка и регистрации за изпити.',
+          style: UiThemeTokens.getSansFont(fontSize: 14, height: 1.4),
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        actions: [
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 44,
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: UiThemeTokens.border),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: UiThemeTokens.borderRadius,
+                      ),
+                    ),
+                    child: Text(
+                      'Отказ',
+                      style: UiThemeTokens.getSansFont(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: UiThemeTokens.foreground,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: SizedBox(
+                  height: 44,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: UiThemeTokens.destructive,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      minimumSize: const Size(0, 44),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: UiThemeTokens.borderRadius,
+                      ),
+                    ),
+                    child: Text(
+                      'Изтрий профила',
+                      style: UiThemeTokens.getSansFont(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true || !mounted || widget.authRepository == null) return;
+
+    // Показваме диалог за изчакване при изтриване
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          backgroundColor: UiThemeTokens.background,
+          shape: RoundedRectangleBorder(
+            borderRadius: UiThemeTokens.borderRadius,
+            side: const BorderSide(color: UiThemeTokens.border),
+          ),
+          content: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Row(
+              children: [
+                const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2.5, color: UiThemeTokens.destructive),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    'Изтриване на профила и биометричните данни...',
+                    style: UiThemeTokens.getSansFont(fontSize: 14),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      final successMsg = await widget.authRepository!.deleteAccount();
+      await widget.authRepository!.getStorageService().clearAll();
+
+      if (!mounted) return;
+      // Затваряме диалога за изчакване
+      Navigator.of(context, rootNavigator: true).pop();
+
+      // Пренасочваме към началния екран за вход с потвърждаващ Snackbar
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(
+          builder: (context) => LoginScreen(
+            authRepository: widget.authRepository!,
+            infoMessage: successMsg.isNotEmpty
+                ? successMsg
+                : 'Профилът и биометричните ви данни бяха заличени успешно (GDPR Чл. 17).',
+          ),
+        ),
+        (route) => false,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.error_outline, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  e.toString().replaceAll('Exception: ', ''),
+                  style: UiThemeTokens.getSansFont(color: Colors.white, fontSize: 13),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: UiThemeTokens.destructive,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: UiThemeTokens.borderRadius),
+        ),
+      );
+    }
+  }
+
   /// Потвърждение при натискане на хардуерен Back бутон на начален таб
   Future<bool?> _showExitConfirmationDialog() {
     return showDialog<bool>(
@@ -1265,6 +1433,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 textStyle: UiThemeTokens.getSansFont(fontSize: 14, fontWeight: FontWeight.bold),
               ),
             ),
+            if (!isImp) ...[
+              const SizedBox(height: 12),
+              ElevatedButton(
+                onPressed: _handleDeleteAccount,
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 48),
+                  backgroundColor: UiThemeTokens.destructive,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: UiThemeTokens.borderRadius),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.delete_forever_rounded, size: 18, color: Colors.white),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        'Изтрий профила и биометричните ми данни (GDPR Чл. 17)',
+                        textAlign: TextAlign.center,
+                        style: UiThemeTokens.getSansFont(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),

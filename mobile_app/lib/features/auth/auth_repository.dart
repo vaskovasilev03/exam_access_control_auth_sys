@@ -144,6 +144,21 @@ class AuthRepository {
     }
   }
 
+  Future<String> deleteAccount() async {
+    try {
+      final response = await _apiClient.dio.delete('/students/delete-account');
+      await _storageService.clearAll();
+      final data = response.data;
+      if (data is Map && data['message'] != null) {
+        return data['message'].toString();
+      }
+      return 'Акаунтът и всички свързани данни бяха заличени успешно.';
+    } on DioException catch (e) {
+      final errorMsg = _extractErrorMessage(e, defaultMessage: 'Неуспешно изтриване на профила');
+      throw Exception(errorMsg);
+    }
+  }
+
   Future<void> logout() async {
     await _storageService.clearAll();
   }

@@ -54,7 +54,10 @@ from .stream_esp32 import (
     ingest_webcam_frame, set_room_camera_source, get_room_camera_source,
     CAMERA_SOURCES
 )
-from .storage import init_storage, upload_photo_to_cloud, get_photo_from_cloud, BUCKET_NAME
+from .storage import (
+    init_storage, upload_photo_to_cloud, get_photo_from_cloud,
+    delete_file_from_cloud, delete_student_cloud_files, BUCKET_NAME
+)
 from .mailer import send_welcome_email, send_allocation_email
 from .hal import actuator, get_actuator
 
@@ -4690,8 +4693,17 @@ def delete_student_account(
     current_user: dict = Depends(get_current_user)
 ):
     """
-    4. Изтриване на студентския акаунт от мобилното приложение.
-    Поради CASCADE релациите в базата данни, автоматично се трият и изпитните му регистрации.
+    Изтриване на биометричните данни и профила на студента съгласно GDPR Чл. 17 (Право да бъдеш забравен).
+    - Изтриват се всички свързани файлове от MinIO облачното хранилище (селфи снимка, книжка, протоколи).
+    - Биометричният вектор (face_embedding) се нулира на NULL.
+    - Пътищата към файловете (photo_path, student_book_photo_path) се нулират на NULL.
+    - GDPR съгласието се анулира (gdpr_consent_given = False, gdpr_consent_timestamp = None).
+    - Флаговете за близнак/дубликат се изчистват.
+    - Статусът на студента се връща в начално състояние "PENDING" (неверифициран).
+    - Мобилният вход се заключва / изисква смяна на парола (must_change_password = True),
+      а паролата се рандомизира с криптографски сигурен низ, за да се гарантира отнемане на достъпа.
+    - Изтриват се изпитните му регистрации (ExamRegistration).
+    - Самият академичен запис на студента (име, фак. номер, факултет, специалност, курс, поток, група) остава в базата данни.
     """
     if is_superadmin_user(current_user):
         raise HTTPException(status_code=400, detail="Superadmin account cannot be deleted via mobile student app.")
@@ -4705,6 +4717,48 @@ def delete_student_account(
     if not student:
         raise HTTPException(status_code=404, detail="Акаунтът не беше намерен.")
 
-    db.delete(student)
+    # 1. Изтриваме всички файлове на студента от MinIO облачното хранилище
+    explicit_paths = [student.photo_path, student.student_book_photo_path]
+    delete_student_cloud_files(student.student_id_number, explicit_paths)
+
+    # 2. Нулираме биометричните данни и файловите пътища в базата
+    student.face_embedding = None
+    student.photo_path = None
+    student.student_book_photo_path = None
+
+    # 3. Нулираме GDPR съгласието и флаговете за дубликати / близнаци
+    student.gdpr_consent_given = False
+    student.gdpr_consent_timestamp = None
+    student.is_twin_exception = False
+    student.duplicate_flagged_student_id = None
+    student.duplicate_similarity_distance = None
+
+    # Изчистваме и ако друг студент е бил флагнат към този студент като дубликат
+    db.query(Student).filter(Student.duplicate_flagged_student_id == student.id).update({
+        Student.duplicate_flagged_student_id: None,
+        Student.duplicate_similarity_distance: None
+    })
+
+    # 4. Връщаме статуса на студента на PENDING
+    student.status = "PENDING"
+
+    # 5. Инвалидираме паролата за вход в мобилното приложение
+    random_secret = secrets.token_hex(32)
+    student.hashed_password = bcrypt.hashpw(random_secret.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    student.must_change_password = True
+
+    # 6. Изтриваме изпитните регистрации на студента
+    db.query(ExamRegistration).filter(ExamRegistration.student_id == student.id).delete()
+
+    # 7. Записваме системен лог за изпълнено GDPR заличаване
+    db.add(AdminLog(
+        admin_id=None,
+        action_type="STUDENT_GDPR_ERASURE",
+        details=f"Студент {student.student_id_number} ({student.full_name}) упражни правото си по чл. 17 GDPR. Заличени са биометричният вектор, файловете от MinIO и изпитните регистрации. Профилът е нулиран до начален статус PENDING.",
+        specialty=student.specialty,
+        group=str(student.group),
+        notification_sent=False
+    ))
+
     db.commit()
-    return {"status": "success", "message": "Акаунтът и всички свързани данни бяха заличени успешно."}
+    return {"status": "success", "message": "Биометричните данни, файлове и мобилен профил бяха заличени успешно (GDPR Чл. 17)."}

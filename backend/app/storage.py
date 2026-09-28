@@ -53,3 +53,55 @@ def get_photo_from_cloud(object_name: str) -> bytes:
     except Exception as e:
         print(f"Error fetching from MinIO ({object_name}): {e}")
         raise e
+
+def delete_file_from_cloud(object_name: str) -> bool:
+    """ Изтрива файл от MinIO облака по неговото име или вътрешен път """
+    if not object_name:
+        return False
+    try:
+        prefix = f"/{BUCKET_NAME}/"
+        if object_name.startswith(prefix):
+            clean_name = object_name[len(prefix):]
+        else:
+            clean_name = object_name.lstrip("/")
+        s3_client.delete_object(Bucket=BUCKET_NAME, Key=clean_name)
+        return True
+    except Exception as e:
+        print(f"Error deleting from MinIO ({object_name}): {e}")
+        return False
+
+def delete_student_cloud_files(student_id_number: str, explicit_paths: list = None) -> int:
+    """
+    Изтрива всички файлове в MinIO, свързани със студента:
+    1. Подадените изрични пътища (селфи, книжка).
+    2. Всички обекти в кофата с префикс съответния факултетен номер (напр. селфита, книжки, протоколи).
+    """
+    deleted_count = 0
+    cleaned_keys = set()
+
+    if explicit_paths:
+        prefix = f"/{BUCKET_NAME}/"
+        for p in explicit_paths:
+            if p:
+                key = p[len(prefix):] if p.startswith(prefix) else p.lstrip("/")
+                cleaned_keys.add(key)
+
+    if student_id_number:
+        try:
+            prefixes_to_check = [f"{student_id_number}_", f"protocols/{student_id_number}_"]
+            for pfx in prefixes_to_check:
+                paginator = s3_client.get_paginator('list_objects_v2')
+                for page in paginator.paginate(Bucket=BUCKET_NAME, Prefix=pfx):
+                    for obj in page.get('Contents', []):
+                        cleaned_keys.add(obj['Key'])
+        except Exception as e:
+            print(f"Error listing MinIO files for {student_id_number}: {e}")
+
+    for key in cleaned_keys:
+        try:
+            s3_client.delete_object(Bucket=BUCKET_NAME, Key=key)
+            deleted_count += 1
+        except Exception as e:
+            print(f"Error deleting object {key} from MinIO: {e}")
+
+    return deleted_count
