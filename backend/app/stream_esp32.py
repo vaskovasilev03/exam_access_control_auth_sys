@@ -593,6 +593,7 @@ def analyze_frame_outside_ui(jpg_bytes: bytes, room_number: str, known_face_enco
     Чиста ИИ функция. НЕ рисува нищо върху кадъра.
     Само анализира и обновява текстовото състояние на залата в паметта.
     """
+    t_frame_start = time.perf_counter()
     try:
         nparr = np.frombuffer(jpg_bytes, np.uint8)
         frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
@@ -646,10 +647,14 @@ def analyze_frame_outside_ui(jpg_bytes: bytes, room_number: str, known_face_enco
                 print(f"[QR Stream Scan Error] {e}")
             return None
 
-        # Стандартно ИИ сканиране за лица (устойчиво на сенки, контраст и наклон)
+        # Стандартно ИИ сканиране за лица (YuNet DNN Face Detection)
+        t_detect_start = time.perf_counter()
         face_boxes = detect_face_boxes(frame)
+        yunet_ms = (time.perf_counter() - t_detect_start) * 1000
 
         if not face_boxes:
+            total_ms = (time.perf_counter() - t_frame_start) * 1000
+            print(f"[BENCHMARK] YuNet: {yunet_ms:.1f}ms | Anti-Spoof: N/A | Embed: N/A | pgvector: N/A | Total: {total_ms:.1f}ms (No face)")
             misses = state.get("consecutive_face_misses", 0) + 1
             state["consecutive_face_misses"] = misses
             last_seen = state.get("last_face_seen_time", 0.0)
@@ -671,9 +676,47 @@ def analyze_frame_outside_ui(jpg_bytes: bytes, room_number: str, known_face_enco
 
         # Координатите на първото лице в оригиналната резолюция на кадъра
         face_box_orig = face_boxes[0]
+
+        # Защита от прекомерна близост до камерата:
+        # MiniFASNet изисква мащаб Scale 4.0 за засичане на рамката на дисплея/хартията.
+        # Ако лицето заема над 48% от височината на кадъра, физическите граници на устройството
+        # излизат извън обхвата на сензора и класификаторът губи периферния си контекст.
+        face_top, face_right, face_bottom, face_left = face_box_orig
+        face_h = face_bottom - face_top
+        frame_h = frame.shape[0]
+        if frame_h > 0 and (face_h / frame_h) > 0.48:
+            state["consecutive_face_misses"] = 0
+            state["last_face_seen_time"] = current_time
+            state["student_name"] = ""
+            state["faculty_number"] = ""
+            state["status_text"] = "Моля, отдръпнете се леко назад от камерата"
+            state["status_type"] = "warning"
+            state["liveness_scores"] = []
+            state["liveness_student_id"] = None
+            emit_room_event(room_number, "biometric_status", {
+                "student_name": "",
+                "faculty_number": "",
+                "status_text": state["status_text"],
+                "status_type": "warning"
+            })
+            return None
+
+        # 1. MiniFASNet Liveness: пасивен Anti-Spoofing анализ
+        t_liveness_start = time.perf_counter()
+        liveness_detector = get_liveness_detector()
+        is_real_frame, real_score_frame = liveness_detector.check(frame, face_box_orig)
+        liveness_ms = (time.perf_counter() - t_liveness_start) * 1000
+
+        try:
+            score_num = float(real_score_frame)
+        except (ValueError, TypeError):
+            score_num = 1.0 if is_real_frame else 0.0
+        p_real = score_num
+
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-        # Извличаме вектора от пълната резолюция за максимална прецизност
+        # 2. dlib 128D Embedding: Извличаме вектора от пълната резолюция за максимална прецизност
+        t_embed_start = time.perf_counter()
         orig_encodings = face_recognition.face_encodings(rgb_frame, [face_box_orig])
         if orig_encodings:
             face_encoding = orig_encodings[0]
@@ -688,6 +731,9 @@ def analyze_frame_outside_ui(jpg_bytes: bytes, room_number: str, known_face_enco
             if enh_encs:
                 face_encoding = enh_encs[0]
             else:
+                embed_ms = (time.perf_counter() - t_embed_start) * 1000
+                total_ms = (time.perf_counter() - t_frame_start) * 1000
+                print(f"[BENCHMARK] YuNet: {yunet_ms:.1f}ms | Anti-Spoof: {liveness_ms:.1f}ms (P={p_real:.2f}) | Embed: {embed_ms:.1f}ms (Fail) | pgvector: N/A | Total: {total_ms:.1f}ms")
                 misses = state.get("consecutive_face_misses", 0) + 1
                 state["consecutive_face_misses"] = misses
                 last_seen = state.get("last_face_seen_time", 0.0)
@@ -704,19 +750,49 @@ def analyze_frame_outside_ui(jpg_bytes: bytes, room_number: str, known_face_enco
                 state["candidate_student_id"] = None
                 return None
 
+        embed_ms = (time.perf_counter() - t_embed_start) * 1000
+
         # Успешно засечено и векторизирано лице: нулираме брояча на пропуски
         state["consecutive_face_misses"] = 0
         state["last_face_seen_time"] = current_time
+
+        # 3. pgvector Search: Търсене на най-близък съсед в PostgreSQL с векторна L2 дистанция
+        t_pgvector_start = time.perf_counter()
+        db_pg = SessionLocal()
+        pg_student = None
+        pg_distance = None
+        try:
+            closest_row = (
+                db_pg.query(
+                    Student,
+                    Student.face_embedding.l2_distance(face_encoding).label("dist")
+                )
+                .filter(
+                    Student.face_embedding != None,
+                    Student.status == "APPROVED"
+                )
+                .order_by("dist")
+                .first()
+            )
+            if closest_row and closest_row[0] is not None:
+                pg_student = closest_row[0]
+                pg_distance = float(closest_row[1]) if closest_row[1] is not None else None
+        except Exception:
+            pass
+        finally:
+            db_pg.close()
+        pgvector_ms = (time.perf_counter() - t_pgvector_start) * 1000
 
         student_found = None
         matching_students = []
         is_twin_case = False
 
+        try:
+            TOLERANCE = float(os.getenv("FACE_RECOGNITION_TOLERANCE", "0.52"))
+        except (ValueError, TypeError):
+            TOLERANCE = 0.52
+
         if known_face_encodings:
-            try:
-                TOLERANCE = float(os.getenv("FACE_RECOGNITION_TOLERANCE", "0.52"))
-            except (ValueError, TypeError):
-                TOLERANCE = 0.52
             distances = face_recognition.face_distance(known_face_encodings, face_encoding)
             matching_indices = [i for i, d in enumerate(distances) if d <= TOLERANCE]
             if matching_indices:
@@ -736,21 +812,33 @@ def analyze_frame_outside_ui(jpg_bytes: bytes, room_number: str, known_face_enco
                     or len(matching_students) > 1
                 )
 
+        if not student_found and pg_student is not None and pg_distance is not None:
+            if pg_distance <= TOLERANCE:
+                student_found = pg_student
+                matching_students = [pg_student]
+                is_twin_case = getattr(student_found, "is_twin_exception", False)
+
+        # 4. Total Verification Latency: сумарно време от получаване на кадъра до финалното решение (в ms)
+        total_ms = (time.perf_counter() - t_frame_start) * 1000
+
+        # Конзолен структуриран лог с времената за изпълнение
+        print(f"[BENCHMARK] YuNet: {yunet_ms:.1f}ms | Anti-Spoof: {liveness_ms:.1f}ms (P={p_real:.2f}) | Embed: {embed_ms:.1f}ms | pgvector: {pgvector_ms:.1f}ms | Total: {total_ms:.1f}ms")
+
+        state["last_benchmark"] = {
+            "yunet_ms": round(yunet_ms, 2),
+            "anti_spoof_ms": round(liveness_ms, 2),
+            "p_real": round(p_real, 4),
+            "embed_ms": round(embed_ms, 2),
+            "pgvector_ms": round(pgvector_ms, 2),
+            "total_ms": round(total_ms, 2)
+        }
+
         if not student_found:
             state["student_name"] = "Непознат обект"
             state["faculty_number"] = "—"
             state["status_text"] = "ВНИМАНИЕ: Лицето липсва в базата данни!"
             state["status_type"] = "danger" # Червен цвят в UI
             return None
-
-        # MiniFASNetV2 Anti-Spoofing проверка на лицето
-        liveness_detector = get_liveness_detector()
-        is_real_frame, real_score_frame = liveness_detector.check(frame, face_box_orig)
-
-        try:
-            score_num = float(real_score_frame)
-        except (ValueError, TypeError):
-            score_num = 1.0 if is_real_frame else 0.0
 
         detector_thresh = getattr(liveness_detector, 'threshold', None)
         if isinstance(detector_thresh, (int, float)):
@@ -762,7 +850,8 @@ def analyze_frame_outside_ui(jpg_bytes: bytes, room_number: str, known_face_enco
                 thresh_num = 0.60
         thresh_disp = f"{thresh_num:.2f}"
 
-        # Буфер за времево изглаждане (2.0s прозорец за наблюдение)
+        # Буфер за времево изглаждане: поддържаме плъзгащ се прозорец от последните 5 кадъра,
+        # за да предотвратим отравяне на сесията от единичен пиков кадър (Single-Frame Poisoning).
         now = time.time()
         curr_student_id = str(student_found.id)
         if state.get("liveness_student_id") != curr_student_id or (now - state.get("liveness_last_seen", 0)) > 2.5:
@@ -772,13 +861,27 @@ def analyze_frame_outside_ui(jpg_bytes: bytes, room_number: str, known_face_enco
 
         state["liveness_last_seen"] = now
         state["liveness_scores"].append(score_num)
+        if len(state["liveness_scores"]) > 5:
+            state["liveness_scores"] = state["liveness_scores"][-5:]
 
-        highest_score = max(state["liveness_scores"]) if state["liveness_scores"] else score_num
-        score_disp = f"{highest_score:.2f}"
+        # Медианата премахва единични аномалии/пикове при движение и осигурява консенсус от мнозинството (>= 3 от 5 кадъра)
+        scores_window = state["liveness_scores"]
+        aggregated_score = float(np.median(scores_window))
+        score_disp = f"{aggregated_score:.2f}"
         window_elapsed = now - state.get("liveness_window_start", now)
         buffer_duration = float(state.get("liveness_buffer_seconds", 0.0))
 
-        is_real = bool(highest_score >= thresh_num)
+        # Защита от единичен фалшив пик:
+        # 1. При висока увереност (истински човек със скор >= 0.80) или нулев буфер допускаме веднага.
+        # 2. При граничен скор (между прага и 0.80) по време на активен буфер изискваме поне 2 кадъра за потвърждение.
+        # 3. При натрупани кадри изискваме медианата да е над прага и мнозинство от кадрите да са преминали.
+        if len(scores_window) == 1:
+            is_real = bool(score_num >= 0.80 or (score_num >= thresh_num and buffer_duration <= 0.0))
+        elif len(scores_window) == 2:
+            is_real = bool(aggregated_score >= thresh_num and (all(s >= thresh_num for s in scores_window) or aggregated_score >= 0.80))
+        else:
+            passes = sum(1 for s in scores_window if s >= thresh_num)
+            is_real = bool(aggregated_score >= thresh_num and passes >= (len(scores_window) // 2 + 1))
 
         print(f"[Stream AI] Face: {student_found.full_name} | Liveness: {score_disp} (Frame: {score_num:.2f}, Thresh: {thresh_disp}) -> {'REAL' if is_real else 'BUFFER/SPOOF'}")
 
@@ -818,7 +921,7 @@ def analyze_frame_outside_ui(jpg_bytes: bytes, room_number: str, known_face_enco
                 "status_text": state["status_text"],
                 "status_type": "danger"
             })
-            return {"admitted": False, "reason": "spoof", "student_id": str(student_found.id), "student_name": student_found.full_name, "liveness_score": highest_score}
+            return {"admitted": False, "reason": "spoof", "student_id": str(student_found.id), "student_name": student_found.full_name, "liveness_score": aggregated_score}
 
         # Проверка за случай на близнак (is_twin_exception == True или двусмислено биометрично съвпадение)
         # Поради генетично идентичната морфология се изисква динамичен QR пропуск

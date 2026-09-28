@@ -666,6 +666,117 @@ class StreamLivenessTestCase(unittest.TestCase):
             self.assertEqual(left, 38)
             self.assertEqual(right, 162)
 
+    @patch("app.stream_esp32.detect_face_boxes")
+    def test_17_face_too_close_prompts_step_back(self, mock_detect_boxes):
+        """
+        Тества защитата при прекомерна близост до камерата:
+        Ако лицето заема над 48% от височината на кадъра (напр. приближен телефонен екран),
+        системата превантивно инструктира потребителя да се отдръпне и нулира буфера за liveness.
+        """
+        room = "TEST_PROXIMITY_ROOM"
+        state = {
+            "student_name": "Тестов Студент",
+            "faculty_number": "12128801",
+            "status_text": "Очакване на студент...",
+            "status_type": "idle",
+            "ai_busy": False,
+            "green_state_end_time": 0,
+            "locked_student_name": "",
+            "locked_fac_num": "",
+            "last_ai_run_time": 0,
+            "qr_scan_mode": False,
+            "qr_scan_expiry": 0.0,
+            "liveness_scores": [0.90],
+            "liveness_student_id": str(self.student.id),
+        }
+
+        # Кадър 480x640: лицето заема от y=20 до y=300 (височина 280 / 480 = 58% > 48%)
+        mock_detect_boxes.return_value = [(20, 400, 300, 100)]
+        frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        _, enc = cv2.imencode(".jpg", frame)
+        jpg_bytes = enc.tobytes()
+
+        known_encs = [np.array(self.dummy_embedding)]
+        known_names = [self.student]
+
+        res = analyze_frame_outside_ui(jpg_bytes, room, known_encs, known_names, state)
+
+        self.assertIsNone(res)
+        self.assertEqual(state["student_name"], "")
+        self.assertEqual(state["faculty_number"], "")
+        self.assertEqual(state["status_type"], "warning")
+        self.assertEqual(state["status_text"], "Моля, отдръпнете се леко назад от камерата")
+        self.assertEqual(state["liveness_scores"], [])
+        self.assertIsNone(state["liveness_student_id"])
+
+    @patch("app.stream_esp32.detect_face_boxes")
+    @patch("app.stream_esp32.face_recognition.face_encodings")
+    @patch("app.stream_esp32.get_liveness_detector")
+    def test_18_sliding_window_median_rejects_single_glitch_attack(self, mock_get_detector, mock_encs, mock_detect_boxes):
+        """
+        Тества устойчивостта на плъзгащия се прозорец с медиана:
+        Единичен фалшив пик от 0.65 при екранна атака бива неутрализиран от последващите
+        spoof кадри (0.27, 0.38), медианата остава под прага и атаката се отхвърля с REJECTED_SPOOF.
+        """
+        room = "TEST_MEDIAN_SPOOF_ROOM"
+        state = {
+            "student_name": "—",
+            "faculty_number": "—",
+            "status_text": "Очакване на студент...",
+            "status_type": "idle",
+            "ai_busy": False,
+            "green_state_end_time": 0,
+            "locked_student_name": "",
+            "locked_fac_num": "",
+            "last_ai_run_time": 0,
+            "qr_scan_mode": False,
+            "qr_scan_expiry": 0.0,
+            "liveness_buffer_seconds": 2.0,
+            "liveness_scores": [],
+            "liveness_student_id": None,
+        }
+
+        # Нормален размер лице (височина 100 / 480 = 20.8% < 48%)
+        mock_detect_boxes.return_value = [(50, 200, 150, 100)]
+        mock_encs.return_value = [np.array(self.dummy_embedding)]
+
+        mock_detector_inst = MagicMock()
+        mock_detector_inst.threshold = 0.60
+        mock_get_detector.return_value = mock_detector_inst
+
+        known_encs = [np.array(self.dummy_embedding)]
+        known_names = {self.student.full_name: self.student}
+
+        # Кадър 1: Случаен пик 0.65 (при активен 2.0s буфер не се признава веднага за REAL)
+        mock_detector_inst.check.return_value = (True, 0.65)
+        res1 = analyze_frame_outside_ui(self.dummy_jpg, room, known_encs, known_names, state)
+        self.assertIsNone(res1)
+        self.assertEqual(state["status_type"], "idle")
+        self.assertEqual(state["status_text"], "Проверка на автентичност...")
+        self.assertEqual(state["liveness_scores"], [0.65])
+
+        # Кадър 2: Реалният характер на атаката се проявява (0.27)
+        mock_detector_inst.check.return_value = (False, 0.27)
+        res2 = analyze_frame_outside_ui(self.dummy_jpg, room, known_encs, known_names, state)
+        self.assertIsNone(res2)
+        self.assertEqual(state["status_text"], "Проверка на автентичност...")
+        self.assertEqual(state["liveness_scores"], [0.65, 0.27])
+
+        # Симулираме изтичане на 2.0s прозореца за наблюдение
+        state["liveness_window_start"] = time.time() - 3.0
+
+        # Кадър 3: Пореден spoof кадър (0.38) -> медианата от [0.65, 0.27, 0.38] е 0.38 < 0.60
+        mock_detector_inst.check.return_value = (False, 0.38)
+        res3 = analyze_frame_outside_ui(self.dummy_jpg, room, known_encs, known_names, state)
+
+        self.assertIsNotNone(res3)
+        self.assertFalse(res3.get("admitted"))
+        self.assertEqual(res3.get("reason"), "spoof")
+        self.assertEqual(state["status_type"], "danger")
+        self.assertIn("Засечена симулация", state["status_text"])
+        self.assertAlmostEqual(res3.get("liveness_score"), 0.38, places=2)
+
 
 if __name__ == "__main__":
     unittest.main()
+
