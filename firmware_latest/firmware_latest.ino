@@ -26,6 +26,14 @@
 #define PCLK_GPIO_NUM  13
 
 const int PIR_PIN = 2;
+
+// --- HARDWARE ABSTRACTION LAYER (HAL) ACTUATOR PINS ---
+// В съответствие с документацията на дипломната работа (Раздел 6.1, Фиг. 6.1):
+// GPIO 12: 5V Оптоизолирано реле PC817 (комутира 12V соленоидна брава с 1N4007 диод)
+// GPIO 13: Панелен зелен светодиод за визуален допуск
+const int RELAY_PIN = 12;
+const int STATUS_LED_PIN = 13;
+
 bool streaming_active = true;
 unsigned long last_wake_time = 0;
 const unsigned long TIMEOUT_MS = 3000; 
@@ -299,6 +307,44 @@ static esp_err_t config_post_handler(httpd_req_t *req) {
   return httpd_resp_send(req, success_html.c_str(), success_html.length());
 }
 
+// --- HAL ACTUATOR REMOTE DOOR UNLOCK HANDLER ---
+static volatile unsigned long door_unlock_until = 0;
+
+static void trigger_door_unlock(unsigned long duration_ms) {
+  pinMode(RELAY_PIN, OUTPUT);
+  pinMode(STATUS_LED_PIN, OUTPUT);
+  digitalWrite(RELAY_PIN, HIGH);
+  digitalWrite(STATUS_LED_PIN, HIGH);
+  door_unlock_until = millis() + duration_ms;
+  Serial.printf("[HAL ACTUATOR] >>> ESP32 Relay TRIGGERED: GPIO %d HIGH -> Door Unlocked for %.1f seconds...\n", 
+                RELAY_PIN, (float)duration_ms / 1000.0f);
+}
+
+static esp_err_t unlock_handler(httpd_req_t *req) {
+  char buf[32];
+  size_t buf_len = httpd_req_get_url_query_len(req) + 1;
+  unsigned long duration_ms = 5000;
+
+  if (buf_len > 1 && buf_len <= sizeof(buf)) {
+    if (httpd_req_get_url_query_str(req, buf, buf_len) == ESP_OK) {
+      char param[16];
+      if (httpd_query_key_value(buf, "duration", param, sizeof(param)) == ESP_OK) {
+        float dur_sec = atof(param);
+        if (dur_sec > 0.0f && dur_sec <= 60.0f) {
+          duration_ms = (unsigned long)(dur_sec * 1000.0f);
+        }
+      }
+    }
+  }
+
+  trigger_door_unlock(duration_ms);
+
+  httpd_resp_set_type(req, "application/json");
+  httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+  const char* resp = "{\"status\":\"unlocked\",\"gpio\":12,\"duration\":5}\r\n";
+  return httpd_resp_send(req, resp, strlen(resp));
+}
+
 // --- START DUAL HTTP SERVERS (PORT 80 FOR WEB UI, PORT 81 FOR STREAM) ---
 void startCameraServer() {
   // 1. УЕБ СЪРВЪР ЗА НАСТРОЙКИ (ПОРТ 80)
@@ -353,23 +399,32 @@ void startCameraServer() {
     .user_ctx  = NULL
   };
 
-  // Стартиране на Порт 80 (Web UI)
+  httpd_uri_t unlock_uri = {
+    .uri       = "/unlock",
+    .method    = HTTP_GET,
+    .handler   = unlock_handler,
+    .user_ctx  = NULL
+  };
+
+  // Стартиране на Порт 80 (Web UI & HAL Actuator)
   if (httpd_start(&config_httpd, &config_web) == ESP_OK) {
     httpd_register_uri_handler(config_httpd, &root_uri);
     httpd_register_uri_handler(config_httpd, &config_get_uri);
     httpd_register_uri_handler(config_httpd, &config_post_uri);
     httpd_register_uri_handler(config_httpd, &stop_uri);
-    Serial.println("[HTTPD] Web Config Server started on Port 80 (http://<ip>/config)");
+    httpd_register_uri_handler(config_httpd, &unlock_uri);
+    Serial.println("[HTTPD] Web Config Server started on Port 80 (http://<ip>/config & /unlock)");
   } else {
     Serial.println("[HTTPD] ERROR: Failed to start Web Config Server on Port 80!");
   }
 
-  // Стартиране на Порт 81 (Stream + резервен /config)
+  // Стартиране на Порт 81 (Stream + резервен /config & /unlock)
   if (httpd_start(&stream_httpd, &config_stream) == ESP_OK) {
     httpd_register_uri_handler(stream_httpd, &stream_uri);
     httpd_register_uri_handler(stream_httpd, &config_get_uri);
     httpd_register_uri_handler(stream_httpd, &config_post_uri);
     httpd_register_uri_handler(stream_httpd, &stop_uri);
+    httpd_register_uri_handler(stream_httpd, &unlock_uri);
     Serial.println("[HTTPD] Video Stream Server started on Port 81 (http://<ip>:81/stream)");
   } else {
     Serial.println("[HTTPD] ERROR: Failed to start Stream Server on Port 81!");
@@ -449,6 +504,13 @@ void setup() {
   Serial.println("\n--- [BOOT] Exam Gate Starting (Robust Server Edition) ---");
 
   pinMode(PIR_PIN, INPUT_PULLDOWN);
+
+  // --- HAL ACTUATOR (RELAY & STATUS LED) INITIALIZATION ---
+  pinMode(RELAY_PIN, OUTPUT);
+  digitalWrite(RELAY_PIN, LOW);
+  pinMode(STATUS_LED_PIN, OUTPUT);
+  digitalWrite(STATUS_LED_PIN, LOW);
+  Serial.printf("[HAL ACTUATOR] Initialized GPIO %d (Relay PC817) and GPIO %d (Status LED)\n", RELAY_PIN, STATUS_LED_PIN);
 
   preferences.begin("exam-gate", false);
   String saved_room = preferences.getString("room", "1151");
@@ -596,6 +658,14 @@ void loop() {
     if (now - last_wake_time > TIMEOUT_MS) {
       streaming_active = false;
     }
+  }
+
+  // --- HAL ACTUATOR NON-BLOCKING RELOCK TIMER ---
+  if (door_unlock_until > 0 && millis() >= door_unlock_until) {
+    digitalWrite(RELAY_PIN, LOW);
+    digitalWrite(STATUS_LED_PIN, LOW);
+    door_unlock_until = 0;
+    Serial.printf("[HAL ACTUATOR] >>> ESP32 Relay RELEASED: GPIO %d LOW -> Door locked..\n", RELAY_PIN);
   }
 
   delay(10);
