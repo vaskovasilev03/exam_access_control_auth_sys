@@ -21,6 +21,7 @@ from zoneinfo import ZoneInfo
 from .database import SessionLocal
 from .models import Student, Exam, ExamRegistration, AccessLog
 from .liveness.detector import get_liveness_detector
+from .hal import actuator
 
 ACTIVE_CAMERAS = {}
 LATEST_FRAMES = {}
@@ -466,7 +467,12 @@ def process_twin_qr_admission(qr_data: str, room_number: str, db: Session = None
         # 4. Успешен допуск
         valid_registration.is_admitted = True
         valid_registration.admitted_at = current_now
+        status = "TWIN_PASSED"
         log_access_event(db, student.id, room_number, "GRANTED_TWIN_QR", deduplicate=True)
+
+        # Задействане на задвижването на вратата през HAL
+        if status in ("GRANTED", "TWIN_PASSED"):
+            actuator.unlock_door(duration=5, room_number=room_number)
 
         if state is not None:
             state["qr_scan_mode"] = False
@@ -499,6 +505,7 @@ def process_twin_qr_admission(qr_data: str, room_number: str, db: Session = None
 
         return {
             "admitted": True,
+            "status": "TWIN_PASSED",
             "student_id": str(student.id),
             "student_name": student.full_name,
             "faculty_number": student.student_id_number
@@ -1009,7 +1016,12 @@ def analyze_frame_outside_ui(jpg_bytes: bytes, room_number: str, known_face_enco
                 valid_registration.is_admitted = True
                 valid_registration.admitted_at = current_now
                 # Записваме лога в базата
-                log_access_event(db, student_found.id, room_number, "GRANTED", deduplicate=True)
+                status = "GRANTED"
+                log_access_event(db, student_found.id, room_number, status, deduplicate=True)
+
+                # Задействане на задвижването на вратата през HAL
+                if status in ("GRANTED", "TWIN_PASSED"):
+                    actuator.unlock_door(duration=5, room_number=room_number)
                 
                 # Заключваме зеления статус на екрана за 5 секунди
                 state["green_state_end_time"] = time.time() + 5.0  
@@ -1017,7 +1029,7 @@ def analyze_frame_outside_ui(jpg_bytes: bytes, room_number: str, known_face_enco
                 state["locked_fac_num"] = student_found.student_id_number
                 state["status_text"] = "ДОСТЪПЪТ РАЗРЕШЕН!"
                 state["status_type"] = "success" # Зелен цвят в UI
-                return {"admitted": True, "student_id": str(student_found.id), "student_name": student_found.full_name}
+                return {"admitted": True, "status": "GRANTED", "student_id": str(student_found.id), "student_name": student_found.full_name}
                 
             elif valid_registration and not is_time_valid:
                 if window_start and current_now < window_start:

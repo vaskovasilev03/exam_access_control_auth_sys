@@ -56,6 +56,7 @@ from .stream_esp32 import (
 )
 from .storage import init_storage, upload_photo_to_cloud, get_photo_from_cloud, BUCKET_NAME
 from .mailer import send_welcome_email, send_allocation_email
+from .hal import actuator, get_actuator
 
 from starlette.middleware.gzip import GZipMiddleware
 from fastapi.middleware.cors import CORSMiddleware
@@ -367,10 +368,16 @@ def _student_book_photo_url_for_student(student: Student) -> Optional[str]:
     return f"/admins/students/{student.id}/student-book-photo"
 
 @app.on_event("startup")
-def on_startup():
+async def on_startup():
     init_db()
     init_storage()
     seed_superadmin()
+    try:
+        loop = asyncio.get_running_loop()
+        if hasattr(actuator, "set_event_loop"):
+            actuator.set_event_loop(loop)
+    except Exception:
+        pass
 
 @app.get("/")
 def read_root():
@@ -3521,6 +3528,9 @@ def admit_student_manual(
 
     db.commit()
 
+    if status_val in ("GRANTED", "TWIN_PASSED", "GRANTED_OVERTIME"):
+        actuator.unlock_door(duration=5, room_number=room_number)
+
     emit_room_event(room_number, "roster_update", {
         "room_number": room_number,
         "student_id": str(student.id),
@@ -3570,6 +3580,36 @@ def verify_twin_qr(
     if not res.get("admitted"):
         raise HTTPException(status_code=400, detail=res.get("error", "Невалиден изпитен пропуск"))
     return res
+
+
+@app.post("/api/v1/exams/{room_number}/actuator/unlock")
+def trigger_actuator_unlock(
+    room_number: str,
+    duration: float = Query(5.0, description="Времетраене на отключването в секунди"),
+    current_user: dict = Depends(get_current_examiner)
+):
+    """
+    Hardware Abstraction Layer (HAL): Ръчно задействане на изпълнителния механизъм на вратата (отключване за N секунди).
+    """
+    actuator.unlock_door(duration=duration, room_number=room_number)
+    return {
+        "status": "unlocked",
+        "room_number": room_number,
+        "duration": duration,
+        "is_simulation": actuator.is_simulation,
+        "driver": type(actuator).__name__
+    }
+
+
+@app.get("/api/v1/exams/{room_number}/actuator/status")
+def get_actuator_door_status(
+    room_number: str,
+    current_user: dict = Depends(get_current_examiner)
+):
+    """
+    Hardware Abstraction Layer (HAL): Връща текущото състояние на бравата и релейния драйвер.
+    """
+    return actuator.get_status(room_number=room_number)
 
 
 @app.get("/api/v1/exams/{room_number}/monitor", response_class=HTMLResponse)
@@ -3656,6 +3696,8 @@ def force_register_student_to_exam(
             db.add(admin_log)
             db.commit()
 
+            actuator.unlock_door(duration=5, room_number=room_number)
+
             emit_room_event(room_number, "roster_update", {
                 "room_number": room_number,
                 "student_id": str(student.id),
@@ -3692,6 +3734,8 @@ def force_register_student_to_exam(
     )
     db.add(admin_log)
     db.commit()
+
+    actuator.unlock_door(duration=5, room_number=room_number)
 
     emit_room_event(room_number, "roster_update", {
         "room_number": room_number,

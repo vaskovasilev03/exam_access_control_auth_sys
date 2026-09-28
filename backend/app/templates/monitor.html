@@ -184,6 +184,17 @@
 
                     <!-- Camera Armed Status & Fullscreen -->
                     <div class="flex items-center gap-2">
+                        <!-- HAL Actuator Door Status Badge -->
+                        <span id="actuatorStatusBadge" title="Хардуерен статус на соленоидната брава (GPIO 12)" class="flex items-center text-xs text-slate-400 bg-slate-500/10 px-2.5 py-0.5 rounded-full font-bold uppercase border border-slate-500/30 transition-all duration-300">
+                            <svg id="actuatorLockIconClosed" class="w-3.5 h-3.5 mr-1.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                            </svg>
+                            <svg id="actuatorLockIconOpen" class="w-3.5 h-3.5 mr-1.5 text-emerald-400 hidden animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"></path>
+                            </svg>
+                            <span id="actuatorStatusText">Брава: Заключена</span>
+                        </span>
+
                         <span id="cameraStatusBadge" class="flex items-center text-xs text-red-400 bg-red-500/10 px-2.5 py-0.5 rounded-full font-bold uppercase border border-red-500/30">
                             <span id="cameraStatusDot" class="w-2 h-2 bg-red-400 rounded-full mr-1.5 animate-pulse"></span>
                             <span id="cameraStatusText">Камера Офлайн</span>
@@ -217,6 +228,14 @@
                         <span id="hudSourceTag" class="text-[11px] font-bold text-white/90 bg-black/60 backdrop-blur px-2.5 py-1 rounded-full shadow border border-white/10">
                             Терминал: Зала {{ room_number }}
                         </span>
+                    </div>
+
+                    <!-- HUD Overlay: Bottom Left (HAL Door Unlocked Indicator) -->
+                    <div id="hudDoorBadge" class="hidden absolute bottom-3 left-3 z-20 flex items-center gap-2 bg-emerald-600/90 text-white font-bold text-xs px-3 py-1.5 rounded-lg shadow-lg backdrop-blur border border-emerald-400/40 pointer-events-none transition-all">
+                        <svg class="w-4 h-4 text-white animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"></path>
+                        </svg>
+                        <span id="hudDoorText">Врата: Отключена (5s)</span>
                     </div>
 
                     <!-- MJPEG Live Stream Image (ESP32-CAM) -->
@@ -1572,9 +1591,111 @@
                 }
             });
 
+            // HAL Actuator Door Listeners
+            sseSource.addEventListener("door_unlocked", (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    updateDoorActuatorUi(true, data.duration || 5.0, data.message);
+                } catch (err) {
+                    console.warn("SSE door_unlocked parse error:", err);
+                }
+            });
+
+            sseSource.addEventListener("door_locked", (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    updateDoorActuatorUi(false, 0, data.message);
+                } catch (err) {
+                    console.warn("SSE door_locked parse error:", err);
+                }
+            });
+
+            sseSource.addEventListener("actuator_status", (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    updateDoorActuatorUi(data.status === "UNLOCKED", data.duration || data.seconds_remaining || 0, data.message);
+                } catch (err) {
+                    console.warn("SSE actuator_status parse error:", err);
+                }
+            });
+
             sseSource.onerror = (err) => {
                 console.warn("SSE връзката прекъсна, EventSource ще се свърже автоматично отново...");
             };
+        }
+
+        // HAL Actuator UI State Manager
+        let doorRelockTimer = null;
+        let doorCountdownInterval = null;
+
+        function updateDoorActuatorUi(isUnlocked, duration = 5.0, message = "") {
+            const badge = document.getElementById("actuatorStatusBadge");
+            const iconClosed = document.getElementById("actuatorLockIconClosed");
+            const iconOpen = document.getElementById("actuatorLockIconOpen");
+            const text = document.getElementById("actuatorStatusText");
+            const hudBadge = document.getElementById("hudDoorBadge");
+            const hudText = document.getElementById("hudDoorText");
+
+            if (doorRelockTimer) {
+                clearTimeout(doorRelockTimer);
+                doorRelockTimer = null;
+            }
+            if (doorCountdownInterval) {
+                clearInterval(doorCountdownInterval);
+                doorCountdownInterval = null;
+            }
+
+            if (isUnlocked) {
+                if (badge) {
+                    badge.className = "flex items-center text-xs text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full font-bold uppercase border border-emerald-500/30 transition-all duration-300 shadow-sm";
+                }
+                if (iconClosed) iconClosed.classList.add("hidden");
+                if (iconOpen) iconOpen.classList.remove("hidden");
+                
+                let remaining = Math.max(1, Math.round(duration));
+                if (text) text.innerText = `Брава: Отключена (${remaining}s)`;
+                if (hudBadge) hudBadge.classList.remove("hidden");
+                if (hudText) hudText.innerText = `Врата: Отключена (${remaining}s)`;
+
+                doorCountdownInterval = setInterval(() => {
+                    remaining -= 1;
+                    if (remaining > 0) {
+                        if (text) text.innerText = `Брава: Отключена (${remaining}s)`;
+                        if (hudText) hudText.innerText = `Врата: Отключена (${remaining}s)`;
+                    } else {
+                        clearInterval(doorCountdownInterval);
+                        doorCountdownInterval = null;
+                    }
+                }, 1000);
+
+                doorRelockTimer = setTimeout(() => {
+                    updateDoorActuatorUi(false);
+                }, (duration || 5.0) * 1000);
+            } else {
+                if (badge) {
+                    badge.className = "flex items-center text-xs text-slate-400 bg-slate-500/10 px-2.5 py-0.5 rounded-full font-bold uppercase border border-slate-500/30 transition-all duration-300";
+                }
+                if (iconClosed) iconClosed.classList.remove("hidden");
+                if (iconOpen) iconOpen.classList.add("hidden");
+                if (text) text.innerText = "Брава: Заключена";
+                if (hudBadge) hudBadge.classList.add("hidden");
+            }
+        }
+
+        async function fetchActuatorStatus() {
+            try {
+                const res = await fetch(`/api/v1/exams/${encodeURIComponent(roomNumber)}/actuator/status?token=${encodeURIComponent(token)}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.status === "UNLOCKED") {
+                        updateDoorActuatorUi(true, data.seconds_remaining || 5.0);
+                    } else {
+                        updateDoorActuatorUi(false);
+                    }
+                }
+            } catch (err) {
+                // Ignore silent network error
+            }
         }
 
 
@@ -2011,6 +2132,7 @@
 
         // Initialize Real-Time SSE Pipeline & Background Tasks
         setupSSE();
+        fetchActuatorStatus();
 
         // Initial Roster Load + relaxed background sync (every 60s)
         fetchRoster();
