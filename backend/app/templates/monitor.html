@@ -359,7 +359,7 @@
                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                         </svg>
-                        <span>Допусни извънредно в тази зала</span>
+                        <span>Ръчно допускане (Override)</span>
                     </button>
                 </div>
 
@@ -498,7 +498,7 @@
         </div>
     </div>
 
-    <!-- Emergency Admission Modal -->
+    <!-- Emergency Admission Modal (Override) -->
     <div id="emergencyModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
         <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 shadow-2xl max-w-md w-full space-y-4">
             <div class="flex items-center justify-between border-b border-[var(--border)] pb-3">
@@ -506,7 +506,7 @@
                     <div class="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-500 flex items-center justify-center">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
                     </div>
-                    <h3 class="text-base font-extrabold text-[var(--foreground)]">Извънредно допускане</h3>
+                    <h3 class="text-base font-extrabold text-[var(--foreground)]">Ръчно допускане (Override)</h3>
                 </div>
                 <button onclick="closeEmergencyAdmitModal()" class="text-[var(--muted-foreground)] hover:text-[var(--foreground)] p-1 cursor-pointer">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
@@ -514,7 +514,7 @@
             </div>
 
             <p class="text-xs text-[var(--muted-foreground)] leading-relaxed">
-                Въведете факултетния номер на студента, за да го запишете и допуснете служебно в Зала {{ room_number }} за текущия изпит.
+                При форсмажорни обстоятелства квесторът може да извърши служебно допускане в Зала {{ room_number }}. Въвеждането на текстова обосновка е задължително за одитния лог.
             </p>
 
             <div class="space-y-1">
@@ -525,6 +525,17 @@
                     placeholder="напр. 12122001" 
                     class="w-full px-4 py-2.5 text-sm font-mono bg-[var(--input)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] transition"
                 >
+            </div>
+
+            <div class="space-y-1">
+                <label class="text-xs font-bold uppercase text-[var(--muted-foreground)]">Текстова обосновка (задължително)</label>
+                <textarea 
+                    id="emergencyReasonInput" 
+                    rows="3" 
+                    placeholder="напр. Студент е с превързано лице, временен отказ на периферната камера..." 
+                    class="w-full px-4 py-2.5 text-sm bg-[var(--input)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] transition resize-none"
+                    required
+                ></textarea>
             </div>
 
             <div class="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border)]">
@@ -594,8 +605,8 @@
                 <button onclick="closeDossierModal()" class="px-4 py-2 text-xs font-bold rounded-xl bg-[var(--input)] hover:bg-[var(--accent)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition cursor-pointer">
                     Затвори
                 </button>
-                <button id="dossierAdmitActionBtn" onclick="executeDossierAdmit()" class="px-4 py-2 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/20 transition cursor-pointer">
-                    Допусни ръчно в залата
+                <button id="dossierAdmitActionBtn" onclick="openOverrideFromDossier()" class="px-4 py-2 text-xs font-bold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-600/20 transition cursor-pointer">
+                    Ръчно допускане (Override)
                 </button>
             </div>
         </div>
@@ -1768,19 +1779,36 @@
             `).join("");
         }
 
-        // Emergency Admission Modal Logic
+        // Emergency / Override Admission Modal Logic
         function openEmergencyAdmitModal() {
             const modal = document.getElementById("emergencyModal");
             const input = document.getElementById("emergencyFacNumInput");
+            const reasonInput = document.getElementById("emergencyReasonInput");
             modal.classList.remove("hidden");
             
+            if (reasonInput) reasonInput.value = "";
+
             // Ако пред камерата има засечен фак. номер, го попълваме предварително
             if (currentDetectedFacNum && currentDetectedFacNum !== "—" && currentDetectedFacNum !== "Непознат обект") {
                 input.value = currentDetectedFacNum;
+                if (reasonInput) reasonInput.focus();
             } else {
                 input.value = "";
+                input.focus();
             }
-            input.focus();
+        }
+
+        function openOverrideFromDossier() {
+            if (!selectedDossierStudent) return;
+            const facNum = selectedDossierStudent.faculty_number || selectedDossierStudent.student_id_number;
+            closeDossierModal();
+            openEmergencyAdmitModal();
+            const input = document.getElementById("emergencyFacNumInput");
+            if (input && facNum) {
+                input.value = facNum;
+            }
+            const reasonInput = document.getElementById("emergencyReasonInput");
+            if (reasonInput) reasonInput.focus();
         }
 
         function closeEmergencyAdmitModal() {
@@ -1789,7 +1817,9 @@
 
         async function submitEmergencyAdmit() {
             const input = document.getElementById("emergencyFacNumInput");
+            const reasonInput = document.getElementById("emergencyReasonInput");
             const facNum = input.value.trim();
+            const reason = reasonInput ? reasonInput.value.trim() : "";
 
             if (!facNum) {
                 showToast("Моля, въведете факултетен номер.", "warning");
@@ -1797,9 +1827,16 @@
                 return;
             }
 
+            if (!reason) {
+                showToast("Моля, въведете текстова обосновка за ръчното допускане.", "warning");
+                if (reasonInput) reasonInput.focus();
+                return;
+            }
+
             try {
                 const formData = new FormData();
                 formData.append("student_id_number", facNum);
+                formData.append("reason", reason);
 
                 const res = await fetch(`/api/v1/exams/${roomNumber}/force-register`, {
                     method: "POST",
@@ -1815,7 +1852,7 @@
                     closeEmergencyAdmitModal();
                     fetchRoster();
                 } else {
-                    showToast(data.detail || "Грешка при извънредното допускане.", "error");
+                    showToast(data.detail || "Грешка при ръчното допускане.", "error");
                 }
 
             } catch (err) {

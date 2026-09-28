@@ -9,6 +9,7 @@ __pycache__/
 .venv/
 venv/
 ENV/
+.local_libs/
 
 # Docker
 .docker/
@@ -31,6 +32,8 @@ agent_data/
 LivenessDetection.md
 GEMINI.md
 .agents/
+
+figures/
 
 .dart_tool/
 .packages

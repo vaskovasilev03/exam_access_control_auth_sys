@@ -623,7 +623,10 @@
                     (room.subject || "").toLowerCase().includes(query) ||
                     (room.lecturer || "").toLowerCase().includes(query) ||
                     (room.faculty || "").toLowerCase().includes(query) ||
-                    (room.specialty || "").toLowerCase().includes(query);
+                    (room.specialty || "").toLowerCase().includes(query) ||
+                    String(room.course || "").toLowerCase().includes(query) ||
+                    (room.group || "").toLowerCase().includes(query) ||
+                    (room.session_type || "").toLowerCase().includes(query);
 
                 if (!matchesQuery) return false;
 

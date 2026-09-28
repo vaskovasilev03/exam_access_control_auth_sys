@@ -155,7 +155,8 @@ class AccessLog(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     student_id = Column(UUID(as_uuid=True), ForeignKey("students.id", ondelete="SET NULL"), nullable=True)
     location = Column(String, nullable=False)  # Зала
-    status = Column(String, nullable=False)    # "GRANTED", "DENIED", "UNKNOWN"
+    status = Column(String, nullable=False)    # "GRANTED", "DENIED", "UNKNOWN", "GRANTED_OVERTIME"
+    details = Column(String, nullable=True, default=None)  # Текстова обосновка при форсмажорно допускане (Override)
     
     student = relationship("Student", back_populates="logs")
     created_at = Column(DateTime(timezone=True), server_default=func.now())

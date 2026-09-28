@@ -156,7 +156,7 @@ def set_room_qr_scan_mode(room_number: str, enabled: bool, duration_seconds: int
         return {"success": True, "enabled": False, "expires_in_seconds": 0}
 
 
-def log_access_event(db: Session, student_id: uuid.UUID, location: str, status: str, deduplicate: bool = True) -> AccessLog:
+def log_access_event(db: Session, student_id: uuid.UUID, location: str, status: str, deduplicate: bool = True, details: Optional[str] = None) -> AccessLog:
     """
     Записва събитие в AccessLog. За отхвърлени или повтарящи се статуси
     проверява дали вече съществува запис със същите (student_id, location, status) за текущия ден,
@@ -173,7 +173,7 @@ def log_access_event(db: Session, student_id: uuid.UUID, location: str, status: 
         if existing:
             return existing
 
-    new_log = AccessLog(student_id=student_id, location=location, status=status)
+    new_log = AccessLog(student_id=student_id, location=location, status=status, details=details)
     db.add(new_log)
     db.commit()
     return new_log
@@ -404,7 +404,7 @@ def process_twin_qr_admission(qr_data: str, room_number: str, db: Session = None
         already_in_room = db.query(AccessLog).filter(
             AccessLog.student_id == student.id,
             AccessLog.location == room_number,
-            AccessLog.status.in_(["GRANTED", "GRANTED_TWIN_QR"]),
+            AccessLog.status.in_(["GRANTED", "GRANTED_TWIN_QR", "GRANTED_OVERTIME"]),
             func.date(AccessLog.created_at) == current_now.date()
         ).first()
 
@@ -856,7 +856,7 @@ def analyze_frame_outside_ui(jpg_bytes: bytes, room_number: str, known_face_enco
             already_in_room = db.query(AccessLog).filter(
                 AccessLog.student_id == student_found.id,
                 AccessLog.location == room_number,
-                AccessLog.status == "GRANTED",
+                AccessLog.status.in_(["GRANTED", "GRANTED_TWIN_QR", "GRANTED_OVERTIME"]),
                 func.date(AccessLog.created_at) == current_now.date()
             ).first()
 

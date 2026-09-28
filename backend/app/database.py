@@ -33,6 +33,7 @@ def init_db():
         conn.execute(text("ALTER TABLE students ADD COLUMN IF NOT EXISTS duplicate_similarity_distance FLOAT"))
         conn.execute(text("ALTER TABLE exam_registrations ADD COLUMN IF NOT EXISTS is_admitted BOOLEAN NOT NULL DEFAULT FALSE"))
         conn.execute(text("ALTER TABLE exam_registrations ADD COLUMN IF NOT EXISTS admitted_at TIMESTAMP WITH TIME ZONE"))
+        conn.execute(text("ALTER TABLE access_logs ADD COLUMN IF NOT EXISTS details VARCHAR"))
         conn.commit()
 
 

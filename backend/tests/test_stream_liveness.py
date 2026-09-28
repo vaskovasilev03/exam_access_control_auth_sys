@@ -186,7 +186,7 @@ class StreamLivenessTestCase(unittest.TestCase):
         finally:
             self.db.close()
 
-    @patch("app.stream_esp32.face_recognition.face_locations")
+    @patch("app.stream_esp32.detect_face_boxes")
     @patch("app.stream_esp32.face_recognition.face_encodings")
     @patch("app.stream_esp32.get_liveness_detector")
     def test_01_stream_anti_spoof_detection_rejects_photo(self, mock_get_detector, mock_encodings, mock_locations):
@@ -222,7 +222,7 @@ class StreamLivenessTestCase(unittest.TestCase):
         self.db.refresh(self.reg_normal)
         self.assertFalse(self.reg_normal.is_admitted)
 
-    @patch("app.stream_esp32.face_recognition.face_locations")
+    @patch("app.stream_esp32.detect_face_boxes")
     @patch("app.stream_esp32.face_recognition.face_encodings")
     @patch("app.stream_esp32.get_liveness_detector")
     def test_02_stream_liveness_passed_admits_student(self, mock_get_detector, mock_encodings, mock_locations):
@@ -257,7 +257,7 @@ class StreamLivenessTestCase(unittest.TestCase):
         self.db.refresh(self.reg_normal)
         self.assertTrue(self.reg_normal.is_admitted)
 
-    @patch("app.stream_esp32.face_recognition.face_locations")
+    @patch("app.stream_esp32.detect_face_boxes")
     @patch("app.stream_esp32.face_recognition.face_encodings")
     @patch("app.stream_esp32.get_liveness_detector")
     def test_03_stream_twin_detection_requires_qr(self, mock_get_detector, mock_encodings, mock_locations):

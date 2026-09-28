@@ -2910,6 +2910,99 @@ def get_debugger_students(
     results.sort(key=lambda x: (not x["is_registered_in_room"], x["full_name"]))
     return results
 
+def get_primary_exam_for_room(
+    db: Session,
+    room_number: str,
+    apply_filters_fn = None,
+    now: Optional[datetime] = None
+) -> Optional[Exam]:
+    """
+    Избира най-релевантния изпит за дадена зала според строга приоритетна йерархия:
+    1. Днешен активен/предстоящ изпит С РЕГИСТРИРАНИ СТУДЕНТИ (от 15 мин след старта нататък)
+    2. Всеки днешен изпит С РЕГИСТРИРАНИ СТУДЕНТИ
+    3. Днешен активен/предстоящ изпит (дори без активни регистрации)
+    4. Всеки днешен изпит за тази зала
+    5. Изпит С РЕГИСТРИРАНИ СТУДЕНТИ в залата (най-близък по време до текущия момент)
+    6. Най-близък бъдещ насрочен изпит (date_time >= now)
+    7. Последен изпит за залата (краен fallback)
+    """
+    if now is None:
+        now = datetime.now(timezone)
+
+    def _apply(q):
+        return apply_filters_fn(q) if apply_filters_fn else q
+
+    has_regs = db.query(ExamRegistration.id).filter(ExamRegistration.exam_id == Exam.id).exists()
+
+    # 1. Днешен активен/предстоящ изпит с регистрации
+    exam = _apply(
+        db.query(Exam).filter(
+            Exam.room_number == room_number,
+            has_regs,
+            func.date(Exam.date_time) == now.date(),
+            Exam.date_time >= now - timedelta(minutes=15)
+        )
+    ).order_by(Exam.date_time.asc()).first()
+
+    # 2. Всеки днешен изпит с регистрации
+    if not exam:
+        exam = _apply(
+            db.query(Exam).filter(
+                Exam.room_number == room_number,
+                has_regs,
+                func.date(Exam.date_time) == now.date()
+            )
+        ).order_by(Exam.date_time.desc()).first()
+
+    # 3. Днешен активен/предстоящ изпит (общ)
+    if not exam:
+        exam = _apply(
+            db.query(Exam).filter(
+                Exam.room_number == room_number,
+                func.date(Exam.date_time) == now.date(),
+                Exam.date_time >= now - timedelta(minutes=15)
+            )
+        ).order_by(Exam.date_time.asc()).first()
+
+    # 4. Всеки днешен изпит (общ)
+    if not exam:
+        exam = _apply(
+            db.query(Exam).filter(
+                Exam.room_number == room_number,
+                func.date(Exam.date_time) == now.date()
+            )
+        ).order_by(Exam.date_time.desc()).first()
+
+    # 5. Изпит с регистрирани студенти в залата (най-близък по време до сега)
+    if not exam:
+        exam = _apply(
+            db.query(Exam).filter(
+                Exam.room_number == room_number,
+                has_regs
+            )
+        ).order_by(
+            func.abs(func.extract('epoch', Exam.date_time) - func.extract('epoch', now)).asc()
+        ).first()
+
+    # 6. Бъдещ насрочен изпит за залата
+    if not exam:
+        exam = _apply(
+            db.query(Exam).filter(
+                Exam.room_number == room_number,
+                Exam.date_time >= now
+            )
+        ).order_by(Exam.date_time.asc()).first()
+
+    # 7. Последен изпит за залата като резервен вариант
+    if not exam:
+        exam = _apply(
+            db.query(Exam).filter(
+                Exam.room_number == room_number
+            )
+        ).order_by(Exam.date_time.desc()).first()
+
+    return exam
+
 @app.get("/api/v1/examiner/rooms-overview")
 def get_examiner_rooms_overview(
     session_type: Optional[str] = None,
@@ -2979,37 +3072,12 @@ def get_examiner_rooms_overview(
     total_cameras_online = 0
 
     for room_num in sorted_rooms:
-        # Търсим днешен активен или предстоящ изпит за тази зала (до 15 мин след старта му)
-        primary_exam = apply_academic_filters(
-            db.query(Exam).filter(
-                Exam.room_number == room_num,
-                func.date(Exam.date_time) == now.date(),
-                Exam.date_time >= now - timedelta(minutes=15)
-            )
-        ).order_by(Exam.date_time.asc()).first()
-
-        if not primary_exam:
-            primary_exam = apply_academic_filters(
-                db.query(Exam).filter(
-                    Exam.room_number == room_num,
-                    func.date(Exam.date_time) == now.date()
-                )
-            ).order_by(Exam.date_time.desc()).first()
-
-        if not primary_exam:
-            primary_exam = apply_academic_filters(
-                db.query(Exam).filter(
-                    Exam.room_number == room_num,
-                    Exam.date_time >= now
-                )
-            ).order_by(Exam.date_time.asc()).first()
-
-        if not primary_exam:
-            primary_exam = apply_academic_filters(
-                db.query(Exam).filter(
-                    Exam.room_number == room_num
-                )
-            ).order_by(Exam.date_time.desc()).first()
+        primary_exam = get_primary_exam_for_room(
+            db=db,
+            room_number=room_num,
+            apply_filters_fn=apply_academic_filters,
+            now=now
+        )
 
         if has_academic_filter and not primary_exam:
             continue
@@ -3229,28 +3297,11 @@ def get_exam_room_roster(
     assigned_info = ACTIVE_EXAMINER_ASSIGNMENTS.get(room_number)
 
     now = datetime.now(timezone)
-    exam = db.query(Exam).filter(
-        Exam.room_number == room_number,
-        func.date(Exam.date_time) == now.date(),
-        Exam.date_time >= now - timedelta(minutes=15)
-    ).order_by(Exam.date_time.asc()).first()
-
-    if not exam:
-        exam = db.query(Exam).filter(
-            Exam.room_number == room_number,
-            func.date(Exam.date_time) == now.date()
-        ).order_by(Exam.date_time.desc()).first()
-
-    if not exam:
-        exam = db.query(Exam).filter(
-            Exam.room_number == room_number,
-            Exam.date_time >= now
-        ).order_by(Exam.date_time.asc()).first()
-
-    if not exam:
-        exam = db.query(Exam).filter(
-            Exam.room_number == room_number
-        ).order_by(Exam.date_time.desc()).first()
+    exam = get_primary_exam_for_room(
+        db=db,
+        room_number=room_number,
+        now=now
+    )
 
     if not exam:
         return {
@@ -3389,12 +3440,13 @@ def get_exam_room_roster(
 def admit_student_manual(
     room_number: str,
     student_id: str,
+    reason: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_examiner)
 ):
     """
     Ръчно допускане на студент от квестора (ин-ап модал или чип).
-    Маркира is_admitted = True и записва GRANTED събитие в AccessLog.
+    Маркира is_admitted = True и записва GRANTED или GRANTED_OVERTIME събитие в AccessLog.
     """
     # Намираме студента по UUID или фак. номер
     student = None
@@ -3420,16 +3472,10 @@ def admit_student_manual(
         reg.admitted_at = now_ts
     else:
         # 2. Ако няма, намираме изпита за създаване на нова регистрация
-        now = datetime.now()
-        exam = db.query(Exam).filter(
-            Exam.room_number == room_number,
-            func.date(Exam.date_time) == now.date()
-        ).first()
-
-        if not exam:
-            exam = db.query(Exam).filter(
-                Exam.room_number == room_number
-            ).order_by(Exam.date_time.desc()).first()
+        exam = get_primary_exam_for_room(
+            db=db,
+            room_number=room_number
+        )
 
         if not exam:
             raise HTTPException(status_code=404, detail=f"Няма активен изпит в зала {room_number}.")
@@ -3442,12 +3488,37 @@ def admit_student_manual(
         )
         db.add(reg)
 
+    justification = reason.strip() if reason and reason.strip() else None
+    status_val = "GRANTED_OVERTIME" if justification else "GRANTED"
+
     log_entry = AccessLog(
         student_id=student.id,
         location=room_number,
-        status="GRANTED"
+        status=status_val,
+        details=justification
     )
     db.add(log_entry)
+
+    if justification:
+        admin_uuid = None
+        try:
+            user_sub = current_user.get("sub")
+            if user_sub:
+                cand_uuid = uuid.UUID(user_sub)
+                if db.query(Admin).filter(Admin.id == cand_uuid).first():
+                    admin_uuid = cand_uuid
+        except Exception:
+            admin_uuid = None
+
+        admin_log = AdminLog(
+            admin_id=admin_uuid,
+            action_type="EXAMINER_OVERRIDE_ADMIT",
+            details=f"Ръчно допускане (Override) на студент {student.full_name} (фак. № {student.student_id_number}) в Зала {room_number}. Обосновка: {justification}",
+            specialty=student.specialty,
+            group=str(student.group) if student.group else None
+        )
+        db.add(admin_log)
+
     db.commit()
 
     emit_room_event(room_number, "roster_update", {
@@ -3520,29 +3591,41 @@ def get_monitor_page(room_number: str, request: fastapi.Request, response: Respo
 def force_register_student_to_exam(
     room_number: str, 
     student_id_number: str = Form(...), 
+    reason: Optional[str] = Form(None),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_examiner) # Позволява Bearer хедър, токен или куки
 ):
-    """ Академичен модул: Принудително записване и допускане на студент за изпит в текущата зала """
+    """ Академичен модул: Принудително / форсмажорно (Override) записване и допускане на студент за изпит в текущата зала """
     # 1. Търсим студента
     student = db.query(Student).filter(Student.student_id_number == student_id_number.strip()).first()
     if not student:
         raise HTTPException(status_code=404, detail="Студент с такъв факултетен номер не съществува.")
 
-    # 2. Намираме изпита за тази зала, провеждащ се ДНЕС или най-скоро планирания
-    current_date = datetime.now().date()
-    current_exam = db.query(Exam).filter(
-        Exam.room_number == room_number,
-        func.date(Exam.date_time) == current_date
-    ).first()
-
-    if not current_exam:
-        current_exam = db.query(Exam).filter(Exam.room_number == room_number).order_by(Exam.date_time.desc()).first()
+    # 2. Намираме изпита за тази зала според йерархията на релевантност
+    current_exam = get_primary_exam_for_room(
+        db=db,
+        room_number=room_number
+    )
 
     if not current_exam:
         raise HTTPException(status_code=404, detail=f"Няма планиран изпит в зала {room_number}.")
 
     now_ts = datetime.now().astimezone()
+    justification = reason.strip() if reason and reason.strip() else None
+
+    # Опит за извличане на ID на админ/квестор за одитния лог
+    admin_uuid = None
+    try:
+        user_sub = current_user.get("sub")
+        if user_sub:
+            cand_uuid = uuid.UUID(user_sub)
+            if db.query(Admin).filter(Admin.id == cand_uuid).first():
+                admin_uuid = cand_uuid
+    except Exception:
+        admin_uuid = None
+
+    override_msg = justification or "Ръчно служебно допускане (Override)"
+    audit_desc = f"Ръчно допускане (Override) на студент {student.full_name} (фак. № {student.student_id_number}) в Зала {room_number}. Обосновка: {override_msg}"
 
     # 3. Проверяваме дали вече няма регистрация
     already_registered = db.query(ExamRegistration).filter(
@@ -3554,9 +3637,25 @@ def force_register_student_to_exam(
         if not already_registered.is_admitted:
             already_registered.is_admitted = True
             already_registered.admitted_at = now_ts
-            log_entry = AccessLog(student_id=student.id, location=room_number, status="GRANTED")
+            log_entry = AccessLog(
+                student_id=student.id, 
+                location=room_number, 
+                status="GRANTED_OVERTIME",
+                details=justification
+            )
             db.add(log_entry)
+
+            # Перманентен запис в admin_logs за одит
+            admin_log = AdminLog(
+                admin_id=admin_uuid,
+                action_type="EXAMINER_OVERRIDE_ADMIT",
+                details=audit_desc,
+                specialty=student.specialty,
+                group=str(student.group) if student.group else None
+            )
+            db.add(admin_log)
             db.commit()
+
             emit_room_event(room_number, "roster_update", {
                 "room_number": room_number,
                 "student_id": str(student.id),
@@ -3564,7 +3663,7 @@ def force_register_student_to_exam(
                 "faculty_number": student.student_id_number,
                 "action": "force_register"
             })
-            return {"status": "success", "message": f"Студентът {student.full_name} вече имаше регистрация и беше допуснат в зала {room_number}."}
+            return {"status": "success", "message": f"Студентът {student.full_name} беше допуснат в зала {room_number} чрез ръчно допускане (Override)."}
         return {"status": "already_done", "message": "Студентът вече има валидна регистрация и е допуснат."}
 
     # 4. Създаваме принудителна нова регистрация с допуск
@@ -3575,8 +3674,23 @@ def force_register_student_to_exam(
         admitted_at=now_ts
     )
     db.add(new_registration)
-    log_entry = AccessLog(student_id=student.id, location=room_number, status="GRANTED")
+    log_entry = AccessLog(
+        student_id=student.id, 
+        location=room_number, 
+        status="GRANTED_OVERTIME",
+        details=justification
+    )
     db.add(log_entry)
+
+    # Перманентен запис в admin_logs за одит
+    admin_log = AdminLog(
+        admin_id=admin_uuid,
+        action_type="EXAMINER_OVERRIDE_ADMIT",
+        details=audit_desc,
+        specialty=student.specialty,
+        group=str(student.group) if student.group else None
+    )
+    db.add(admin_log)
     db.commit()
 
     emit_room_event(room_number, "roster_update", {
@@ -3587,8 +3701,8 @@ def force_register_student_to_exam(
         "action": "force_register"
     })
 
-    print(f"[Спешен Допуск] Квесторът записа студент {student.full_name} за изпит в зала {room_number}")
-    return {"status": "success", "message": f"Успешно извънредно записване на {student.full_name} за дисциплина: {current_exam.subject}."}
+    print(f"[Ръчен Допуск / Override] Квесторът записа студент {student.full_name} за изпит в зала {room_number}. {audit_desc}")
+    return {"status": "success", "message": f"Успешно ръчно допускане (Override) на {student.full_name} за дисциплина: {current_exam.subject}."}
 
 def optimize_image_for_storage(image_bytes: bytes, max_dim: int = 800, quality: int = 85) -> bytes:
     """

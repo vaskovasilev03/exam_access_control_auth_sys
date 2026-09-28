@@ -11,7 +11,7 @@ os.environ["SUPERADMIN_NAME"] = "Super Administrator"
 
 from app.main import app, ACTIVE_EXAMINER_ASSIGNMENTS
 from app.database import get_db, SessionLocal, init_db
-from app.models import Admin, Student, Examiner, Exam, ExamRegistration, AccessLog, SessionType
+from app.models import Admin, Student, Examiner, Exam, ExamRegistration, AccessLog, AdminLog, SessionType
 from app.seed import seed_superadmin
 from app.auth import get_password_hash, create_access_token
 
@@ -391,7 +391,10 @@ class ExaminerMonitoringTestCase(unittest.TestCase):
 
         res = self.client.post(
             "/api/v1/exams/TEST_ROOM_2/force-register",
-            data={"student_id_number": "TEST_EX_05"},
+            data={
+                "student_id_number": "TEST_EX_05",
+                "reason": "Превързано лице след стоматологична травма"
+            },
             headers={"Authorization": f"Bearer {self.token_ex1}"}
         )
         self.assertEqual(res.status_code, 200)
@@ -402,6 +405,23 @@ class ExaminerMonitoringTestCase(unittest.TestCase):
         self.assertIsNotNone(reg)
         self.assertTrue(reg.is_admitted)
         self.assertIsNotNone(reg.admitted_at)
+
+        # Verify AccessLog has GRANTED_OVERTIME and details
+        access_log = self.db.query(AccessLog).filter(
+            AccessLog.student_id == st.id, 
+            AccessLog.location == "TEST_ROOM_2"
+        ).first()
+        self.assertIsNotNone(access_log)
+        self.assertEqual(access_log.status, "GRANTED_OVERTIME")
+        self.assertEqual(access_log.details, "Превързано лице след стоматологична травма")
+
+        # Verify permanent AdminLog audit record
+        audit_log = self.db.query(AdminLog).filter(
+            AdminLog.action_type == "EXAMINER_OVERRIDE_ADMIT"
+        ).order_by(AdminLog.created_at.desc()).first()
+        self.assertIsNotNone(audit_log)
+        self.assertIn("TEST_EX_05", audit_log.details)
+        self.assertIn("Превързано лице след стоматологична травма", audit_log.details)
 
     def test_09_examiner_monitoring_unauthorized_access(self):
         """ Verify unauthenticated users and students are denied access """
